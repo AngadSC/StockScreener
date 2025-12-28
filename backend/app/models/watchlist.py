@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List
-from app.models.stock import StockDetail
+from .stock import StockDetail
 
 class WatchlistItemBase(BaseModel):
     ticker: str

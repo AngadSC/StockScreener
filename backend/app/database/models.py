@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, Float, BigInteger, DateTime, ForeignKey, JSON, Date, Boolean,  UniqueConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database.connection import Base
 
@@ -92,7 +91,7 @@ class StockPrice(Base):
     # Relationships
     stock = relationship("Stock", back_populates="prices")
 
-class WatchList(Base) :
+class Watchlist(Base) :
     __tablename__ = "watchlists"
     __table_args__ = (
         UniqueConstraint('user_id', 'ticker', name='unique_user_stock'),

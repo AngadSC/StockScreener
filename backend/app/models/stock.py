@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, date
 
 class StockBase(BaseModel):
@@ -54,10 +54,10 @@ class StockDetail(StockBase):
     fifty_two_week_low: Optional[float] = None
     
     # Metadata
-    last_updated: datetime
+    last_updated: Optional[datetime] = None
     
     class Config:
-        from_attributes = True  # Allows SQLAlchemy model → Pydantic conversion
+        from_attributes = True
 
 class StockFilter(BaseModel):
     # Valuation filters
@@ -85,8 +85,8 @@ class StockFilter(BaseModel):
     limit: int = Field(default=50, ge=1, le=500)
     
     # Sorting
-    sort_by: Optional[str] = Field(default="market_cap", pattern="^(market_cap|pe_ratio|dividend_yield|current_price|ticker)$")
-    sort_order: Optional[str] = Field(default="desc", pattern="^(asc|desc)$")
+    sort_by: str = Field(default="market_cap")
+    sort_order: str = Field(default="desc", pattern="^(asc|desc)$")
 
 class StockPriceHistory(BaseModel):
     date: date
@@ -101,3 +101,22 @@ class StockPriceHistory(BaseModel):
 
 class StockWithPrices(StockDetail):
     prices: List[StockPriceHistory] = []
+
+# Response models for new endpoints
+class BacktestDataResponse(BaseModel):
+    ticker: str
+    source: str  # "cache" or "yfinance"
+    start_date: str
+    end_date: str
+    data_points: int
+    indicators_included: bool
+    columns: List[str]
+    data: List[Dict[str, Any]]
+
+class MLFeaturesResponse(BaseModel):
+    ticker: str
+    source: str
+    data_points: int
+    features: List[str]
+    description: Dict[str, int]
+    data: List[Dict[str, Any]]

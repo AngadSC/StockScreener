@@ -27,6 +27,17 @@ class Settings(BaseSettings):
     STOCK_UPDATE_HOUR: int = 21
     STOCK_UPDATE_BATCH_SIZE: int = 1000
     STOCK_CACHE_TTL: int = 86400
+
+    # rate limiting
+    YFINANCE_REQUESTS_PER_MINUTE: int = 30
+    YFINANCE_MAX_RETRIES: int = 3
+    YFINANCE_RETRY_DELAY: int = 5
+
+    #Cache TTLS
+    SCREENER_CACHE_TTL: int = 3600  # 1 hour
+    PRICE_HISTORY_CACHE_TTL: int = 7200  # 2 hours
+    BACKTEST_CACHE_TTL: int = 7200  # 2 hours
+    
     
     # Environment
     ENVIRONMENT: str = "development"

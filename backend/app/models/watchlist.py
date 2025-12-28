@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List
-from .stock import StockDetail
+from app.models.stock import StockDetail
 
 class WatchlistItemBase(BaseModel):
     ticker: str
@@ -12,7 +12,7 @@ class WatchlistItemCreate(WatchlistItemBase):
 class WatchlistItemResponse(WatchlistItemBase):
     id: int
     added_at: datetime
-    stock: StockDetail  # Nested stock data
+    stock: StockDetail
     
     class Config:
         from_attributes = True

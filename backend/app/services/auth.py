@@ -10,17 +10,18 @@ from app.database.connection import get_db
 from app.database.models import User
 from app.models.user import TokenData
 
-#password hashing 
-pwd_context = CryptContext(schemes = ["bcrypt"] , deprecated = "auto")
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-#OAuth2 token 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl = f"{settings.API_V1_PREFIX}/auth/login")
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_PREFIX}/auth/login")
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Compare plain password with hashed password"""
+    """Verify password against hash"""
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """Hash a plain password"""
+    """Hash a password"""
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -35,7 +36,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
-    """Extract user from JWT token (dependency for protected routes)"""
+    """Get current user from JWT token"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

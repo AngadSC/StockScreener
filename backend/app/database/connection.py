@@ -8,6 +8,7 @@ engine = create_engine (
     pool_pre_ping=True,      # Check connections before using
     pool_size=10,            # Max connections in pool
     max_overflow=20          # Extra connections when pool full
+    echo=False
 
 )
 

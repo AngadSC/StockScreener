@@ -6,7 +6,7 @@ class UserBase(BaseModel):
     email: EmailStr  # Auto-validates email format
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)  # Minimum 8 characters
+    password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
 
 class UserLogin(BaseModel):
     email: EmailStr

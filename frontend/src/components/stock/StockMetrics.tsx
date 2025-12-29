@@ -1,12 +1,18 @@
 'use client';
 
 import { Stock } from '@/types/stock';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency, formatMarketCap, formatNumber, formatPercent } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatCurrency, formatMarketCap, formatNumber } from '@/lib/utils';
 
 interface StockMetricsProps {
   stock: Stock;
 }
+
+// ✅ Helper function to safely format percentages
+const safeFormatPercent = (value: number | null | undefined): string => {
+  if (value === null || value === undefined) return 'N/A';
+  return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
+};
 
 export default function StockMetrics({ stock }: StockMetricsProps) {
   const metrics = [
@@ -25,17 +31,17 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
       category: 'Profitability',
       items: [
         { label: 'EPS', value: stock.eps ? formatCurrency(stock.eps) : 'N/A' },
-        { label: 'Profit Margin', value: stock.profit_margin ? formatPercent(stock.profit_margin * 100) : 'N/A' },
-        { label: 'Operating Margin', value: stock.operating_margin ? formatPercent(stock.operating_margin * 100) : 'N/A' },
-        { label: 'ROE', value: stock.roe ? formatPercent(stock.roe * 100) : 'N/A' },
-        { label: 'ROA', value: stock.roa ? formatPercent(stock.roa * 100) : 'N/A' },
+        { label: 'Profit Margin', value: safeFormatPercent(stock.profit_margin) },
+        { label: 'Operating Margin', value: safeFormatPercent(stock.operating_margin) },
+        { label: 'ROE', value: safeFormatPercent(stock.roe) },
+        { label: 'ROA', value: safeFormatPercent(stock.roa) },
       ],
     },
     {
       category: 'Growth',
       items: [
-        { label: 'Revenue Growth', value: stock.revenue_growth ? formatPercent(stock.revenue_growth * 100) : 'N/A' },
-        { label: 'Earnings Growth', value: stock.earnings_growth ? formatPercent(stock.earnings_growth * 100) : 'N/A' },
+        { label: 'Revenue Growth', value: safeFormatPercent(stock.revenue_growth) },
+        { label: 'Earnings Growth', value: safeFormatPercent(stock.earnings_growth) },
       ],
     },
     {
@@ -49,9 +55,9 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
     {
       category: 'Dividends',
       items: [
-        { label: 'Dividend Yield', value: stock.dividend_yield ? formatPercent(stock.dividend_yield * 100) : 'N/A' },
+        { label: 'Dividend Yield', value: safeFormatPercent(stock.dividend_yield) },
         { label: 'Dividend Rate', value: stock.dividend_rate ? formatCurrency(stock.dividend_rate) : 'N/A' },
-        { label: 'Payout Ratio', value: stock.payout_ratio ? formatPercent(stock.payout_ratio * 100) : 'N/A' },
+        { label: 'Payout Ratio', value: safeFormatPercent(stock.payout_ratio) },
       ],
     },
     {

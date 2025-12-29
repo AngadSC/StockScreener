@@ -62,7 +62,11 @@ export default function StockChart({ data, ticker }: StockChartProps) {
               tickFormatter={(value) => `$${value.toFixed(2)}`}
             />
             <Tooltip 
-              formatter={(value: number) => [`$${value.toFixed(2)}`, 'Price']}
+              formatter={(value: number | undefined) => {
+
+                if (value === undefined) return ['N/A', 'Price'];
+                return [`$${value.toFixed(2)}`, 'Price'];
+              }}
               labelStyle={{ color: '#000' }}
             />
             <Legend />

@@ -1,34 +1,40 @@
 # FastAPI & Server
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-python-multipart==0.0.6
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.18
 
 # Database
-sqlalchemy==2.0.23
-alembic==1.12.1
-psycopg2-binary==2.9.9
+sqlalchemy==2.0.36
+alembic==1.14.0
+
+# PostgreSQL driver (psycopg3 has better Python 3.13 support)
+psycopg[binary]==3.2.3
+# Alternative if above doesn't work: psycopg2-binary==2.9.10
 
 # Caching
-redis==5.0.1
+redis==5.2.0
 
 # Auth & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-dotenv==1.0.0
+python-dotenv==1.0.1
 
 # Data & API
-yfinance==0.2.33
-pandas==2.1.3
-numpy==1.26.2
-httpx==0.25.2
+yfinance==0.2.50
+pandas==2.2.3
+numpy==2.2.1
+httpx==0.28.1
 
 # Job Scheduling
 apscheduler==3.10.4
 
 # Validation
-pydantic==2.5.2
-pydantic-settings==2.1.0
+pydantic==2.10.3
+pydantic-settings==2.6.1
 
-# Development
-pytest==7.4.3
-pytest-asyncio==0.21.1
+# Email validation
+email-validator==2.2.0
+
+# Development & Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0

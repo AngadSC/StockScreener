@@ -7,10 +7,9 @@ engine = create_engine (
     settings.DATABASE_URL,
     pool_pre_ping=True,      # Check connections before using
     pool_size=10,            # Max connections in pool
-    max_overflow=20          # Extra connections when pool full
+    max_overflow=20,       # Extra connections when pool full
     echo=False
-
-)
+) 
 
 #session facotry 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

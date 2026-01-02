@@ -63,40 +63,49 @@ def get_all_us_tickers() -> List[str]:
         nasdaq_url = "ftp://ftp.nasdaqtrader.com/symboldirectory/nasdaqlisted.txt"
         nasdaq_df = pd.read_csv(nasdaq_url, sep="|")
         nasdaq_df = nasdaq_df[nasdaq_df['Test Issue'] == 'N']  # Exclude test issues
-        nasdaq_tickers = nasdaq_df['Symbol'].tolist()
+        nasdaq_tickers = nasdaq_df['Symbol'].astype(str).tolist()  # Convert to string first
         
         # Other exchanges (NYSE, AMEX, etc.)
         other_url = "ftp://ftp.nasdaqtrader.com/symboldirectory/otherlisted.txt"
         other_df = pd.read_csv(other_url, sep="|")
         other_df = other_df[other_df['Test Issue'] == 'N']
-        other_tickers = other_df['ACT Symbol'].tolist()
+        other_tickers = other_df['ACT Symbol'].astype(str).tolist()  # Convert to string first
         
         # Combine
         all_tickers = nasdaq_tickers + other_tickers
         
-        # Clean
-        all_tickers = [t.strip() for t in all_tickers if t and t.strip()]
+        # Clean - now safe to strip since they're all strings
+        all_tickers = [str(t).strip() for t in all_tickers if t and str(t).strip() and str(t) != 'nan']
         all_tickers = [t for t in all_tickers if not t.endswith('.TEST')]
         all_tickers = list(set(all_tickers))  # Remove duplicates
         
-        print(f"✓ Fetched {len(all_tickers)} US stock tickers")
+        print(f"✓ Fetched {len(all_tickers)} US stock tickers from NASDAQ")
         return all_tickers
         
     except Exception as e:
         print(f"✗ Error fetching US tickers: {e}")
-        print("Falling back to S&P 500...")
-        return get_sp500_tickers()
+        return []
 
 
 def get_sp500_tickers() -> List[str]:
-    """Fetch S&P 500 ticker list (fallback)"""
+    """
+    Fetch S&P 500 ticker list from Wikipedia (with User-Agent header)
+    Fallback option if NASDAQ fails
+    """
     try:
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-        tables = pd.read_html(url)
+        
+        # Add headers to avoid 403 error
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        tables = pd.read_html(url, storage_options=headers)
         df = tables[0]
-        tickers = df['Symbol'].tolist()
-        tickers = [t.replace('.', '-') for t in tickers]
-        print(f"✓ Fetched {len(tickers)} S&P 500 tickers")
+        tickers = df['Symbol'].astype(str).tolist()
+        tickers = [t.replace('.', '-') for t in tickers if str(t) != 'nan']
+        
+        print(f"✓ Fetched {len(tickers)} S&P 500 tickers from Wikipedia")
         return tickers
     except Exception as e:
         print(f"✗ Error fetching S&P 500 list: {e}")

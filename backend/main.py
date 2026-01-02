@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     print("👋 Shutting down Stock Screener API...")
 
 app = FastAPI(
-    title = settings.STOCKSCREENER,
+    title = settings.PROJECT_NAME,
     description="Stock Screener & Backtesting API - Filter stocks by fundamentals, backtest strategies, and train ML models",
     version="1.0.0",
     lifespan=lifespan,

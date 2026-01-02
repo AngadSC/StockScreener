@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     STOCK_CACHE_TTL: int = 86400
 
     # rate limiting
-    YFINANCE_REQUESTS_PER_MINUTE: int = 30
+    YFINANCE_REQUESTS_PER_MINUTE: int = 15
     YFINANCE_MAX_RETRIES: int = 3
     YFINANCE_RETRY_DELAY: int = 5
 

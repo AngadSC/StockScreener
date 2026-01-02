@@ -1,36 +1,34 @@
 """
-Quick test: Load first 500 US stocks from NASDAQ (~500 stocks, ~17 minutes)
-Uses NASDAQ FTP instead of Wikipedia
+Optimized Script: Load actual S&P 500 stocks into the database.
+Uses Wikipedia source for accurate S&P 500 tickers and follows rate limits.
 """
 
 from app.database.connection import SessionLocal
 from app.database.models import Stock
-from app.utils.data_fetcher import get_all_us_tickers, fetch_stock_fundamentals
+from app.utils.data_fetcher import get_sp500_tickers, fetch_stock_fundamentals
 from datetime import datetime
+import time
 
 def load_sp500():
-    """Load first 500 US stocks from NASDAQ into database"""
+    """Load actual S&P 500 stocks from Wikipedia into database"""
     db = SessionLocal()
     
     try:
         print("\n" + "="*60)
-        print("📊 LOADING TOP 500 US STOCKS (FROM NASDAQ)")
+        print("📊 LOADING S&P 500 CONSTITUENTS")
         print("="*60 + "\n")
         
-        # Get all US tickers from NASDAQ FTP
-        print("Fetching ticker list from NASDAQ FTP...")
-        all_tickers = get_all_us_tickers()
+        # FIX: Get the actual S&P 500 list instead of the first 500 NASDAQ tickers
+        print("Fetching S&P 500 ticker list from Wikipedia...")
+        tickers = get_sp500_tickers()
         
-        if not all_tickers:
-            print("❌ Failed to fetch tickers from NASDAQ")
+        if not tickers:
+            print("❌ Failed to fetch S&P 500 tickers")
             return
         
-        # Take first 500
-        tickers = all_tickers[:500]
         total = len(tickers)
-        
-        print(f"✓ Fetched {len(all_tickers)} total US tickers")
-        print(f"📋 Processing first {total} stocks...\n")
+        print(f"✓ Found {total} S&P 500 tickers")
+        print(f"📋 Processing stocks...\n")
         
         # Track statistics
         stats = {
@@ -44,7 +42,7 @@ def load_sp500():
         
         for i, ticker in enumerate(tickers, 1):
             try:
-                # Fetch fundamentals (automatically rate limited)
+                # Fetch fundamentals (automatically rate limited via decorator)
                 fundamentals = fetch_stock_fundamentals(ticker, quiet=True)
                 
                 if not fundamentals:
@@ -69,7 +67,7 @@ def load_sp500():
                     stats['created'] += 1
                     print(f"✓ [{i}/{total}] {ticker}: Created - {fundamentals.get('name', 'N/A')}")
                 
-                # Commit every 10 stocks
+                # Commit in batches for performance and safety
                 if i % 10 == 0:
                     db.commit()
                     elapsed = (datetime.now() - start_time).seconds / 60
@@ -78,13 +76,16 @@ def load_sp500():
                     
                     print(f"\n📊 Progress: {i}/{total} ({i/total*100:.1f}%)")
                     print(f"   ✓ Created: {stats['created']} | Updated: {stats['updated']}")
-                    print(f"   ✗ Failed: {stats['failed']} | No data: {stats['no_data']}")
                     print(f"   ⏱  Rate: {rate:.1f}/min | ETA: {eta:.0f} min\n")
                     
             except Exception as e:
                 print(f"✗ [{i}/{total}] {ticker}: Error - {e}")
                 stats['failed'] += 1
                 db.rollback()
+                # Stop if we hit a persistent 429 during the loop
+                if "429" in str(e):
+                    print("🛑 Rate limit exceeded. Stopping to avoid IP ban.")
+                    break
                 continue
         
         # Final commit
@@ -93,22 +94,17 @@ def load_sp500():
         # Final report
         end_time = datetime.now()
         duration = (end_time - start_time).seconds / 60
-        success_rate = ((stats['created'] + stats['updated']) / total * 100) if total > 0 else 0
+        success_rate = ((stats['created'] + stats['updated']) / i * 100) if i > 0 else 0
         
         print("\n" + "="*60)
-        print("✅ STOCK LOADING COMPLETE")
+        print("✅ S&P 500 LOADING COMPLETE")
         print("="*60)
         print(f"   Duration: {duration:.1f} minutes")
         print(f"   Created: {stats['created']}")
         print(f"   Updated: {stats['updated']}")
         print(f"   Failed: {stats['failed']}")
-        print(f"   No data: {stats['no_data']}")
         print(f"   Success rate: {success_rate:.1f}%")
         print("="*60 + "\n")
-        
-        # Show final count
-        final_count = db.query(Stock).count()
-        print(f"📊 Total stocks in database: {final_count}\n")
         
     except Exception as e:
         print(f"\n❌ CRITICAL ERROR: {e}")
@@ -118,6 +114,7 @@ def load_sp500():
         db.close()
 
 if __name__ == "__main__":
-    print("\n🚀 Starting stock loader (NASDAQ source)...\n")
+    print("\n🚀 Starting stock loader...")
+    # Add a small initial delay if you just ran into a 429 error
     load_sp500()
     print("✨ Done!\n")

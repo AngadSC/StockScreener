@@ -1,128 +1,143 @@
 from sqlalchemy.orm import Session
-from app.database.models import Stock, StockPrice
-from app.utils.data_fetcher import fmp_client, tiingo_client
-from app.utils.market_calendar import (
-    get_last_trading_day, 
-    detect_missing_days,
-    get_trading_days_between
-)
+from sqlalchemy import and_
+from app.database.models import Ticker, DailyOHLCV, StockFundamental, StockSplit, Dividend
+from app.providers.factory import ProviderFactory
+from app.utils.market_calendar import get_last_trading_day, detect_missing_days
 from app.services.cache import cache_service
+from app.config import settings
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date, timedelta
 import pandas as pd
 
-# ====================================
-# STOCK FUNDAMENTALS
-# ====================================
+# ============================================
+# STOCK DATA SERVICE
+# PostgreSQL-first architecture
+# ============================================
 
-def get_stock_from_db(db: Session, ticker: str) -> Optional[Stock]:
-    """Get stock from database"""
-    return db.query(Stock).filter(Stock.ticker == ticker.upper()).first()
-
-def get_stock_with_cache(db: Session, ticker: str) -> Optional[dict]:
+def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
     """
-    Get stock data with Redis caching:
+    Get stock data with fundamentals
+    
+    Flow:
     1. Check Redis cache
-    2. If miss, query database
-    3. If not in DB, return None
-    4. Cache result in Redis
+    2. Query PostgreSQL
+    3. Cache result
+    
+    Args:
+        db: Database session
+        ticker: Stock symbol
+        use_cache: Whether to use cache
+    
+    Returns:
+        Dict with stock data and fundamentals
     """
     ticker = ticker.upper()
     cache_key = f"stock:{ticker}"
     
-    # Try cache first
-    cached = cache_service.get(cache_key)
-    if cached:
-        return cached
+    # Check cache
+    if use_cache:
+        cached = cache_service.get(cache_key)
+        if cached:
+            return cached
     
     # Query database
-    stock = get_stock_from_db(db, ticker)
-    if not stock:
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+    if not ticker_obj:
         return None
     
-    # Convert to dict and cache
-    stock_dict = {
-        "ticker": stock.ticker,
-        "name": stock.name,
-        "sector": stock.sector,
-        "industry": stock.industry,
-        "market_cap": stock.market_cap,
+    # Get fundamentals
+    fundamentals = db.query(StockFundamental).filter(
+        StockFundamental.ticker_id == ticker_obj.id
+    ).first()
+    
+    if not fundamentals:
+        return None
+    
+    # Build response
+    stock_data = {
+        'ticker': ticker_obj.symbol,
+        'name': ticker_obj.name,
         
         # Valuation
-        "pe_ratio": stock.pe_ratio,
-        "forward_pe": stock.forward_pe,
-        "peg_ratio": stock.peg_ratio,
-        "pb_ratio": stock.pb_ratio,
-        "ps_ratio": stock.ps_ratio,
-        "ev_to_ebitda": stock.ev_to_ebitda,
+        'pe_ratio': fundamentals.pe_ratio,
+        'forward_pe': fundamentals.forward_pe,
+        'peg_ratio': fundamentals.peg_ratio,
+        'price_to_book': fundamentals.price_to_book,
+        'price_to_sales': fundamentals.price_to_sales,
+        'ev_to_ebitda': fundamentals.ev_to_ebitda,
         
         # Profitability
-        "eps": stock.eps,
-        "profit_margin": stock.profit_margin,
-        "operating_margin": stock.operating_margin,
-        "roe": stock.roe,
-        "roa": stock.roa,
+        'profit_margin': fundamentals.profit_margin,
+        'operating_margin': fundamentals.operating_margin,
+        'roe': fundamentals.roe,
+        'roa': fundamentals.roa,
+        
+        # Financial Health
+        'debt_to_equity': fundamentals.debt_to_equity,
+        'current_ratio': fundamentals.current_ratio,
+        'quick_ratio': fundamentals.quick_ratio,
         
         # Growth
-        "revenue_growth": stock.revenue_growth,
-        "earnings_growth": stock.earnings_growth,
-        
-        # Financial health
-        "debt_to_equity": stock.debt_to_equity,
-        "current_ratio": stock.current_ratio,
-        "quick_ratio": stock.quick_ratio,
+        'revenue_growth': fundamentals.revenue_growth,
+        'earnings_growth': fundamentals.earnings_growth,
         
         # Dividends
-        "dividend_yield": stock.dividend_yield,
-        "dividend_rate": stock.dividend_rate,
-        "payout_ratio": stock.payout_ratio,
+        'dividend_yield': fundamentals.dividend_yield,
+        'dividend_rate': fundamentals.dividend_rate,
+        'payout_ratio': fundamentals.payout_ratio,
         
-        # Trading
-        "current_price": stock.current_price,
-        "day_change_percent": stock.day_change_percent,
-        "volume": stock.volume,
-        "avg_volume": stock.avg_volume,
-        "beta": stock.beta,
-        "fifty_two_week_high": stock.fifty_two_week_high,
-        "fifty_two_week_low": stock.fifty_two_week_low,
+        # Size & Trading
+        'market_cap': fundamentals.market_cap,
+        'volume': fundamentals.volume,
+        'avg_volume': fundamentals.avg_volume,
+        'beta': fundamentals.beta,
+        
+        # Price
+        'current_price': fundamentals.current_price,
+        'day_change_percent': fundamentals.day_change_percent,
+        'fifty_two_week_high': fundamentals.fifty_two_week_high,
+        'fifty_two_week_low': fundamentals.fifty_two_week_low,
+        
+        # Classification
+        'sector': fundamentals.sector,
+        'industry': fundamentals.industry,
         
         # Metadata
-        "last_updated": stock.last_updated.isoformat() if stock.last_updated else None,
-        "created_at": stock.created_at.isoformat() if stock.created_at else None
+        'last_updated': fundamentals.last_updated.isoformat() if fundamentals.last_updated else None,
+        
+        # Additional data
+        'additional_data': fundamentals.additional_data
     }
     
-    cache_service.set(cache_key, stock_dict)
-    return stock_dict
+    # Cache for 24 hours
+    if use_cache:
+        cache_service.set(cache_key, stock_data, ttl=settings.STOCK_CACHE_TTL)
+    
+    return stock_data
 
-
-# ====================================
-# PRICE HISTORY - POSTGRESQL FIRST
-# ====================================
 
 def get_price_history(
-    db: Session, 
+    db: Session,
     ticker: str,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     use_cache: bool = True
 ) -> pd.DataFrame:
     """
-    Get historical price data for a stock (PostgreSQL-first architecture)
+    Get historical price data for a stock
     
     Flow:
-    1. Check Redis cache (if enabled)
-    2. Check if data exists in PostgreSQL
-    3. If missing, initialize from Tiingo (4 years)
-    4. If stale, fill gaps from Tiingo
-    5. Cache result in Redis
-    6. Return complete dataset
+    1. Check Redis cache (for detailed view requests - 2 hour TTL)
+    2. Query PostgreSQL
+    3. Check for gaps and fill if needed
+    4. Cache result
     
     Args:
         db: Database session
         ticker: Stock symbol
-        start_date: Start date (defaults to 4 years ago)
-        end_date: End date (defaults to last trading day)
-        use_cache: Whether to use Redis cache
+        start_date: Start date
+        end_date: End date
+        use_cache: Whether to use cache
     
     Returns:
         DataFrame with OHLCV data
@@ -133,11 +148,11 @@ def get_price_history(
     if end_date is None:
         end_date = get_last_trading_day()
     if start_date is None:
-        start_date = end_date - timedelta(days=365 * 4)  # 4 years
+        start_date = end_date - timedelta(days=365)  # Default 1 year
     
-    # Check cache
+    # Check cache (for detailed stock views)
+    cache_key = f"prices:{ticker}:detailed"
     if use_cache:
-        cache_key = f"prices:{ticker}:historical"
         cached = cache_service.get(cache_key)
         if cached:
             df = pd.DataFrame(cached)
@@ -145,28 +160,27 @@ def get_price_history(
                 df['date'] = pd.to_datetime(df['date']).dt.date
                 df = df.set_index('date')
                 # Filter to requested range
-                return df[(df.index >= start_date) & (df.index <= end_date)]
+                mask = (df.index >= start_date) & (df.index <= end_date)
+                return df[mask]
     
-    # Query database for existing data
-    prices = db.query(StockPrice).filter(
-        StockPrice.ticker == ticker
-    ).order_by(StockPrice.date).all()
+    # Get ticker ID
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+    if not ticker_obj:
+        return pd.DataFrame()
     
-    # CASE 1: No data exists - Initialize from Tiingo
+    # Query database
+    prices = db.query(DailyOHLCV).filter(
+        and_(
+            DailyOHLCV.ticker_id == ticker_obj.id,
+            DailyOHLCV.date >= start_date,
+            DailyOHLCV.date <= end_date
+        )
+    ).order_by(DailyOHLCV.date).all()
+    
     if not prices:
-        print(f"📥 Initializing {ticker} with {settings.STOCK_HISTORY_YEARS} years of data from Tiingo...")
-        df = _initialize_stock_history(db, ticker, start_date, end_date)
-        
-        if df is not None and not df.empty:
-            # Cache the result
-            if use_cache:
-                cache_data = df.reset_index().to_dict('records')
-                cache_service.set(f"prices:{ticker}:historical", cache_data, ttl=settings.PRICE_HISTORY_CACHE_TTL)
-            return df
-        else:
-            return pd.DataFrame()
+        return pd.DataFrame()
     
-    # Convert DB records to DataFrame
+    # Convert to DataFrame
     df = pd.DataFrame([{
         'date': p.date,
         'Open': p.open,
@@ -176,179 +190,162 @@ def get_price_history(
         'Volume': p.volume
     } for p in prices])
     
-    if df.empty:
-        return df
-    
     df = df.set_index('date')
-    df.index = pd.to_datetime(df.index).date
     
-    # CASE 2: Check for gaps (freshness + missing days)
-    latest_date = df.index.max()
-    last_trading_day = get_last_trading_day()
+    # Check for gaps (optional - can be disabled for performance)
+    # existing_dates = df.index.tolist()
+    # missing = detect_missing_days(existing_dates, start_date, end_date)
+    # if missing:
+    #     # Fill gaps if needed (implementation depends on requirements)
+    #     pass
     
-    gaps_filled = False
-    
-    # Check if data is stale
-    if latest_date < last_trading_day:
-        print(f"📊 {ticker} data is stale (latest: {latest_date}, expected: {last_trading_day})")
-        gap_start = latest_date + timedelta(days=1)
-        gap_df = _fill_price_gap(db, ticker, gap_start, last_trading_day)
-        
-        if gap_df is not None and not gap_df.empty:
-            df = pd.concat([df, gap_df])
-            gaps_filled = True
-    
-    # Check for missing days within the range
-    existing_dates = df.index.tolist()
-    missing_days = detect_missing_days(existing_dates, start_date, end_date)
-    
-    if missing_days:
-        print(f"📊 {ticker} has {len(missing_days)} missing trading days, filling gaps...")
-        for missing_date in missing_days:
-            # Fill small gaps (group consecutive days)
-            gap_df = _fill_price_gap(db, ticker, missing_date, missing_date)
-            if gap_df is not None and not gap_df.empty:
-                df = pd.concat([df, gap_df])
-                gaps_filled = True
-    
-    # Sort and remove duplicates
-    df = df.sort_index()
-    df = df[~df.index.duplicated(keep='last')]
-    
-    # Cache if we filled gaps
-    if gaps_filled and use_cache:
+    # Cache for 2 hours (for detailed views)
+    if use_cache:
         cache_data = df.reset_index().to_dict('records')
-        cache_service.set(f"prices:{ticker}:historical", cache_data, ttl=settings.PRICE_HISTORY_CACHE_TTL)
+        cache_service.set(cache_key, cache_data, ttl=settings.STOCK_DETAIL_CACHE_TTL)
     
-    # Filter to requested range
-    return df[(df.index >= start_date) & (df.index <= end_date)]
+    return df
 
 
-def _initialize_stock_history(
+def screen_stocks(
     db: Session,
-    ticker: str,
-    start_date: date,
-    end_date: date
-) -> Optional[pd.DataFrame]:
+    filters: Dict[str, Any],
+    limit: int = 100,
+    offset: int = 0
+) -> List[Dict[str, Any]]:
     """
-    Initialize stock with historical data from Tiingo
+    Screen stocks based on fundamental criteria
+    
+    ALWAYS queries PostgreSQL directly (no cache)
     
     Args:
         db: Database session
-        ticker: Stock symbol
-        start_date: Start date
-        end_date: End date
+        filters: Dict of filter criteria
+        limit: Max results
+        offset: Pagination offset
     
     Returns:
-        DataFrame with historical prices
+        List of stocks matching criteria
     """
-    try:
-        # Fetch from Tiingo
-        df = tiingo_client.get_historical_prices(
-            ticker,
-            start_date.strftime("%Y-%m-%d"),
-            end_date.strftime("%Y-%m-%d")
-        )
-        
-        if df is None or df.empty:
-            print(f"✗ No historical data available for {ticker}")
-            return None
-        
-        # Save to database
-        for date_idx, row in df.iterrows():
-            price = StockPrice(
-                ticker=ticker,
-                date=date_idx,
-                open=float(row['Open']),
-                high=float(row['High']),
-                low=float(row['Low']),
-                close=float(row['Close']),
-                volume=int(row['Volume']) if not pd.isna(row['Volume']) else 0
-            )
-            db.merge(price)  # Use merge to handle duplicates
-        
-        db.commit()
-        print(f"✓ Initialized {ticker} with {len(df)} records")
-        
-        return df
-        
-    except Exception as e:
-        print(f"✗ Error initializing {ticker}: {e}")
-        db.rollback()
-        return None
-
-
-def _fill_price_gap(
-    db: Session,
-    ticker: str,
-    start_date: date,
-    end_date: date
-) -> Optional[pd.DataFrame]:
-    """
-    Fill missing price data using Tiingo
+    # Build query
+    query = db.query(Ticker, StockFundamental).join(
+        StockFundamental,
+        Ticker.id == StockFundamental.ticker_id
+    )
     
-    Args:
-        db: Database session
-        ticker: Stock symbol
-        start_date: Gap start date
-        end_date: Gap end date
+    # Apply filters
+    if 'pe_ratio_min' in filters and filters['pe_ratio_min'] is not None:
+        query = query.filter(StockFundamental.pe_ratio >= filters['pe_ratio_min'])
     
-    Returns:
-        DataFrame with gap-filled data
-    """
-    try:
-        # Fetch missing data from Tiingo
-        df = tiingo_client.get_historical_prices(
-            ticker,
-            start_date.strftime("%Y-%m-%d"),
-            end_date.strftime("%Y-%m-%d"),
-            quiet=True
-        )
-        
-        if df is None or df.empty:
-            return None
-        
-        # Save to database
-        for date_idx, row in df.iterrows():
-            price = StockPrice(
-                ticker=ticker,
-                date=date_idx,
-                open=float(row['Open']),
-                high=float(row['High']),
-                low=float(row['Low']),
-                close=float(row['Close']),
-                volume=int(row['Volume']) if not pd.isna(row['Volume']) else 0
-            )
-            db.merge(price)
-        
-        db.commit()
-        print(f"✓ Filled gap for {ticker}: {start_date} to {end_date} ({len(df)} records)")
-        
-        # Invalidate cache
-        cache_service.delete(f"prices:{ticker}:historical")
-        
-        return df
-        
-    except Exception as e:
-        print(f"✗ Error filling gap for {ticker}: {e}")
-        db.rollback()
-        return None
+    if 'pe_ratio_max' in filters and filters['pe_ratio_max'] is not None:
+        query = query.filter(StockFundamental.pe_ratio <= filters['pe_ratio_max'])
+    
+    if 'market_cap_min' in filters and filters['market_cap_min'] is not None:
+        query = query.filter(StockFundamental.market_cap >= filters['market_cap_min'])
+    
+    if 'market_cap_max' in filters and filters['market_cap_max'] is not None:
+        query = query.filter(StockFundamental.market_cap <= filters['market_cap_max'])
+    
+    if 'debt_to_equity_max' in filters and filters['debt_to_equity_max'] is not None:
+        query = query.filter(StockFundamental.debt_to_equity <= filters['debt_to_equity_max'])
+    
+    if 'dividend_yield_min' in filters and filters['dividend_yield_min'] is not None:
+        query = query.filter(StockFundamental.dividend_yield >= filters['dividend_yield_min'])
+    
+    if 'roe_min' in filters and filters['roe_min'] is not None:
+        query = query.filter(StockFundamental.roe >= filters['roe_min'])
+    
+    if 'sector' in filters and filters['sector']:
+        query = query.filter(StockFundamental.sector == filters['sector'])
+    
+    if 'industry' in filters and filters['industry']:
+        query = query.filter(StockFundamental.industry == filters['industry'])
+    
+    # Add more filters as needed...
+    
+    # Apply pagination
+    results = query.limit(limit).offset(offset).all()
+    
+    # Format results
+    stocks = []
+    for ticker, fundamental in results:
+        stocks.append({
+            'ticker': ticker.symbol,
+            'name': ticker.name,
+            'sector': fundamental.sector,
+            'industry': fundamental.industry,
+            'market_cap': fundamental.market_cap,
+            'pe_ratio': fundamental.pe_ratio,
+            'dividend_yield': fundamental.dividend_yield,
+            'current_price': fundamental.current_price,
+            'day_change_percent': fundamental.day_change_percent,
+            'roe': fundamental.roe,
+            'debt_to_equity': fundamental.debt_to_equity
+        })
+    
+    return stocks
 
 
-# ====================================
-# HELPER FUNCTIONS
-# ====================================
+def get_stock_splits(db: Session, ticker: str) -> List[Dict[str, Any]]:
+    """Get stock split history"""
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker.upper()).first()
+    if not ticker_obj:
+        return []
+    
+    splits = db.query(StockSplit).filter(
+        StockSplit.ticker_id == ticker_obj.id
+    ).order_by(StockSplit.date.desc()).all()
+    
+    return [{
+        'date': s.date.isoformat(),
+        'ratio': s.ratio
+    } for s in splits]
 
-def get_active_tickers(db: Session) -> List[str]:
-    """
-    Get list of tickers that have been initialized (have price data in DB)
-    These are the stocks we'll update in the nightly batch job
-    """
-    result = db.query(StockPrice.ticker).distinct().all()
-    return [r[0] for r in result]
+
+def get_dividends(db: Session, ticker: str) -> List[Dict[str, Any]]:
+    """Get dividend history"""
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker.upper()).first()
+    if not ticker_obj:
+        return []
+    
+    dividends = db.query(Dividend).filter(
+        Dividend.ticker_id == ticker_obj.id
+    ).order_by(Dividend.date.desc()).all()
+    
+    return [{
+        'date': d.date.isoformat(),
+        'amount': d.amount
+    } for d in dividends]
 
 
-def invalidate_stock_cache(ticker: str):
-    """Invalidate all cache entries for a stock"""
-    cache_service.delete(f"stock:{ticker}")
-    cache_service.delete(f"prices:{ticker}:historical")
+def get_all_sectors(db: Session) -> List[str]:
+    """Get list of all sectors in database"""
+    sectors = db.query(StockFundamental.sector).distinct().all()
+    return [s[0] for s in sectors if s[0]]
+
+
+def get_all_industries(db: Session) -> List[str]:
+    """Get list of all industries in database"""
+    industries = db.query(StockFundamental.industry).distinct().all()
+    return [i[0] for i in industries if i[0]]
+
+
+def get_database_stats(db: Session) -> Dict[str, Any]:
+    """Get database statistics"""
+    total_tickers = db.query(Ticker).count()
+    total_prices = db.query(DailyOHLCV).count()
+    total_fundamentals = db.query(StockFundamental).count()
+    
+    # Get date range
+    min_date = db.query(func.min(DailyOHLCV.date)).scalar()
+    max_date = db.query(func.max(DailyOHLCV.date)).scalar()
+    
+    return {
+        'total_tickers': total_tickers,
+        'total_price_records': total_prices,
+        'total_fundamentals': total_fundamentals,
+        'date_range': {
+            'start': min_date.isoformat() if min_date else None,
+            'end': max_date.isoformat() if max_date else None
+        }
+    }

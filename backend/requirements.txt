@@ -3,13 +3,10 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 python-multipart==0.0.18
 
-# Database
+# Database (Using psycopg3 for better performance/support)
 sqlalchemy==2.0.36
+psycopg[binary]==3.3.2
 alembic==1.14.0
-
-# PostgreSQL driver (psycopg3 has better Python 3.13 support)
-psycopg[binary]==3.2.3
-# Alternative if above doesn't work: psycopg2-binary==2.9.10
 
 # Caching
 redis==5.2.0
@@ -19,11 +16,18 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
 
-# Data & API
-yfinance==0.2.50
+# NEW: Data Providers (Pinned to the stable versions you just installed)
+yfinance==1.0.0
+yahooquery==2.4.1
+curl-cffi==0.7.0b4
+
+# Data Processing
 pandas==2.2.3
 numpy==2.2.1
 httpx==0.28.1
+
+# Market Calendar (Essential for skipping non-trading days in your DB)
+pandas-market-calendars==4.3.0
 
 # Job Scheduling
 apscheduler==3.10.4
@@ -31,10 +35,4 @@ apscheduler==3.10.4
 # Validation
 pydantic==2.10.3
 pydantic-settings==2.6.1
-
-# Email validation
 email-validator==2.2.0
-
-# Development & Testing
-pytest==8.3.4
-pytest-asyncio==0.24.0

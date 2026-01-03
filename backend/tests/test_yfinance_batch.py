@@ -144,7 +144,9 @@ try:
         session=session,
         threads=False,
         auto_adjust=True,
+        actions=True,
         progress=False
+
     )
     
     elapsed = time.time() - start_time

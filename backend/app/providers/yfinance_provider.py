@@ -168,7 +168,7 @@ class YFinanceProvider(StockDataProvider):
                 start=start_date,
                 end=end_date,
                 session=session,
-                threads=False,  # Critical: No threading to avoid detection
+                threads=False,  #  No threading to avoid detection
                 auto_adjust=True,
                 actions=True,
                 progress=False,
@@ -190,8 +190,12 @@ class YFinanceProvider(StockDataProvider):
                 # Multiple tickers - multi-index format
                 # Convert from wide format (columns per ticker) to long format
                 df = data.stack(level=1, future_stack=True).reset_index()
-                df.columns = ['date', 'ticker', 'Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits']
-                df['date'] = pd.to_datetime(df['date']).dt.date
+                rename_map = {
+                    'Date' : 'date',
+                    'Ticker':'ticker',
+                    'index':'date'  # fallback if the index is not named
+                }
+                df = df.rename(columns=rename_map)
             
             # Drop rows with NaN in critical columns
             df = df.dropna(subset=['Open', 'High', 'Low', 'Close'])

@@ -20,41 +20,42 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
     PROJECT_NAME: str = "Stock Screener API"
     
-    # CORS - will be converted from string to list
+    # CORS
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000"
-
-    #API KEYS 
-    FMP_API_KEY: str
-    TIINGO_API_KEY:str
     
-    # Stock Settings
-    STOCK_UPDATE_HOUR: int = 21
-    STOCK_UPDATE_BATCH_SIZE: int = 1000
-    STOCK_CACHE_TTL: int = 86400
-    STOCK_HISTORY_YEARS: int = 4
-
-    # rate limiting
-    YFINANCE_REQUESTS_PER_MINUTE: int = 15
-    YFINANCE_MAX_RETRIES: int = 3
-    YFINANCE_RETRY_DELAY: int = 5
-
-    #FMP SETTINGS
-    FMP_BASE_URL: str = "https://financialmodelingprep.com/api/v3"
-    FMP_REQUESTS_PER_DAY: int = 250
-    FMP_BATCH_SIZE: int = 100  
- 
- 
-    # Tiingo Settings
-    TIINGO_BASE_URL: str = "https://api.tiingo.com"
-    TIINGO_REQUESTS_PER_HOUR: int = 50
-    TIINGO_REQUESTS_PER_DAY: int = 1000
-
-
-    #Cache TTLS
-    SCREENER_CACHE_TTL: int = 3600  # 1 hour
-    PRICE_HISTORY_CACHE_TTL: int = 7200  # 2 hours
-    BACKTEST_CACHE_TTL: int = 7200  # 2 hours
+    # ===== DATA PROVIDERS =====
+    HISTORICAL_PROVIDER: str = "yfinance"
+    REALTIME_PROVIDER: str = "yfinance"
+    FUNDAMENTALS_PROVIDER: str = "yahooquery"
+    FUNDAMENTALS_FALLBACK: str = "yfinance"
     
+    # ===== YFINANCE SETTINGS =====
+    YFINANCE_ENABLED: bool = True
+    YFINANCE_BATCH_SIZE: int = 100
+    YFINANCE_INITIAL_JITTER_MIN: int = 15  # Seconds between batches during initial load
+    YFINANCE_INITIAL_JITTER_MAX: int = 25
+    YFINANCE_DAILY_JITTER_MIN: int = 2     # Seconds between batches during daily update
+    YFINANCE_DAILY_JITTER_MAX: int = 5
+    
+    # ===== YAHOOQUERY SETTINGS =====
+    YAHOOQUERY_ENABLED: bool = True
+    YAHOOQUERY_BATCH_SIZE: int = 50
+    YAHOOQUERY_JITTER_MIN: int = 10
+    YAHOOQUERY_JITTER_MAX: int = 15
+    
+    # ===== DATA SETTINGS =====
+    STOCK_HISTORY_YEARS: int = 5
+    FUNDAMENTALS_UPDATE_CYCLE_DAYS: int = 7  # Full refresh in 7 days
+    
+    # ===== REDIS CACHE SETTINGS =====
+    STOCK_CACHE_TTL: int = 86400              # 24 hours for basic stock info
+    STOCK_DETAIL_CACHE_TTL: int = 7200        # 2 hours for detailed stock views
+    SCREENER_CACHE_TTL: int = 3600            # 1 hour for screener results
+    PRICE_HISTORY_CACHE_TTL: int = 7200       # 2 hours for price history
+    SCREENER_USE_CACHE: bool = False          # Always query PostgreSQL for screener
+    
+    # ===== RATE LIMITING =====
+    RATE_LIMIT_ENABLED: bool = True
     
     # Environment
     ENVIRONMENT: str = "development"

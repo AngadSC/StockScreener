@@ -172,7 +172,6 @@ class YFinanceProvider(StockDataProvider):
                 auto_adjust=True,
                 actions=True,
                 progress=False,
-                show_errors=False
             )
             
             if data.empty:

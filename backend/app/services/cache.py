@@ -27,7 +27,7 @@ class CacheService:
         """Set value in cache with TTL"""
         try:
             ttl = ttl or settings.STOCK_CACHE_TTL
-            serialized = json.dumps(value, default=str)  # default=str handles datetime
+            serialized = json.dumps(value, default=str)
             self.redis_client.setex(key, ttl, serialized)
             return True
         except Exception as e:
@@ -53,6 +53,22 @@ class CacheService:
         except Exception as e:
             print(f"Cache clear error: {e}")
             return False
+    
+    def exists(self, key: str) -> bool:
+        """Check if key exists in cache"""
+        try:
+            return self.redis_client.exists(key) > 0
+        except Exception as e:
+            print(f"Cache exists error: {e}")
+            return False
+    
+    def get_ttl(self, key: str) -> int:
+        """Get remaining TTL for a key (-1 if no expiry, -2 if doesn't exist)"""
+        try:
+            return self.redis_client.ttl(key)
+        except Exception as e:
+            print(f"Cache TTL error: {e}")
+            return -2
 
 # Singleton instance
 cache_service = CacheService()

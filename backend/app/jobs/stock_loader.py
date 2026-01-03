@@ -2,26 +2,27 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
 from app.database.models import Stock, StockPrice
-from app.utils.data_fetcher import (
-    fetch_stock_fundamentals,
-    get_all_us_tickers,
-    fetch_price_history
-)
+from app.utils.data_fetcher import fmp_client
+from app.utils.market_calendar import is_trading_day, get_last_trading_day
 from app.services.cache import cache_service
+from app.services.stock_service import get_active_tickers
 from datetime import datetime, timedelta
 import time
-
+from typing import List
 
 scheduler = AsyncIOScheduler()
 
+
 def update_all_stocks_nightly():
     """
-    Nightly job: Update fundamentals for all US stocks.
+    Nightly Batch Job: Update all active stocks using FMP Batch Quote API
     
-    - Runs at 9 PM ET (after market close)
-    - Fetches ~8,000 US stocks
-    - Takes ~4.5 hours (rate limited to 30/min)
-    - Updates existing stocks, adds new ones
+    Strategy:
+    - Only updates stocks that have been initialized (exist in stock_prices table)
+    - Fetches today's OHLCV from FMP in batches of 100
+    - Appends to existing historical data in PostgreSQL
+    - Updates fundamentals in Stock table
+    - Runs at 9 PM ET after market close
     """
     db = SessionLocal()
     start_time = datetime.now()
@@ -32,84 +33,152 @@ def update_all_stocks_nightly():
         print(f"   Time: {start_time.strftime('%Y-%m-%d %H:%M:%S ET')}")
         print("="*70 + "\n")
         
-        # Get all US stock tickers
-        tickers = get_all_us_tickers()
-        total = len(tickers)
+        # Check if today is a trading day
+        today = datetime.now().date()
+        if not is_trading_day(today):
+            print("📅 Market closed today (weekend/holiday), skipping update")
+            return
         
-        print(f"📋 Processing {total} tickers...\n")
+        # Get list of active tickers (stocks already in database)
+        active_tickers = get_active_tickers(db)
+        
+        if not active_tickers:
+            print("📋 No active stocks to update yet")
+            print("   (Stocks will be added as users request them)")
+            return
+        
+        total = len(active_tickers)
+        batch_size = 100
+        
+        print(f"📋 Updating {total} active stocks in batches of {batch_size}...\n")
         
         # Track statistics
         stats = {
-            'updated': 0,
-            'created': 0,
+            'updated_prices': 0,
+            'updated_fundamentals': 0,
             'failed': 0,
             'no_data': 0
         }
         
-        for i, ticker in enumerate(tickers, 1):
+        # Process in batches
+        for i in range(0, total, batch_size):
+            batch = active_tickers[i:i + batch_size]
+            batch_num = (i // batch_size) + 1
+            total_batches = (total + batch_size - 1) // batch_size
+            
+            print(f"📦 Processing batch {batch_num}/{total_batches} ({len(batch)} stocks)...")
+            
             try:
-                # Fetch fundamentals (automatically rate limited)
-                fundamentals = fetch_stock_fundamentals(ticker, quiet=True)
+                # Fetch batch quotes from FMP
+                quotes = fmp_client.get_batch_quotes(batch, quiet=True)
                 
-                if not fundamentals:
-                    stats['no_data'] += 1
+                if not quotes:
+                    print(f"   ✗ No data returned for batch {batch_num}")
+                    stats['no_data'] += len(batch)
                     continue
                 
-                # Check if stock exists
-                stock = db.query(Stock).filter(Stock.ticker == ticker).first()
+                # Process each quote
+                for quote in quotes:
+                    try:
+                        ticker = quote.get('symbol')
+                        if not ticker:
+                            continue
+                        
+                        ticker = ticker.upper()
+                        
+                        # Extract data from FMP response
+                        price_data = {
+                            'open': quote.get('open'),
+                            'high': quote.get('dayHigh'),
+                            'low': quote.get('dayLow'),
+                            'close': quote.get('price'),  # Current price = close for EOD
+                            'volume': quote.get('volume')
+                        }
+                        
+                        # Skip if missing critical data
+                        if not all([price_data['open'], price_data['high'], 
+                                   price_data['low'], price_data['close']]):
+                            stats['no_data'] += 1
+                            continue
+                        
+                        # 1. Update/Insert today's price record
+                        price_record = StockPrice(
+                            ticker=ticker,
+                            date=today,
+                            open=float(price_data['open']),
+                            high=float(price_data['high']),
+                            low=float(price_data['low']),
+                            close=float(price_data['close']),
+                            volume=int(price_data['volume']) if price_data['volume'] else 0
+                        )
+                        db.merge(price_record)  # Use merge to handle duplicates
+                        stats['updated_prices'] += 1
+                        
+                        # 2. Update Stock fundamentals
+                        stock = db.query(Stock).filter(Stock.ticker == ticker).first()
+                        
+                        if stock:
+                            # Update existing stock
+                            stock.current_price = price_data['close']
+                            stock.day_change_percent = quote.get('changesPercentage')
+                            stock.volume = price_data['volume']
+                            stock.market_cap = quote.get('marketCap')
+                            stock.last_updated = datetime.now()
+                        else:
+                            # Create new stock entry
+                            stock = Stock(
+                                ticker=ticker,
+                                name=quote.get('name'),
+                                current_price=price_data['close'],
+                                day_change_percent=quote.get('changesPercentage'),
+                                volume=price_data['volume'],
+                                market_cap=quote.get('marketCap'),
+                                fifty_two_week_high=quote.get('yearHigh'),
+                                fifty_two_week_low=quote.get('yearLow'),
+                                pe_ratio=quote.get('pe'),
+                                eps=quote.get('eps')
+                            )
+                            db.add(stock)
+                        
+                        stats['updated_fundamentals'] += 1
+                        
+                        # Invalidate cache for this ticker
+                        cache_service.delete(f"stock:{ticker}")
+                        cache_service.delete(f"prices:{ticker}:historical")
+                        
+                    except Exception as e:
+                        print(f"   ✗ Error processing {ticker}: {e}")
+                        stats['failed'] += 1
+                        continue
                 
-                if stock:
-                    # Update existing stock
-                    for key, value in fundamentals.items():
-                        if key != "ticker" and hasattr(stock, key):
-                            setattr(stock, key, value)
-                    stats['updated'] += 1
-                else:
-                    # Create new stock
-                    stock = Stock(**fundamentals)
-                    db.add(stock)
-                    stats['created'] += 1
+                # Commit batch
+                db.commit()
+                print(f"   ✓ Batch {batch_num} complete")
                 
-                # Commit every 10 stocks (batch commits for performance)
-                if i % 10 == 0:
-                    db.commit()
+                # Small delay between batches
+                if i + batch_size < total:
+                    time.sleep(1)
                 
-                # Progress report every 100 stocks
-                if i % 100 == 0:
-                    elapsed = (datetime.now() - start_time).seconds / 60
-                    rate = i / elapsed if elapsed > 0 else 0
-                    eta = (total - i) / rate if rate > 0 else 0
-                    
-                    print(f"📊 Progress: {i}/{total} ({i/total*100:.1f}%)")
-                    print(f"   ✓ Updated: {stats['updated']} | Created: {stats['created']}")
-                    print(f"   ✗ Failed: {stats['failed']} | No data: {stats['no_data']}")
-                    print(f"   ⏱  Rate: {rate:.1f}/min | ETA: {eta:.0f} min\n")
-                    
             except Exception as e:
-                print(f"✗ Error processing {ticker}: {e}")
-                stats['failed'] += 1
+                print(f"   ✗ Batch {batch_num} failed: {e}")
                 db.rollback()
+                stats['failed'] += len(batch)
                 continue
         
-        # Final commit
-        db.commit()
-        
-        # Clear all stock-related caches (data is fresh now)
-        print("\n🗑️  Clearing caches...")
-        cache_service.clear_pattern("stock:*")
+        # Clear pattern-based caches
+        print("\n🗑️  Clearing screener caches...")
         cache_service.clear_pattern("screener:*")
-        cache_service.clear_pattern("prices:*")
         
         # Final report
         end_time = datetime.now()
         duration = (end_time - start_time).seconds / 60
-        success_rate = ((stats['updated'] + stats['created']) / total * 100) if total > 0 else 0
+        success_rate = ((stats['updated_prices']) / total * 100) if total > 0 else 0
         
         print("\n" + "="*70)
         print(f"✅ NIGHTLY UPDATE COMPLETE")
-        print(f"   Duration: {duration:.1f} minutes ({duration/60:.1f} hours)")
-        print(f"   Updated: {stats['updated']}")
-        print(f"   Created: {stats['created']}")
+        print(f"   Duration: {duration:.1f} minutes")
+        print(f"   Prices updated: {stats['updated_prices']}")
+        print(f"   Fundamentals updated: {stats['updated_fundamentals']}")
         print(f"   Failed: {stats['failed']}")
         print(f"   No data: {stats['no_data']}")
         print(f"   Success rate: {success_rate:.1f}%")
@@ -122,67 +191,48 @@ def update_all_stocks_nightly():
     finally:
         db.close()
 
-def update_price_history():
+
+def trim_old_price_data():
     """
-    Optional: Update 1 year of price history for all stocks.
+    Weekly job: Remove price data older than configured retention period
     
-    Run this less frequently (weekly?) as it takes longer.
-    Only stores 1 year to save database space.
+    - Runs Sunday at 3 AM ET
+    - Keeps only the last N years of data (configured in settings)
+    - Reclaims database storage space
     """
     db = SessionLocal()
     
     try:
-        print("\n📈 Updating price history...")
+        print("\n🗑️  TRIMMING OLD PRICE DATA")
         
-        # Get all tickers from database
-        stocks = db.query(Stock.ticker).all()
-        tickers = [s.ticker for s in stocks]
+        # Calculate cutoff date
+        retention_years = getattr(settings, 'STOCK_HISTORY_YEARS', 4)
+        cutoff_date = datetime.now().date() - timedelta(days=365 * retention_years)
         
-        print(f"Fetching prices for {len(tickers)} stocks...")
+        print(f"   Retention: {retention_years} years")
+        print(f"   Cutoff date: {cutoff_date}")
         
-        for i, ticker in enumerate(tickers, 1):
-            try:
-                # Fetch 1 year of daily prices
-                df = fetch_price_history(ticker, period="1y", quiet=True)
-                
-                if df is None or df.empty:
-                    continue
-                
-                # Delete old prices for this ticker
-                db.query(StockPrice).filter(StockPrice.ticker == ticker).delete()
-                
-                # Insert new prices
-                for date, row in df.iterrows():
-                    price = StockPrice(
-                        ticker=ticker,
-                        date=date.date(),
-                        open=row['Open'],
-                        high=row['High'],
-                        low=row['Low'],
-                        close=row['Close'],
-                        volume=row['Volume']
-                    )
-                    db.add(price)
-                
-                # Commit every 10 stocks
-                if i % 10 == 0:
-                    db.commit()
-                    print(f"  Progress: {i}/{len(tickers)}")
-                    
-            except Exception as e:
-                print(f"✗ Error fetching prices for {ticker}: {e}")
-                db.rollback()
-                continue
-        
+        # Delete old records
+        deleted = db.query(StockPrice).filter(StockPrice.date < cutoff_date).delete()
         db.commit()
-        print("✓ Price history update complete")
+        
+        print(f"   ✓ Deleted {deleted} old price records")
+        print(f"   ✓ Database space reclaimed")
+        
+        # Clear all price caches (data may have changed)
+        cache_service.clear_pattern("prices:*")
         
     except Exception as e:
-        print(f"❌ Error updating price history: {e}")
+        print(f"   ✗ Error trimming data: {e}")
         db.rollback()
         
     finally:
         db.close()
+
+
+# ====================================
+# SCHEDULER CONFIGURATION
+# ====================================
 
 @scheduler.scheduled_job('cron', hour=21, minute=0, timezone='America/New_York')
 def scheduled_nightly_update():
@@ -191,17 +241,16 @@ def scheduled_nightly_update():
     update_all_stocks_nightly()
 
 
-# we can run a job on sunday as well so we can get the data for monday
-@scheduler.scheduled_job('cron', day_of_week='sun', hour=2, minute=0, timezone='America/New_York')
-def scheduled_price_update():
-    """Runs Sunday at 2:00 AM ET"""
-    print("⏰ Triggering weekly price history update...")
-    update_price_history()
+@scheduler.scheduled_job('cron', day_of_week='sun', hour=3, minute=0, timezone='America/New_York')
+def scheduled_data_trimming():
+    """Runs Sunday at 3:00 AM ET"""
+    print("⏰ Triggering weekly data trimming...")
+    trim_old_price_data()
 
 
 def start_scheduler():
     """Start the APScheduler"""
     scheduler.start()
     print("✓ Scheduler initialized")
-    print("   Nightly fundamentals update: 9:00 PM ET daily")
-    print("   Weekly price history update: 2:00 AM ET Sunday")
+    print("   Nightly updates: 9:00 PM ET daily (active stocks only)")
+    print("   Data trimming: 3:00 AM ET Sunday")

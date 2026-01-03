@@ -22,16 +22,33 @@ class Settings(BaseSettings):
     
     # CORS - will be converted from string to list
     BACKEND_CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000"
+
+    #API KEYS 
+    FMP_API_KEY: str
+    TIINGO_API_KEY:str
     
     # Stock Settings
     STOCK_UPDATE_HOUR: int = 21
     STOCK_UPDATE_BATCH_SIZE: int = 1000
     STOCK_CACHE_TTL: int = 86400
+    STOCK_HISTORY_YEARS: int = 4
 
     # rate limiting
     YFINANCE_REQUESTS_PER_MINUTE: int = 15
     YFINANCE_MAX_RETRIES: int = 3
     YFINANCE_RETRY_DELAY: int = 5
+
+    #FMP SETTINGS
+    FMP_BASE_URL: str = "https://financialmodelingprep.com/api/v3"
+    FMP_REQUESTS_PER_DAY: int = 250
+    FMP_BATCH_SIZE: int = 100  
+ 
+ 
+    # Tiingo Settings
+    TIINGO_BASE_URL: str = "https://api.tiingo.com"
+    TIINGO_REQUESTS_PER_HOUR: int = 50
+    TIINGO_REQUESTS_PER_DAY: int = 1000
+
 
     #Cache TTLS
     SCREENER_CACHE_TTL: int = 3600  # 1 hour

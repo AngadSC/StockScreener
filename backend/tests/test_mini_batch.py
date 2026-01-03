@@ -12,14 +12,14 @@ from sqlalchemy.orm import sessionmaker
 from app.providers.yfinance_provider import YFinanceProvider
 from datetime import datetime, timedelta
 import pandas as pd
-from app.config import Settings
+from app.config import settings
 
 print("\n" + "="*70)
 print("TEST 4: Mini Batch Job (10 stocks, 1 year)")
 print("="*70 + "\n")
 
 # Configuration
-TEST_DB_URL = Settings.DATABASE_URL
+TEST_DB_URL = settings.DATABASE_URL
 TEST_TICKERS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'META', 'BRK-B', 'UNH', 'JNJ']
 
 print("⚠️  This test requires a PostgreSQL database!")

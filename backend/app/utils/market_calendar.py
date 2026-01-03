@@ -4,7 +4,10 @@ import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar, Holiday, nearest_workday
 from pandas import DateOffset
 
-# US Stock Market Holidays (NYSE/NASDAQ)
+# ============================================
+# US STOCK MARKET HOLIDAYS (NYSE/NASDAQ)
+# ============================================
+
 class USMarketCalendar(USFederalHolidayCalendar):
     """US Stock Market Holiday Calendar"""
     
@@ -20,6 +23,7 @@ class USMarketCalendar(USFederalHolidayCalendar):
         Holiday('Thanksgiving', month=11, day=1, offset=DateOffset(weekday=3, weeks=4)),
         Holiday('Christmas', month=12, day=25, observance=nearest_workday),
     ]
+
 
 def is_trading_day(check_date: date) -> bool:
     """
@@ -41,6 +45,7 @@ def is_trading_day(check_date: date) -> bool:
     
     return len(holidays) == 0
 
+
 def get_last_trading_day(reference_date: date = None) -> date:
     """
     Get the most recent trading day (or current day if market is open)
@@ -61,6 +66,7 @@ def get_last_trading_day(reference_date: date = None) -> date:
         current -= timedelta(days=1)
     
     return current
+
 
 def get_trading_days_between(start_date: date, end_date: date) -> List[date]:
     """
@@ -87,6 +93,7 @@ def get_trading_days_between(start_date: date, end_date: date) -> List[date]:
     
     return [d.date() for d in trading_days]
 
+
 def detect_missing_days(existing_dates: List[date], start_date: date, end_date: date) -> List[date]:
     """
     Detect missing trading days in a date range
@@ -106,3 +113,23 @@ def detect_missing_days(existing_dates: List[date], start_date: date, end_date: 
     
     return sorted(list(missing))
 
+
+def get_next_trading_day(reference_date: date = None) -> date:
+    """
+    Get the next trading day after reference date
+    
+    Args:
+        reference_date: Date to start from (defaults to today)
+    
+    Returns:
+        Next trading day
+    """
+    if reference_date is None:
+        reference_date = datetime.now().date()
+    
+    current = reference_date + timedelta(days=1)
+    
+    while not is_trading_day(current):
+        current += timedelta(days=1)
+    
+    return current

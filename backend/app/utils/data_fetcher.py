@@ -1,18 +1,8 @@
-"""
-Data fetching utilities - Pure utility functions only.
-
-This module contains provider-agnostic utility functions:
-- Ticker list fetchers (S&P 500, NASDAQ, etc.)
-- Technical indicator calculations
-- Data post-processing utilities
-
-For actual data fetching, use the provider system:
-- app.providers.yfinance_provider.YFinanceProvider
-- app.providers.yahooquery_provider.YahooQueryProvider
-"""
-
-from typing import List
+from typing import Optional, Dict, Any, List
 import pandas as pd
+from datetime import datetime, timedelta, date
+import yfinance as yf
+from app.config import settings
 
 
 # ====================================
@@ -87,25 +77,217 @@ def get_sp500_tickers() -> List[str]:
 
 
 # ====================================
+# YFINANCE DATA FETCHERS (NEW)
+# ====================================
+
+def prepare_backtest_data(
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    include_splits: bool = True,
+    include_dividends: bool = True,
+    quiet: bool = False
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch extended historical data for backtesting using yfinance.
+    
+    Args:
+        ticker: Stock symbol
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
+        include_splits: Include stock splits
+        include_dividends: Include dividend data
+        quiet: Suppress print statements
+    
+    Returns:
+        DataFrame with OHLCV data and optional splits/dividends
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching backtest data for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        
+        # Fetch historical data
+        df = stock.history(
+            start=start_date,
+            end=end_date,
+            auto_adjust=True,  # Use adjusted prices
+            actions=include_splits or include_dividends  # Include corporate actions
+        )
+        
+        if df.empty:
+            if not quiet:
+                print(f"✗ No data for {ticker}")
+            return None
+        
+        # Ensure Date is in the index
+        if 'Date' in df.columns:
+            df = df.set_index('Date')
+        
+        if not quiet:
+            print(f"✓ Fetched {len(df)} records for {ticker}")
+        
+        return df
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching backtest data for {ticker}: {e}")
+        return None
+
+
+def fetch_price_history(
+    ticker: str,
+    period: str = "1y",
+    interval: str = "1d",
+    quiet: bool = False
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch price history using yfinance.
+    
+    Args:
+        ticker: Stock symbol
+        period: Time period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+        interval: Data interval (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
+        quiet: Suppress print statements
+    
+    Returns:
+        DataFrame with OHLCV data
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching {period} of {interval} data for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        
+        df = stock.history(
+            period=period,
+            interval=interval,
+            auto_adjust=True
+        )
+        
+        if df.empty:
+            if not quiet:
+                print(f"✗ No data for {ticker}")
+            return None
+        
+        # Ensure Date is in the index
+        if 'Date' in df.columns:
+            df = df.set_index('Date')
+        
+        if not quiet:
+            print(f"✓ Fetched {len(df)} records for {ticker}")
+        
+        return df
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching price history for {ticker}: {e}")
+        return None
+
+
+def fetch_stock_fundamentals(ticker: str, quiet: bool = False) -> Optional[Dict[str, Any]]:
+    """
+    Fetch fundamental data for a single stock using yfinance.
+    
+    NOTE: For production, use YahooQueryProvider for batch fundamentals!
+    This is a fallback for single-ticker requests.
+    
+    Args:
+        ticker: Stock symbol
+        quiet: Suppress print statements
+    
+    Returns:
+        Dict with fundamental data
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching fundamentals for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        if not info or len(info) < 5:
+            if not quiet:
+                print(f"✗ No fundamental data for {ticker}")
+            return None
+        
+        # Extract fundamentals (same structure as yahooquery provider)
+        fundamentals = {
+            'ticker': ticker,
+            'name': info.get('longName') or info.get('shortName'),
+            'exchange': info.get('exchange'),
+            
+            # Valuation
+            'pe_ratio': info.get('trailingPE'),
+            'forward_pe': info.get('forwardPE'),
+            'peg_ratio': info.get('pegRatio'),
+            'price_to_book': info.get('priceToBook'),
+            'price_to_sales': info.get('priceToSalesTrailing12Months'),
+            'ev_to_ebitda': info.get('enterpriseToEbitda'),
+            
+            # Profitability
+            'profit_margin': info.get('profitMargins'),
+            'operating_margin': info.get('operatingMargins'),
+            'roe': info.get('returnOnEquity'),
+            'roa': info.get('returnOnAssets'),
+            
+            # Financial Health
+            'debt_to_equity': info.get('debtToEquity'),
+            'current_ratio': info.get('currentRatio'),
+            'quick_ratio': info.get('quickRatio'),
+            
+            # Growth
+            'revenue_growth': info.get('revenueGrowth'),
+            'earnings_growth': info.get('earningsGrowth'),
+            
+            # Dividends
+            'dividend_yield': info.get('dividendYield'),
+            'dividend_rate': info.get('dividendRate'),
+            'payout_ratio': info.get('payoutRatio'),
+            
+            # Size & Trading
+            'market_cap': info.get('marketCap'),
+            'volume': info.get('volume'),
+            'avg_volume': info.get('averageVolume'),
+            'beta': info.get('beta'),
+            
+            # Price
+            'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+            'day_change_percent': info.get('regularMarketChangePercent'),
+            'fifty_two_week_high': info.get('fiftyTwoWeekHigh'),
+            'fifty_two_week_low': info.get('fiftyTwoWeekLow'),
+            
+            # Classification
+            'sector': info.get('sector'),
+            'industry': info.get('industry'),
+        }
+        
+        if not quiet:
+            print(f"✓ Fetched fundamentals for {ticker}")
+        
+        return fundamentals
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching fundamentals for {ticker}: {e}")
+        return None
+
+
+# ====================================
 # TECHNICAL INDICATORS
 # ====================================
 
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add technical indicators to price DataFrame.
-
+    
     Adds:
     - Moving Averages (SMA 20/50/200, EMA 12/26)
     - MACD and Signal
     - RSI (14)
     - Bollinger Bands
     - Volume SMA
-
-    Args:
-        df: DataFrame with OHLCV data (must have 'Close' and 'Volume' columns)
-
-    Returns:
-        DataFrame with added indicator columns
     """
     df = df.copy()
 

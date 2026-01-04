@@ -64,7 +64,7 @@ class DailyOHLCV(Base):
     __table_args__ = (
         Index('idx_ohlcv_ticker', 'ticker_id'),
         Index('idx_ohlcv_date', 'date'),
-        {'postgresql_fillfactor': 90}  # Leave room for daily updates
+          # Leave room for daily updates
     )
 
 

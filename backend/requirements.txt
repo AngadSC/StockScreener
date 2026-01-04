@@ -36,3 +36,4 @@ apscheduler==3.10.4
 pydantic==2.10.3
 pydantic-settings==2.6.1
 email-validator==2.2.0
+psycopg2-binary==2.9.9

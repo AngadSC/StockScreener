@@ -38,7 +38,7 @@ def load_sp500_historical():
         script_start = time.perf_counter()
         
         # 2. BATCHING
-        batch_size = 10 
+        batch_size = 50
         batches = [ticker_symbols[i:i + batch_size] for i in range(0, total_tickers, batch_size)]
         
         for batch_num, batch in enumerate(batches, 1):

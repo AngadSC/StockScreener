@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
-from app.database.models import Stock, StockPrice
+from app.database.models import Ticker, DailyOHLCV, StockFundamental
 from app.services.cache import cache_service
+from app.services.stock_service import get_stock_with_fundamentals, get_price_history
 from app.utils.data_fetcher import (
     prepare_backtest_data,
     add_technical_indicators,
@@ -19,33 +20,19 @@ router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 @router.get("/{ticker}", response_model=StockDetail)
 def get_stock_detail(ticker: str, db: Session = Depends(get_db)):
-
+    """Get detailed stock information including fundamentals"""
     ticker = ticker.upper()
-    cache_key = f"stock:{ticker}"
 
-    #we check the redis cache first
+    # Use the stock service which handles caching and DB queries
+    stock_data = get_stock_with_fundamentals(db, ticker, use_cache=True)
 
-    cached = cache_service.get(cache_key)
-    if cached:
-        return cached
-    
-    #query db if redis empty 
-
-    stock = db.query(Stock).filter(Stock.ticker == ticker).first()
-    if not stock:
+    if not stock_data:
         raise HTTPException(
             status_code=404,
             detail=f"Stock {ticker} not found. Try the screener to find valid tickers."
         )
-    
-    #conver tot the pydantic model 
 
-    stock_data = StockDetail.from_orm(stock)
-
-    #cache for 1 hour into the DB 
-    cache_service.set(cache_key, stock_data.dict(), ttl=3600)
-
-    return stock_data
+    return StockDetail(**stock_data)
 
 @router.get("/{ticker}/prices")
 def get_stock_prices(
@@ -53,53 +40,50 @@ def get_stock_prices(
     period: str = Query("1y", regex="^(1mo|3mo|6mo|1y)$", description="Time period"),
     db: Session = Depends(get_db)
 ):
+    """Get historical price data for a stock"""
     ticker = ticker.upper()
     cache_key = f"prices:{ticker}:{period}"
 
-
-    # chcecj the redis cache 
+    # Check the redis cache
     cached = cache_service.get(cache_key)
     if cached:
         return cached
-    
-    #calcualte the date range 
 
+    # Calculate the date range
     period_map = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
     days = period_map[period]
     start_date = datetime.now().date() - timedelta(days=days)
+    end_date = datetime.now().date()
 
-    #query the db for the prices ( we save here daily)
+    # Use the price history service
+    df = get_price_history(db, ticker, start_date, end_date, use_cache=False)
 
-    prices = db.query(StockPrice).filter(
-        StockPrice.ticker == ticker,
-        StockPrice.date >= start_date
-    ).order_by(StockPrice.date).all()
-    
-    if not prices:
+    if df.empty:
         raise HTTPException(
             status_code=404,
             detail=f"No price data found for {ticker}"
         )
-    
-    #formatting the repsonse from db 
 
+    # Format the response
+    df_reset = df.reset_index()
     result = {
         "ticker": ticker,
         "period": period,
-        "data_points": len(prices),
+        "data_points": len(df_reset),
         "data": [
             {
-                "date": p.date.isoformat(),
-                "open": p.open,
-                "high": p.high,
-                "low": p.low,
-                "close": p.close,
-                "volume": p.volume
+                "date": row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
+                "open": row['Open'],
+                "high": row['High'],
+                "low": row['Low'],
+                "close": row['Close'],
+                "volume": row['Volume']
             }
-            for p in prices
+            for _, row in df_reset.iterrows()
         ]
     }
-#cache for an hour 
+
+    # Cache for an hour
     cache_service.set(cache_key, result, ttl=3600)
 
     return result 
@@ -138,11 +122,11 @@ def get_backtest_data(
             **cached
         }
     
-    stock  = db.query(Stock).filter(Stock.ticker ==ticker).first()
-    if not stock:
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+    if not ticker_obj:
         raise HTTPException(
-            status_code = 404,
-            detail = f"Stock {ticker} not found in database"
+            status_code=404,
+            detail=f"Stock {ticker} not found in database"
         )
     
     try: 
@@ -240,10 +224,10 @@ def get_ml_features(
             **cached
         }
     
-    #chyeck if we have stock
+    # Check if we have the ticker
 
-    stock = db.query(Stock).filter(Stock.ticker == ticker).first()
-    if not stock:
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+    if not ticker_obj:
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
     
     try:
@@ -359,9 +343,9 @@ def get_intraday_data(
             **cached
         }
     
-    # Verify stock exists
-    stock = db.query(Stock).filter(Stock.ticker == ticker).first()
-    if not stock:
+    # Verify ticker exists
+    ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+    if not ticker_obj:
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
     
     try:

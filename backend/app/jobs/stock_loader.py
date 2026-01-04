@@ -1,12 +1,12 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 from app.database.connection import SessionLocal
-from app.database.models import Stock, StockPrice
+from app.database.models import Ticker, DailyOHLCV, StockFundamental
 from app.utils.data_fetcher import fmp_client
 from app.utils.market_calendar import is_trading_day, get_last_trading_day
 from app.services.cache import cache_service
 from app.services.stock_service import get_active_tickers
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date as date_type
 import time
 from typing import List
 
@@ -96,14 +96,27 @@ def update_all_stocks_nightly():
                         }
                         
                         # Skip if missing critical data
-                        if not all([price_data['open'], price_data['high'], 
+                        if not all([price_data['open'], price_data['high'],
                                    price_data['low'], price_data['close']]):
                             stats['no_data'] += 1
                             continue
-                        
-                        # 1. Update/Insert today's price record
-                        price_record = StockPrice(
-                            ticker=ticker,
+
+                        # 1. Get or create Ticker
+                        ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+
+                        if not ticker_obj:
+                            # Create new ticker
+                            ticker_obj = Ticker(
+                                symbol=ticker,
+                                name=quote.get('name'),
+                                exchange=quote.get('exchange')
+                            )
+                            db.add(ticker_obj)
+                            db.flush()  # Get the ID
+
+                        # 2. Update/Insert today's price record
+                        price_record = DailyOHLCV(
+                            ticker_id=ticker_obj.id,
                             date=today,
                             open=float(price_data['open']),
                             high=float(price_data['high']),
@@ -113,33 +126,36 @@ def update_all_stocks_nightly():
                         )
                         db.merge(price_record)  # Use merge to handle duplicates
                         stats['updated_prices'] += 1
-                        
-                        # 2. Update Stock fundamentals
-                        stock = db.query(Stock).filter(Stock.ticker == ticker).first()
-                        
-                        if stock:
-                            # Update existing stock
-                            stock.current_price = price_data['close']
-                            stock.day_change_percent = quote.get('changesPercentage')
-                            stock.volume = price_data['volume']
-                            stock.market_cap = quote.get('marketCap')
-                            stock.last_updated = datetime.now()
+
+                        # 3. Update StockFundamental
+                        fundamental = db.query(StockFundamental).filter(
+                            StockFundamental.ticker_id == ticker_obj.id
+                        ).first()
+
+                        if fundamental:
+                            # Update existing fundamentals
+                            fundamental.current_price = price_data['close']
+                            fundamental.day_change_percent = quote.get('changesPercentage')
+                            fundamental.volume = price_data['volume']
+                            fundamental.market_cap = quote.get('marketCap')
+                            fundamental.fifty_two_week_high = quote.get('yearHigh')
+                            fundamental.fifty_two_week_low = quote.get('yearLow')
+                            fundamental.pe_ratio = quote.get('pe')
+                            fundamental.last_updated = datetime.now()
                         else:
-                            # Create new stock entry
-                            stock = Stock(
-                                ticker=ticker,
-                                name=quote.get('name'),
+                            # Create new fundamental entry
+                            fundamental = StockFundamental(
+                                ticker_id=ticker_obj.id,
                                 current_price=price_data['close'],
                                 day_change_percent=quote.get('changesPercentage'),
                                 volume=price_data['volume'],
                                 market_cap=quote.get('marketCap'),
                                 fifty_two_week_high=quote.get('yearHigh'),
                                 fifty_two_week_low=quote.get('yearLow'),
-                                pe_ratio=quote.get('pe'),
-                                eps=quote.get('eps')
+                                pe_ratio=quote.get('pe')
                             )
-                            db.add(stock)
-                        
+                            db.add(fundamental)
+
                         stats['updated_fundamentals'] += 1
                         
                         # Invalidate cache for this ticker
@@ -213,7 +229,7 @@ def trim_old_price_data():
         print(f"   Cutoff date: {cutoff_date}")
         
         # Delete old records
-        deleted = db.query(StockPrice).filter(StockPrice.date < cutoff_date).delete()
+        deleted = db.query(DailyOHLCV).filter(DailyOHLCV.date < cutoff_date).delete()
         db.commit()
         
         print(f"   ✓ Deleted {deleted} old price records")

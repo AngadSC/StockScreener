@@ -4,11 +4,8 @@ from app.database.connection import get_db
 from app.database.models import Ticker, DailyOHLCV, StockFundamental
 from app.services.cache import cache_service
 from app.services.stock_service import get_stock_with_fundamentals, get_price_history
-from app.utils.data_fetcher import (
-    prepare_backtest_data,
-    add_technical_indicators,
-    fetch_price_history
-)
+from app.providers.factory import ProviderFactory
+from app.utils.data_fetcher import add_technical_indicators
 
 from app.models.stock import StockDetail, BacktestDataResponse, MLFeaturesResponse
 from datetime import datetime, timedelta
@@ -129,17 +126,18 @@ def get_backtest_data(
             detail=f"Stock {ticker} not found in database"
         )
     
-    try: 
+    try:
         print(f"🔄 Fetching backtest data for {ticker} from yfinance...")
 
-        df = prepare_backtest_data(
-            ticker=ticker,
-            start_date=start_date,
-            end_date=end_date,
-            include_splits=True,
-            include_dividends=True,
-            quiet=False
-        )
+        # Use the historical provider (yfinance)
+        provider = ProviderFactory.get_historical_provider()
+
+        # Convert string dates to date objects
+        from datetime import datetime as dt
+        start = dt.strptime(start_date, "%Y-%m-%d").date()
+        end = dt.strptime(end_date, "%Y-%m-%d").date()
+
+        df = provider.get_historical_prices(ticker, start, end)
 
         if df is None or df.empty:
             raise HTTPException(
@@ -233,9 +231,17 @@ def get_ml_features(
     try:
         # Fetch data from yfinance (rate limited)
         print(f"🤖 Generating ML features for {ticker}...")
-        
-        df = prepare_backtest_data(ticker, start_date, end_date, quiet=False)
-        
+
+        # Use the historical provider
+        provider = ProviderFactory.get_historical_provider()
+
+        # Convert string dates to date objects
+        from datetime import datetime as dt
+        start = dt.strptime(start_date, "%Y-%m-%d").date()
+        end = dt.strptime(end_date, "%Y-%m-%d").date()
+
+        df = provider.get_historical_prices(ticker, start, end)
+
         if df is None or df.empty:
             raise HTTPException(
                 status_code=404,
@@ -349,14 +355,16 @@ def get_intraday_data(
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
     
     try:
-        # Fetch from yfinance
-        df = fetch_price_history(
-            ticker=ticker,
+        # Fetch intraday data from yfinance (interval-specific feature)
+        import yfinance as yf
+
+        stock = yf.Ticker(ticker)
+        df = stock.history(
             period=f"{days}d",
             interval=interval,
-            quiet=False
+            auto_adjust=True
         )
-        
+
         if df is None or df.empty:
             raise HTTPException(
                 status_code=404,

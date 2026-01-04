@@ -1,5 +1,15 @@
 from .connection import Base, engine, get_db, SessionLocal
-from .models import User, Stock, StockPrice, Watchlist
+from .models import (
+    User,
+    Ticker,
+    DailyOHLCV,
+    StockFundamental,
+    StockSplit,
+    Dividend,
+    Watchlist,
+    PopulationProgress,
+    FailedTicker
+)
 
 __all__ = [
     "Base",
@@ -7,7 +17,12 @@ __all__ = [
     "get_db",
     "SessionLocal",
     "User",
-    "Stock",
-    "StockPrice",
+    "Ticker",
+    "DailyOHLCV",
+    "StockFundamental",
+    "StockSplit",
+    "Dividend",
     "Watchlist",
+    "PopulationProgress",
+    "FailedTicker",
 ]

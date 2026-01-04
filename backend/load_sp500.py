@@ -4,7 +4,7 @@ Uses Wikipedia source for accurate S&P 500 tickers and follows rate limits.
 """
 
 from app.database.connection import SessionLocal
-from app.database.models import Stock
+from app.database.models import Ticker, StockFundamental
 from app.utils.data_fetcher import get_sp500_tickers, fetch_stock_fundamentals
 from datetime import datetime
 import time
@@ -49,21 +49,40 @@ def load_sp500():
                     stats['no_data'] += 1
                     print(f"⚠️  [{i}/{total}] {ticker}: No data available")
                     continue
-                
-                # Check if stock exists
-                stock = db.query(Stock).filter(Stock.ticker == ticker).first()
-                
-                if stock:
-                    # Update existing stock
-                    for key, value in fundamentals.items():
-                        if key != "ticker" and hasattr(stock, key):
-                            setattr(stock, key, value)
+
+                # Get or create Ticker
+                ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
+
+                if not ticker_obj:
+                    ticker_obj = Ticker(
+                        symbol=ticker,
+                        name=fundamentals.get('name'),
+                        exchange=fundamentals.get('exchange')
+                    )
+                    db.add(ticker_obj)
+                    db.flush()  # Get the ID
+
+                # Check if fundamentals exist
+                fundamental = db.query(StockFundamental).filter(
+                    StockFundamental.ticker_id == ticker_obj.id
+                ).first()
+
+                # Remove fields that belong to Ticker, not StockFundamental
+                fundamental_data = {k: v for k, v in fundamentals.items()
+                                   if k not in ['ticker', 'name', 'exchange', 'symbol']}
+
+                if fundamental:
+                    # Update existing fundamentals
+                    for key, value in fundamental_data.items():
+                        if hasattr(fundamental, key):
+                            setattr(fundamental, key, value)
                     stats['updated'] += 1
                     print(f"✓ [{i}/{total}] {ticker}: Updated - {fundamentals.get('name', 'N/A')}")
                 else:
-                    # Create new stock
-                    stock = Stock(**fundamentals)
-                    db.add(stock)
+                    # Create new fundamentals
+                    fundamental_data['ticker_id'] = ticker_obj.id
+                    fundamental = StockFundamental(**fundamental_data)
+                    db.add(fundamental)
                     stats['created'] += 1
                     print(f"✓ [{i}/{total}] {ticker}: Created - {fundamentals.get('name', 'N/A')}")
                 

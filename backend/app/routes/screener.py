@@ -68,12 +68,12 @@ def screen_stocks_endpoint(
         sort_order=sort_order
     )
 
-    stocks, total  = screen_stocks(db,filters)
+    stocks, total = screen_stocks(db, filters)
 
-    #format response
+    # Format response (stocks are already dicts from the service)
 
     result = {
-        "results": [StockDetail.from_orm(s).dict() for s in stocks],
+        "results": stocks,
         "total": total,
         "page": skip // limit + 1,
         "per_page": limit,
@@ -101,9 +101,9 @@ def get_available_sectors(db: Session = Depends(get_db)):
     
     # Query distinct sectors
     from sqlalchemy import func
-    from app.database.models import Stock
-    
-    sectors = db.query(Stock.sector).filter(Stock.sector != None).distinct().all()
+    from app.database.models import StockFundamental
+
+    sectors = db.query(StockFundamental.sector).filter(StockFundamental.sector != None).distinct().all()
     sector_list = sorted([s[0] for s in sectors if s[0]])
     
     result = {
@@ -130,9 +130,9 @@ def get_available_industries(db: Session = Depends(get_db)):
         return cached
     
     from sqlalchemy import func
-    from app.database.models import Stock
-    
-    industries = db.query(Stock.industry).filter(Stock.industry != None).distinct().all()
+    from app.database.models import StockFundamental
+
+    industries = db.query(StockFundamental.industry).filter(StockFundamental.industry != None).distinct().all()
     industry_list = sorted([i[0] for i in industries if i[0]])
     
     result = {

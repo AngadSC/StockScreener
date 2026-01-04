@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.dialects.postgresql import insert
 from app.database.connection import SessionLocal
 from app.database.models import Ticker, DailyOHLCV, StockSplit, Dividend
 from app.providers.factory import ProviderFactory
@@ -106,7 +107,7 @@ def daily_delta_sync():
                     stats['failed'] += len(batch)
                     continue
                 
-                # Insert data
+                # Insert data using optimized bulk logic
                 records = _upsert_delta_data(db, df)
                 stats['records_inserted'] += records
                 stats['updated'] += len(batch)
@@ -148,52 +149,55 @@ def daily_delta_sync():
 
 def _upsert_delta_data(db: Session, df: pd.DataFrame) -> int:
     """
-    Upsert delta data into database
-    Uses INSERT ... ON CONFLICT DO UPDATE for idempotency
+    Optimized: Upsert delta data using PostgreSQL bulk logic.
     """
-    records_inserted = 0
+    # 1. Map symbols to IDs for this batch
+    ticker_symbols = df['ticker'].unique().tolist()
+    ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
+    ticker_map = {t.symbol: t.id for t in ticker_objs}
     
+    # 2. Prepare data for bulk upsert
+    rows_to_upsert = []
     for _, row in df.iterrows():
-        # Get ticker_id
-        ticker_obj = db.query(Ticker).filter(Ticker.symbol == row['ticker']).first()
-        if not ticker_obj:
-            continue
-        
-        # Upsert OHLCV
-        ohlcv = DailyOHLCV(
-            ticker_id=ticker_obj.id,
-            date=row['date'],
-            open=float(row['Open']),
-            high=float(row['High']),
-            low=float(row['Low']),
-            close=float(row['Close']),
-            volume=int(row['Volume'])
+        t_id = ticker_map.get(row['ticker'])
+        if t_id:
+            rows_to_upsert.append({
+                "ticker_id": t_id,
+                "date": row['date'],
+                "open": float(row['Open']),
+                "high": float(row['High']),
+                "low": float(row['Low']),
+                "close": float(row['Close']),
+                "volume": int(row['Volume'])
+            })
+    
+    # 3. Execute Bulk Upsert
+    if rows_to_upsert:
+        stmt = insert(DailyOHLCV).values(rows_to_upsert)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['ticker_id', 'date'],
+            set_={
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close": stmt.excluded.close,
+                "volume": stmt.excluded.volume
+            }
         )
-        db.merge(ohlcv)
-        records_inserted += 1
+        db.execute(stmt)
     
     # Handle dividends/splits if present
     if hasattr(df, '_dividends') and not df._dividends.empty:
         for _, row in df._dividends.iterrows():
-            ticker_obj = db.query(Ticker).filter(Ticker.symbol == row['ticker']).first()
-            if ticker_obj:
-                div = Dividend(
-                    ticker_id=ticker_obj.id,
-                    date=row['date'],
-                    amount=float(row['Dividends'])
-                )
-                db.merge(div)
+            t_id = ticker_map.get(row['ticker'])
+            if t_id:
+                db.merge(Dividend(ticker_id=t_id, date=row['date'], amount=float(row['Dividends'])))
     
     if hasattr(df, '_splits') and not df._splits.empty:
         for _, row in df._splits.iterrows():
-            ticker_obj = db.query(Ticker).filter(Ticker.symbol == row['ticker']).first()
-            if ticker_obj:
-                split = StockSplit(
-                    ticker_id=ticker_obj.id,
-                    date=row['date'],
-                    ratio=float(row['Stock Splits'])
-                )
-                db.merge(split)
+            t_id = ticker_map.get(row['ticker'])
+            if t_id:
+                db.merge(StockSplit(ticker_id=t_id, date=row['date'], ratio=float(row['Stock Splits'])))
     
     db.commit()
-    return records_inserted
+    return len(rows_to_upsert)

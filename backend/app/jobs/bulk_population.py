@@ -215,67 +215,58 @@ def populate_all_stocks(resume: bool = True) -> dict:
 
 def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
-    Insert batch data into database
-    
-    Args:
-        db: Database session
-        df: DataFrame with columns: date, ticker, Open, High, Low, Close, Volume
-    
-    Returns:
-        Number of records inserted
+    Optimized Bulk Upsert for 8,000 stocks population.
     """
-    records_inserted = 0
+    # 1. Pre-fetch all tickers in the batch to get their IDs in one go
+    ticker_symbols = df['ticker'].unique().tolist()
+    ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
+    ticker_map = {t.symbol: t.id for t in ticker_objs}
     
-    # Group by ticker for efficiency
-    for ticker_symbol, ticker_df in df.groupby('ticker'):
-        
-        # Get or create ticker ID
-        ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker_symbol).first()
-        if not ticker_obj:
-            ticker_obj = Ticker(symbol=ticker_symbol)
-            db.add(ticker_obj)
-            db.flush()  # Get the ID
-        
-        ticker_id = ticker_obj.id
-        
-        # Insert OHLCV records
-        for _, row in ticker_df.iterrows():
-            ohlcv = DailyOHLCV(
-                ticker_id=ticker_id,
-                date=row['date'],
-                open=float(row['Open']),
-                high=float(row['High']),
-                low=float(row['Low']),
-                close=float(row['Close']),
-                volume=int(row['Volume'])
-            )
-            db.merge(ohlcv)  # Use merge to handle duplicates
-            records_inserted += 1
-        
-        # Insert dividends if present (attached as metadata by provider)
-        if hasattr(df, '_dividends') and not df._dividends.empty:
-            divs = df._dividends[df._dividends['ticker'] == ticker_symbol]
-            for _, row in divs.iterrows():
-                div = Dividend(
-                    ticker_id=ticker_id,
-                    date=row['date'],
-                    amount=float(row['Dividends'])
-                )
-                db.merge(div)
-        
-        # Insert splits if present
-        if hasattr(df, '_splits') and not df._splits.empty:
-            splits = df._splits[df._splits['ticker'] == ticker_symbol]
-            for _, row in splits.iterrows():
-                split = StockSplit(
-                    ticker_id=ticker_id,
-                    date=row['date'],
-                    ratio=float(row['Stock Splits'])
-                )
-                db.merge(split)
+    # Identify missing tickers and create them
+    missing_symbols = set(ticker_symbols) - set(ticker_map.keys())
+    for symbol in missing_symbols:
+        new_ticker = Ticker(symbol=symbol)
+        db.add(new_ticker)
     
-    db.commit()
-    return records_inserted
+    if missing_symbols:
+        db.flush() # Get IDs for new tickers
+        # Refresh the map
+        ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
+        ticker_map = {t.symbol: t.id for t in ticker_objs}
+
+    # 2. Prepare data for Bulk Upsert
+    rows_to_upsert = []
+    for _, row in df.iterrows():
+        t_id = ticker_map.get(row['ticker'])
+        if not t_id: continue
+        
+        rows_to_upsert.append({
+            "ticker_id": t_id,
+            "date": row['date'],
+            "open": float(row['Open']) if pd.notna(row['Open']) else None,
+            "high": float(row['High']) if pd.notna(row['High']) else None,
+            "low": float(row['Low']) if pd.notna(row['Low']) else None,
+            "close": float(row['Close']),
+            "volume": int(row['Volume'])
+        })
+
+    # 3. Execute the PostgreSQL Bulk Upsert
+    if rows_to_upsert:
+        stmt = insert(DailyOHLCV).values(rows_to_upsert)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['ticker_id', 'date'],
+            set_={
+                "open": stmt.excluded.open,
+                "high": stmt.excluded.high,
+                "low": stmt.excluded.low,
+                "close": stmt.excluded.close,
+                "volume": stmt.excluded.volume
+            }
+        )
+        db.execute(stmt)
+        db.commit()
+        
+    return len(rows_to_upsert)
 
 
 def retry_failed_tickers() -> dict:

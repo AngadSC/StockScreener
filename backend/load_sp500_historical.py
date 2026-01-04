@@ -1,5 +1,5 @@
 """
-Optimized historical price loader with high-resolution debug timing.
+Optimized historical price loader using PostgreSQL Bulk Upserts.
 """
 import time
 from datetime import datetime, timedelta
@@ -12,142 +12,103 @@ from app.providers.factory import ProviderFactory
 from app.config import settings
 
 def load_sp500_historical():
-    """Load historical prices with detailed debug timing and optimized DB hits"""
+    """Load historical prices using lightning-fast bulk upserts"""
     db = SessionLocal()
     
     try:
         print("\n" + "="*70)
-        print("📈 LOADING S&P 500 HISTORICAL PRICES (DEBUG MODE)")
+        print("🚀 STARTING BULK HISTORICAL LOAD")
         print("="*70 + "\n")
         
-        # 1. PRE-FETCH TICKERS (Optimization: Prevents 500+ extra DB queries)
-        print("Fetching tickers and building cache...")
+        # 1. PRE-FETCH TICKERS (Optimization)
         ticker_objs = db.query(Ticker).all()
         if not ticker_objs:
-            print("❌ No tickers in database. Run load_sp500.py first!")
+            print("❌ No tickers in database.")
             return
         
-        # Map symbol -> id for instant lookups
         ticker_map = {t.symbol: t.id for t in ticker_objs}
         ticker_symbols = list(ticker_map.keys())
-        total = len(ticker_symbols)
-        print(f"✓ Cached {total} tickers from database")
+        total_tickers = len(ticker_symbols)
         
-        # Date range setup
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=365 * settings.STOCK_HISTORY_YEARS)
-        print(f"📅 Date range: {start_date} to {end_date} ({settings.STOCK_HISTORY_YEARS} years)")
-        
-        # Provider setup
         provider = ProviderFactory.get_historical_provider()
-        print(f"✓ Using provider: {provider.name}")
         
-        stats = {
-            'batches_processed': 0,
-            'price_records_added': 0,
-            'tickers_processed': 0,
-            'failed': 0
-        }
-        
+        stats = {'records': 0, 'tickers': 0}
         script_start = time.perf_counter()
         
-        # Batching
+        # 2. BATCHING
         batch_size = 10 
-        batches = [ticker_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
-        total_batches = len(batches)
-        
-        print(f"📦 Processing {total_batches} batches...\n")
+        batches = [ticker_symbols[i:i + batch_size] for i in range(0, total_tickers, batch_size)]
         
         for batch_num, batch in enumerate(batches, 1):
             batch_start = time.perf_counter()
             try:
-                print(f"📦 Batch {batch_num}/{total_batches} ({len(batch)} tickers): {', '.join(batch[:5])}...")
+                print(f"📦 Batch {batch_num}/{len(batches)} ({', '.join(batch[:3])}...)")
                 
-                # --- TIMER 1: DOWNLOAD ---
+                # --- STEP 1: DOWNLOAD ---
                 dl_start = time.perf_counter()
-                prices_df = provider.get_batch_historical_prices(
-                    batch, start_date, end_date, is_bulk_load=True
-                )
-                dl_time = time.perf_counter() - dl_start
-                print(f"   ⏱️  Download: {dl_time:.2f}s")
-                
+                prices_df = provider.get_batch_historical_prices(batch, start_date, end_date, is_bulk_load=True)
                 if prices_df is None or prices_df.empty:
-                    print(f"   ✗ No data returned for this batch.")
-                    stats['failed'] += len(batch)
                     continue
+                print(f"   ⏱️  Download: {time.perf_counter() - dl_start:.2f}s")
 
-                # --- TIMER 2: DATA PROCESSING ---
-                proc_start = time.perf_counter()
-                batch_records_count = 0
+                # --- STEP 2: PREPARE DATA ---
+                prep_start = time.perf_counter()
+                rows_to_upsert = []
                 
-                for ticker_symbol in batch:
-                    t_id = ticker_map.get(ticker_symbol)
+                for _, row in prices_df.iterrows():
+                    t_id = ticker_map.get(row['ticker'])
                     if not t_id: continue
                     
-                    # Extract ticker data (handles both 'long' and 'wide' pandas formats)
-                    if 'ticker' in prices_df.columns:
-                        ticker_data = prices_df[prices_df['ticker'] == ticker_symbol]
-                    elif ticker_symbol in prices_df.columns.get_level_values(1):
-                        ticker_data = prices_df.xs(ticker_symbol, level=1, axis=1)
-                    else:
-                        continue
+                    rows_to_upsert.append({
+                        "ticker_id": t_id,
+                        "date": row['date'],
+                        "open": float(row['Open']) if pd.notna(row['Open']) else None,
+                        "high": float(row['High']) if pd.notna(row['High']) else None,
+                        "low": float(row['Low']) if pd.notna(row['Low']) else None,
+                        "close": float(row['Close']),
+                        "volume": int(row['Volume'])
+                    })
+                
+                print(f"   ⏱️  Data Prep: {time.perf_counter() - prep_start:.2f}s")
 
-                    for idx, row in ticker_data.iterrows():
-                        if pd.notna(row.get('Close')):
-                            # Use SQLAlchemy merge to handle existing records
-                            # (Replace with bulk_insert_mappings for even more speed if table is empty)
-                            price_record = DailyOHLCV(
-                                ticker_id=t_id,
-                                date=idx.date() if hasattr(idx, 'date') else row.get('date'),
-                                open=float(row['Open']) if pd.notna(row['Open']) else None,
-                                high=float(row['High']) if pd.notna(row['High']) else None,
-                                low=float(row['Low']) if pd.notna(row['Low']) else None,
-                                close=float(row['Close']),
-                                volume=int(row['Volume']) if pd.notna(row['Volume']) else 0
-                            )
-                            db.merge(price_record)
-                            batch_records_count += 1
+                # --- STEP 3: BULK UPSERT (The Performance Fix) ---
+                if rows_to_upsert:
+                    db_start = time.perf_counter()
+                    
+                    # Create the "INSERT ... ON CONFLICT" statement
+                    stmt = insert(DailyOHLCV).values(rows_to_upsert)
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=['ticker_id', 'date'], # Composite Primary Key
+                        set_={
+                            "open": stmt.excluded.open,
+                            "high": stmt.excluded.high,
+                            "low": stmt.excluded.low,
+                            "close": stmt.excluded.close,
+                            "volume": stmt.excluded.volume
+                        }
+                    )
+                    
+                    db.execute(stmt)
+                    db.commit()
+                    
+                    db_time = time.perf_counter() - db_start
+                    stats['records'] += len(rows_to_upsert)
+                    stats['tickers'] += len(batch)
+                    print(f"   ⏱️  DB Bulk Upsert: {db_time:.2f}s for {len(rows_to_upsert)} rows")
                 
-                proc_time = time.perf_counter() - proc_start
-                print(f"   ⏱️  Processing/Merge: {proc_time:.2f}s for {batch_records_count} rows")
-
-                # --- TIMER 3: DB COMMIT ---
-                commit_start = time.perf_counter()
-                db.commit()
-                commit_time = time.perf_counter() - commit_start
-                print(f"   ⏱️  DB Commit: {commit_time:.2f}s")
-                
-                # Stats update
-                stats['batches_processed'] += 1
-                stats['price_records_added'] += batch_records_count
-                stats['tickers_processed'] += len(batch)
-                
-                batch_total = time.perf_counter() - batch_start
-                print(f"   ✅ Batch {batch_num} Total: {batch_total:.2f}s")
-                print(f"   📊 Progress: {stats['tickers_processed']}/{total} tickers\n")
+                print(f"   ✅ Batch {batch_num} Total: {time.perf_counter() - batch_start:.2f}s")
+                print(f"   📊 Total Progress: {stats['tickers']}/{total_tickers} tickers\n")
                 
             except Exception as e:
                 print(f"   ✗ Batch {batch_num} failed: {e}")
                 db.rollback()
-                stats['failed'] += len(batch)
-                if "429" in str(e):
-                    print("🛑 Rate limit exceeded. Stopping.")
-                    break
+                if "429" in str(e): break
                 continue
         
-        # Final Report
-        total_duration = (time.perf_counter() - script_start) / 60
-        print("\n" + "="*70)
-        print("✅ HISTORICAL PRICE LOADING COMPLETE")
-        print("="*70)
-        print(f"   Total Duration: {total_duration:.2f} minutes")
-        print(f"   Price records added: {stats['price_records_added']:,}")
-        print(f"   Success Rate: {(stats['tickers_processed']/total)*100:.1f}%")
-        print("="*70 + "\n")
+        print(f"\n✅ FINISHED: {stats['records']:,} records in {(time.perf_counter() - script_start)/60:.2f} mins")
         
-    except Exception as e:
-        print(f"\n❌ CRITICAL ERROR: {e}")
-        db.rollback()
     finally:
         db.close()
 

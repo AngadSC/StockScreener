@@ -208,14 +208,14 @@ class YFinanceProvider(StockDataProvider):
             
             # Extract dividends and splits if present
             if 'Dividends' in df.columns:
-                dividends = df[df['Dividends'] > 0][['date', 'ticker', 'Dividends']]
-                if not dividends.empty:
-                    result._dividends = dividends
+                div_data = df[df['Dividends'] > 0][['date', 'ticker', 'Dividends']]
+                if not div_data.empty:
+                    result.attrs['dividends'] = div_data
             
             if 'Stock Splits' in df.columns:
-                splits = df[df['Stock Splits'] > 0][['date', 'ticker', 'Stock Splits']]
-                if not splits.empty:
-                    result._splits = splits
+                split_data = df[df['Stock Splits'] > 0][['date', 'ticker', 'Stock Splits']]
+                if not split_data.empty:
+                    result.attrs['splits'] = split_data
             
             # Apply jitter after batch
             self._apply_jitter(is_bulk_load=is_bulk_load)

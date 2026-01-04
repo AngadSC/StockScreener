@@ -1,0 +1,8 @@
+FROM postgres:16-alpine
+WORKDIR /app
+
+# copy your migration file into the container
+COPY backend/app/database/migrations/001_optimized_schema.sql /app/migration.sql
+
+# run migration, then print tables so logs prove it worked
+CMD sh -c 'psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /app/migration.sql && psql "$DATABASE_URL" -c "\dt"'

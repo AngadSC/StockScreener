@@ -16,17 +16,17 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
 
-# NEW: Data Providers (Pinned to the stable versions you just installed)
+# Data Providers
 yfinance==1.0.0
 yahooquery==2.4.1
-curl-cffi==0.7.0b4
+# curl-cffi>=0.7,<0.14  # Let yfinance install compatible version automatically
 
 # Data Processing
 pandas==2.2.3
 numpy==2.2.1
 httpx==0.28.1
 
-# Market Calendar (Essential for skipping non-trading days in your DB)
+# Market Calendar
 pandas-market-calendars==4.3.0
 
 # Job Scheduling

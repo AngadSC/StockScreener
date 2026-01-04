@@ -3,6 +3,8 @@ from typing import List
 import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar, Holiday, nearest_workday
 from pandas import DateOffset
+from pandas.tseries.offsets import Easter
+
 
 # ============================================
 # US STOCK MARKET HOLIDAYS (NYSE/NASDAQ)
@@ -15,7 +17,7 @@ class USMarketCalendar(USFederalHolidayCalendar):
         Holiday('New Years Day', month=1, day=1, observance=nearest_workday),
         Holiday('Martin Luther King Jr. Day', month=1, day=1, offset=DateOffset(weekday=0, weeks=3)),
         Holiday('Presidents Day', month=2, day=1, offset=DateOffset(weekday=0, weeks=3)),
-        Holiday('Good Friday', month=1, day=1, offset=[pd.Easter(), pd.DateOffset(days=-2)]),
+        Holiday('Good Friday', month=1, day=1, offset=[Easter(), pd.DateOffset(days=-2)]),
         Holiday('Memorial Day', month=5, day=31, offset=DateOffset(weekday=0, weeks=-1)),
         Holiday('Juneteenth', month=6, day=19, observance=nearest_workday),
         Holiday('Independence Day', month=7, day=4, observance=nearest_workday),

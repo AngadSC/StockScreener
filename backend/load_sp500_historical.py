@@ -41,7 +41,7 @@ def load_sp500_historical():
         # Get YFinance provider
         provider = ProviderFactory.get_historical_provider()
         print(f"✓ Using provider: {provider.name}")
-        print(f"✓ Batch size: {settings.YFINANCE_BATCH_SIZE} tickers per call")
+        print(f"✓ Batch size: 10 tickers per call (reduced to avoid timeouts)")
         print(f"✓ Rate limiting: {settings.YFINANCE_INITIAL_JITTER_MIN}-{settings.YFINANCE_INITIAL_JITTER_MAX}s between batches")
         print()
         
@@ -55,8 +55,8 @@ def load_sp500_historical():
         
         start_time = datetime.now()
         
-        # Process in batches
-        batch_size = settings.YFINANCE_BATCH_SIZE  # 100 tickers per batch
+        # Process in batches - REDUCED SIZE
+        batch_size = 10  # Smaller batches to avoid timeout
         batches = [ticker_symbols[i:i + batch_size] for i in range(0, total, batch_size)]
         total_batches = len(batches)
         
@@ -64,15 +64,18 @@ def load_sp500_historical():
         
         for batch_num, batch in enumerate(batches, 1):
             try:
-                print(f"📦 Batch {batch_num}/{total_batches} ({len(batch)} tickers)...")
+                print(f"📦 Batch {batch_num}/{total_batches} ({len(batch)} tickers): {', '.join(batch[:5])}{'...' if len(batch) > 5 else ''}")
+                print(f"   🔄 Downloading data (this may take 1-2 minutes)...")
                 
-                # Fetch batch historical prices (ONE API CALL for 100 tickers!)
+                # Fetch batch historical prices
                 prices_df = provider.get_batch_historical_prices(
                     batch,
                     start_date,
                     end_date,
                     is_bulk_load=True  # Uses 15-25s jitter
                 )
+                
+                print(f"   ✓ Download complete, processing data...")
                 
                 if prices_df is None or prices_df.empty:
                     print(f"   ✗ No data returned")

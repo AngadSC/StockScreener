@@ -7,6 +7,9 @@ from app.utils.market_calendar import get_last_trading_day
 from datetime import datetime, timedelta, date
 from typing import List
 import pandas as pd
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select
+
 
 # ============================================
 # BULK POPULATION JOB

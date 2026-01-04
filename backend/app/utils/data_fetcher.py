@@ -1,255 +1,12 @@
 from typing import Optional, Dict, Any, List
-import requests
 import pandas as pd
 from datetime import datetime, timedelta, date
-import time
-from functools import wraps
+import yfinance as yf
 from app.config import settings
 
-# ====================================
-# RATE LIMITER
-# ====================================
-
-class RateLimiter:
-    """Rate limiter to prevent hitting API limits"""
-    
-    def __init__(self, calls_per_minute: int = 30):
-        self.calls_per_minute = calls_per_minute
-        self.min_interval = 60.0 / calls_per_minute
-        self.last_call = None
-    
-    def wait_if_needed(self):
-        """Sleep if we're calling too fast"""
-        if self.last_call is not None:
-            elapsed = time.time() - self.last_call
-            if elapsed < self.min_interval:
-                sleep_time = self.min_interval - elapsed
-                time.sleep(sleep_time)
-        self.last_call = time.time()
-
-# Global rate limiters
-tiingo_limiter = RateLimiter(calls_per_minute=50)  # 50 requests/hour = ~0.83/min
-fmp_limiter = RateLimiter(calls_per_minute=10)  # Conservative for free tier
-
-def rate_limited(limiter):
-    """Decorator to rate limit function calls"""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            limiter.wait_if_needed()
-            return func(*args, **kwargs)
-        return wrapper
-    return decorator
-
 
 # ====================================
-# FMP API CLIENT
-# ====================================
-
-class FMPClient:
-    """Financial Modeling Prep API Client"""
-    
-    def __init__(self):
-        self.base_url = settings.FMP_BASE_URL
-        self.api_key = settings.FMP_API_KEY
-        self.batch_size = settings.FMP_BATCH_SIZE
-    
-    @rate_limited(fmp_limiter)
-    def get_batch_quotes(self, tickers: List[str], quiet: bool = False) -> List[Dict[str, Any]]:
-        """
-        Fetch real-time/EOD quotes for multiple stocks in one request
-        
-        Args:
-            tickers: List of ticker symbols (max 100 recommended)
-            quiet: Suppress print statements
-        
-        Returns:
-            List of quote dictionaries
-        """
-        try:
-            # Join tickers with comma
-            symbols = ",".join(tickers[:self.batch_size])
-            
-            url = f"{self.base_url}/quote/{symbols}"
-            params = {"apikey": self.api_key}
-            
-            response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if not quiet:
-                print(f"✓ Fetched {len(data)} quotes from FMP")
-            
-            return data
-            
-        except Exception as e:
-            if not quiet:
-                print(f"✗ FMP batch quote error: {e}")
-            return []
-    
-    @rate_limited(fmp_limiter)
-    def get_historical_prices(
-        self, 
-        ticker: str, 
-        from_date: str, 
-        to_date: str,
-        quiet: bool = False
-    ) -> Optional[pd.DataFrame]:
-        """
-        Fetch historical OHLCV data for a single stock
-        
-        Args:
-            ticker: Stock symbol
-            from_date: Start date (YYYY-MM-DD)
-            to_date: End date (YYYY-MM-DD)
-            quiet: Suppress prints
-        
-        Returns:
-            DataFrame with historical prices
-        """
-        try:
-            url = f"{self.base_url}/historical-price-full/{ticker}"
-            params = {
-                "apikey": self.api_key,
-                "from": from_date,
-                "to": to_date
-            }
-            
-            response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if "historical" not in data or not data["historical"]:
-                if not quiet:
-                    print(f"✗ No historical data for {ticker}")
-                return None
-            
-            df = pd.DataFrame(data["historical"])
-            df['date'] = pd.to_datetime(df['date'])
-            df = df.set_index('date')
-            df = df.sort_index()
-            
-            # Rename columns to match our schema
-            df = df.rename(columns={
-                'open': 'Open',
-                'high': 'High',
-                'low': 'Low',
-                'close': 'Close',
-                'volume': 'Volume'
-            })
-            
-            if not quiet:
-                print(f"✓ Fetched {len(df)} historical records for {ticker}")
-            
-            return df[['Open', 'High', 'Low', 'Close', 'Volume']]
-            
-        except Exception as e:
-            if not quiet:
-                print(f"✗ FMP historical error for {ticker}: {e}")
-            return None
-
-
-# ====================================
-# TIINGO API CLIENT
-# ====================================
-
-class TiingoClient:
-    """Tiingo API Client for historical data"""
-    
-    def __init__(self):
-        self.base_url = settings.TIINGO_BASE_URL
-        self.api_key = settings.TIINGO_API_KEY
-        self.headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Token {self.api_key}'
-        }
-    
-    @rate_limited(tiingo_limiter)
-    def get_historical_prices(
-        self,
-        ticker: str,
-        start_date: str,
-        end_date: str,
-        quiet: bool = False
-    ) -> Optional[pd.DataFrame]:
-        """
-        Fetch historical EOD prices from Tiingo
-        
-        Args:
-            ticker: Stock symbol
-            start_date: Start date (YYYY-MM-DD)
-            end_date: End date (YYYY-MM-DD)
-            quiet: Suppress prints
-        
-        Returns:
-            DataFrame with OHLCV data
-        """
-        try:
-            url = f"{self.base_url}/tiingo/daily/{ticker}/prices"
-            params = {
-                'startDate': start_date,
-                'endDate': end_date,
-                'format': 'json'
-            }
-            
-            response = requests.get(url, headers=self.headers, params=params, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            if not data:
-                if not quiet:
-                    print(f"✗ No data from Tiingo for {ticker}")
-                return None
-            
-            df = pd.DataFrame(data)
-            df['date'] = pd.to_datetime(df['date']).dt.date
-            df = df.set_index('date')
-            
-            # Use adjusted prices for consistency
-            df = df.rename(columns={
-                'adjOpen': 'Open',
-                'adjHigh': 'High',
-                'adjLow': 'Low',
-                'adjClose': 'Close',
-                'adjVolume': 'Volume'
-            })
-            
-            if not quiet:
-                print(f"✓ Fetched {len(df)} records from Tiingo for {ticker}")
-            
-            return df[['Open', 'High', 'Low', 'Close', 'Volume']]
-            
-        except Exception as e:
-            if not quiet:
-                print(f"✗ Tiingo error for {ticker}: {e}")
-            return None
-    
-    @rate_limited(tiingo_limiter)
-    def get_ticker_metadata(self, ticker: str) -> Optional[Dict[str, Any]]:
-        """Get metadata for a ticker from Tiingo"""
-        try:
-            url = f"{self.base_url}/tiingo/daily/{ticker}"
-            response = requests.get(url, headers=self.headers, timeout=30)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            print(f"✗ Tiingo metadata error for {ticker}: {e}")
-            return None
-
-
-# ====================================
-# SINGLETON INSTANCES
-# ====================================
-
-fmp_client = FMPClient()
-tiingo_client = TiingoClient()
-
-
-# ====================================
-# TICKER LISTS (Keep existing functions)
+# TICKER LISTS
 # ====================================
 
 def get_all_us_tickers() -> List[str]:
@@ -318,11 +75,218 @@ def get_sp500_tickers() -> List[str]:
 
 
 # ====================================
+# YFINANCE DATA FETCHERS (NEW)
+# ====================================
+
+def prepare_backtest_data(
+    ticker: str,
+    start_date: str,
+    end_date: str,
+    include_splits: bool = True,
+    include_dividends: bool = True,
+    quiet: bool = False
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch extended historical data for backtesting using yfinance.
+    
+    Args:
+        ticker: Stock symbol
+        start_date: Start date (YYYY-MM-DD)
+        end_date: End date (YYYY-MM-DD)
+        include_splits: Include stock splits
+        include_dividends: Include dividend data
+        quiet: Suppress print statements
+    
+    Returns:
+        DataFrame with OHLCV data and optional splits/dividends
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching backtest data for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        
+        # Fetch historical data
+        df = stock.history(
+            start=start_date,
+            end=end_date,
+            auto_adjust=True,  # Use adjusted prices
+            actions=include_splits or include_dividends  # Include corporate actions
+        )
+        
+        if df.empty:
+            if not quiet:
+                print(f"✗ No data for {ticker}")
+            return None
+        
+        # Ensure Date is in the index
+        if 'Date' in df.columns:
+            df = df.set_index('Date')
+        
+        if not quiet:
+            print(f"✓ Fetched {len(df)} records for {ticker}")
+        
+        return df
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching backtest data for {ticker}: {e}")
+        return None
+
+
+def fetch_price_history(
+    ticker: str,
+    period: str = "1y",
+    interval: str = "1d",
+    quiet: bool = False
+) -> Optional[pd.DataFrame]:
+    """
+    Fetch price history using yfinance.
+    
+    Args:
+        ticker: Stock symbol
+        period: Time period (1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max)
+        interval: Data interval (1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo)
+        quiet: Suppress print statements
+    
+    Returns:
+        DataFrame with OHLCV data
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching {period} of {interval} data for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        
+        df = stock.history(
+            period=period,
+            interval=interval,
+            auto_adjust=True
+        )
+        
+        if df.empty:
+            if not quiet:
+                print(f"✗ No data for {ticker}")
+            return None
+        
+        # Ensure Date is in the index
+        if 'Date' in df.columns:
+            df = df.set_index('Date')
+        
+        if not quiet:
+            print(f"✓ Fetched {len(df)} records for {ticker}")
+        
+        return df
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching price history for {ticker}: {e}")
+        return None
+
+
+def fetch_stock_fundamentals(ticker: str, quiet: bool = False) -> Optional[Dict[str, Any]]:
+    """
+    Fetch fundamental data for a single stock using yfinance.
+    
+    NOTE: For production, use YahooQueryProvider for batch fundamentals!
+    This is a fallback for single-ticker requests.
+    
+    Args:
+        ticker: Stock symbol
+        quiet: Suppress print statements
+    
+    Returns:
+        Dict with fundamental data
+    """
+    try:
+        if not quiet:
+            print(f"📊 Fetching fundamentals for {ticker}...")
+        
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        
+        if not info or len(info) < 5:
+            if not quiet:
+                print(f"✗ No fundamental data for {ticker}")
+            return None
+        
+        # Extract fundamentals (same structure as yahooquery provider)
+        fundamentals = {
+            'ticker': ticker,
+            'name': info.get('longName') or info.get('shortName'),
+            'exchange': info.get('exchange'),
+            
+            # Valuation
+            'pe_ratio': info.get('trailingPE'),
+            'forward_pe': info.get('forwardPE'),
+            'peg_ratio': info.get('pegRatio'),
+            'price_to_book': info.get('priceToBook'),
+            'price_to_sales': info.get('priceToSalesTrailing12Months'),
+            'ev_to_ebitda': info.get('enterpriseToEbitda'),
+            
+            # Profitability
+            'profit_margin': info.get('profitMargins'),
+            'operating_margin': info.get('operatingMargins'),
+            'roe': info.get('returnOnEquity'),
+            'roa': info.get('returnOnAssets'),
+            
+            # Financial Health
+            'debt_to_equity': info.get('debtToEquity'),
+            'current_ratio': info.get('currentRatio'),
+            'quick_ratio': info.get('quickRatio'),
+            
+            # Growth
+            'revenue_growth': info.get('revenueGrowth'),
+            'earnings_growth': info.get('earningsGrowth'),
+            
+            # Dividends
+            'dividend_yield': info.get('dividendYield'),
+            'dividend_rate': info.get('dividendRate'),
+            'payout_ratio': info.get('payoutRatio'),
+            
+            # Size & Trading
+            'market_cap': info.get('marketCap'),
+            'volume': info.get('volume'),
+            'avg_volume': info.get('averageVolume'),
+            'beta': info.get('beta'),
+            
+            # Price
+            'current_price': info.get('currentPrice') or info.get('regularMarketPrice'),
+            'day_change_percent': info.get('regularMarketChangePercent'),
+            'fifty_two_week_high': info.get('fiftyTwoWeekHigh'),
+            'fifty_two_week_low': info.get('fiftyTwoWeekLow'),
+            
+            # Classification
+            'sector': info.get('sector'),
+            'industry': info.get('industry'),
+        }
+        
+        if not quiet:
+            print(f"✓ Fetched fundamentals for {ticker}")
+        
+        return fundamentals
+        
+    except Exception as e:
+        if not quiet:
+            print(f"✗ Error fetching fundamentals for {ticker}: {e}")
+        return None
+
+
+# ====================================
 # TECHNICAL INDICATORS
 # ====================================
 
 def add_technical_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Add technical indicators to price DataFrame"""
+    """
+    Add technical indicators to price DataFrame.
+    
+    Adds:
+    - Moving Averages (SMA 20/50/200, EMA 12/26)
+    - MACD and Signal
+    - RSI (14)
+    - Bollinger Bands
+    - Volume SMA
+    """
     df = df.copy()
     
     # Moving Averages

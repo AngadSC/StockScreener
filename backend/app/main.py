@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database.connection import engine, Base
-from app.routes import stocks, screener, auth, watchlist
+from app.routes import stocks, screener, auth, watchlist, admin
 from app.jobs.stock_loader import start_scheduler
 import uvicorn
 
@@ -53,6 +53,7 @@ app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(stocks.router, prefix=settings.API_V1_PREFIX)
 app.include_router(screener.router, prefix=settings.API_V1_PREFIX)
 app.include_router(watchlist.router, prefix=settings.API_V1_PREFIX)
+app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
 
 #Root endpoint 
 @app.get("/")

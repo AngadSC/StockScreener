@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from app.jobs.bulk_population import populate_all_stocks, retry_failed_tickers
 from app.jobs.daily_sync import daily_delta_sync
 from app.jobs.fundamentals_updater import update_fundamentals_daily, update_single_ticker_fundamentals
+from app.jobs.stock_loader import update_all_stocks_batch
 from typing import Dict, Any
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -67,7 +68,7 @@ async def trigger_fundamentals_update(background_tasks: BackgroundTasks) -> Dict
 async def trigger_single_fundamentals_update(ticker: str) -> Dict[str, Any]:
     """Update fundamentals for a single ticker (on-demand)"""
     success = update_single_ticker_fundamentals(ticker)
-    
+
     if success:
         return {
             "status": "success",
@@ -76,3 +77,29 @@ async def trigger_single_fundamentals_update(ticker: str) -> Dict[str, Any]:
         }
     else:
         raise HTTPException(status_code=404, detail=f"Failed to update {ticker}")
+
+
+@router.post("/batch-update")
+async def trigger_batch_update(background_tasks: BackgroundTasks) -> Dict[str, str]:
+    """
+    Manually trigger batch update of all active stocks
+
+    This updates:
+    - Fundamentals using YahooQuery (50 tickers per API call)
+    - Historical prices using YFinance (100 tickers per API call)
+
+    Note: This is the same job that runs nightly at 9 PM ET,
+    but can be triggered manually by admin at any time.
+    """
+    background_tasks.add_task(update_all_stocks_batch, manual_trigger=True)
+
+    return {
+        "status": "started",
+        "message": "Batch update job started. Check logs for progress.",
+        "details": {
+            "fundamentals_provider": "yahooquery",
+            "fundamentals_batch_size": 50,
+            "prices_provider": "yfinance",
+            "prices_batch_size": 100
+        }
+    }

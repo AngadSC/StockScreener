@@ -51,22 +51,48 @@ def is_trading_day(check_date: date) -> bool:
 def get_last_trading_day(reference_date: date = None) -> date:
     """
     Get the most recent trading day (or current day if market is open)
-    
+
     Args:
         reference_date: Date to check from (defaults to today)
-    
+
     Returns:
         Last trading day
     """
     if reference_date is None:
         reference_date = datetime.now().date()
-    
+
     current = reference_date
-    
+
     # Go back until we find a trading day
     while not is_trading_day(current):
         current -= timedelta(days=1)
-    
+
+    return current
+
+
+def get_previous_trading_day(reference_date: date = None) -> date:
+    """
+    Get the trading day BEFORE the reference date (not including reference date itself)
+
+    This is useful for fetching historical data ranges where you need a start date
+    before the end date to avoid startDate == endDate errors.
+
+    Args:
+        reference_date: Date to check from (defaults to today)
+
+    Returns:
+        Previous trading day (always before reference_date)
+    """
+    if reference_date is None:
+        reference_date = datetime.now().date()
+
+    # Start from the day before reference_date
+    current = reference_date - timedelta(days=1)
+
+    # Go back until we find a trading day
+    while not is_trading_day(current):
+        current -= timedelta(days=1)
+
     return current
 
 

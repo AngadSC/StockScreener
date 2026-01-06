@@ -161,7 +161,13 @@ class YFinanceProvider(StockDataProvider):
         """
         try:
             session = self._get_session()
-            
+
+            # Validate date range
+            if start_date >= end_date:
+                print(f"✗ Invalid date range: start_date ({start_date}) >= end_date ({end_date})")
+                print(f"   Yahoo Finance requires start_date < end_date")
+                return None
+
             # Download batch
             data = yf.download(
                 tickers=tickers,
@@ -173,9 +179,10 @@ class YFinanceProvider(StockDataProvider):
                 actions=True,
                 progress=False,
             )
-            
+
             if data.empty:
-                print(f"✗ No data for batch")
+                print(f"✗ No data for batch (date range: {start_date} to {end_date})")
+                print(f"   This could mean: stocks are delisted, date range is invalid, or Yahoo API issues")
                 return None
             
             # Handle single ticker vs multiple tickers
@@ -205,21 +212,29 @@ class YFinanceProvider(StockDataProvider):
             
             # Filter to only requested columns for OHLCV
             result = df[['date', 'ticker', 'Open', 'High', 'Low', 'Close', 'Volume']].copy()
-            
+
+            # Log batch success metrics
+            if 'ticker' in result.columns:
+                successful_tickers = result['ticker'].nunique()
+                total_rows = len(result)
+                print(f"   ✓ Retrieved data for {successful_tickers}/{len(tickers)} tickers ({total_rows} rows)")
+            else:
+                print(f"   ✓ Retrieved {len(result)} rows for single ticker")
+
             # Extract dividends and splits if present
             if 'Dividends' in df.columns:
                 div_data = df[df['Dividends'] > 0][['date', 'ticker', 'Dividends']]
                 if not div_data.empty:
                     result.attrs['dividends'] = div_data
-            
+
             if 'Stock Splits' in df.columns:
                 split_data = df[df['Stock Splits'] > 0][['date', 'ticker', 'Stock Splits']]
                 if not split_data.empty:
                     result.attrs['splits'] = split_data
-            
+
             # Apply jitter after batch
             self._apply_jitter(is_bulk_load=is_bulk_load)
-            
+
             return result
             
         except Exception as e:

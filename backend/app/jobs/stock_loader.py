@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import insert
 from app.database.connection import SessionLocal
 from app.database.models import Ticker, DailyOHLCV, StockFundamental
 from app.providers.factory import ProviderFactory
-from app.utils.market_calendar import is_trading_day, get_last_trading_day
+from app.utils.market_calendar import is_trading_day, get_last_trading_day, get_previous_trading_day
 from app.services.cache import cache_service
 from app.config import settings
 from datetime import datetime, timedelta, date as date_type
@@ -19,12 +19,38 @@ def get_active_tickers(db: Session) -> List[str]:
     """
     Get list of tickers that have fundamental data.
     These are the stocks actively tracked in the system.
+
+    IMPORTANT FILTERING BEHAVIOR:
+    - Only returns stocks that have StockFundamental records
+    - New stocks without fundamentals will NOT be included
+    - Stocks where fundamental fetch failed will NOT be included
+    - This prevents updating price data for stocks we're not tracking
+    - To update ALL stocks (including those without fundamentals), use get_all_tickers() instead
+
+    Returns:
+        List of ticker symbols that have fundamental data
     """
     tickers = db.query(Ticker.symbol).join(
         StockFundamental,
         Ticker.id == StockFundamental.ticker_id
     ).distinct().all()
 
+    return [t[0] for t in tickers]
+
+
+def get_all_tickers(db: Session) -> List[str]:
+    """
+    Get ALL tickers in the database, regardless of whether they have fundamentals.
+
+    Use this when you want to update price data for all stocks, including:
+    - New stocks that haven't been processed yet
+    - Stocks where fundamental fetch failed
+    - Stocks that are no longer tracked but still have price history
+
+    Returns:
+        List of all ticker symbols in the database
+    """
+    tickers = db.query(Ticker.symbol).distinct().all()
     return [t[0] for t in tickers]
 
 
@@ -47,13 +73,16 @@ def update_all_stocks_batch(manual_trigger: bool = False):
             print("📅 Market closed today (weekend/holiday), skipping update")
             return
 
+        # NOTE: Using get_active_tickers() - only updates stocks with fundamentals
+        # To update ALL stocks in DB (including those without fundamentals), use get_all_tickers()
         active_tickers = get_active_tickers(db)
         if not active_tickers:
             print("📋 No active stocks to update yet")
+            print("    Run bulk_population.py or fundamentals_updater.py first to populate fundamental data")
             return
 
         total = len(active_tickers)
-        print(f"📋 Updating {total} active stocks...\n")
+        print(f"📋 Updating {total} active stocks (with fundamental data)...\n")
 
         stats = {
             'updated_prices': 0,
@@ -132,10 +161,14 @@ def update_all_stocks_batch(manual_trigger: bool = False):
         print("=" * 70 + "\n")
 
         historical_provider = ProviderFactory.get_historical_provider()
-        price_batch_size = settings.YFINANCE_BATCH_SIZE 
+        price_batch_size = settings.YFINANCE_BATCH_SIZE
 
         end_date = today
-        start_date = get_last_trading_day(today) if not manual_trigger else today - timedelta(days=5)
+        # IMPORTANT: Use get_previous_trading_day() to ensure start_date < end_date
+        # This prevents Yahoo Finance "startDate == endDate" errors
+        start_date = get_previous_trading_day(today) if not manual_trigger else today - timedelta(days=5)
+
+        print(f"📅 Fetching prices from {start_date} to {end_date}\n")
 
         for i in range(0, total, price_batch_size):
             batch = active_tickers[i:i + price_batch_size]

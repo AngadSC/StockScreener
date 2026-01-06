@@ -13,16 +13,27 @@ from sqlalchemy import select
 
 # ============================================
 # BULK POPULATION JOB
-# Populates all 8,000 US stocks with 5 years of historical data
+# Populates ~6,000 high-quality global stocks with 5 years of historical data
+# Includes: US companies, international ADRs, and major ETFs (SPY, QQQ, etc.)
 # ============================================
 
 def populate_all_stocks(resume: bool = True) -> dict:
     """
-    One-time bulk population job: Fetch 5 years of OHLCV for all US stocks
-    
+    One-time bulk population job: Fetch 5 years of OHLCV for ~6,000 global stocks
+
+    Includes:
+    - Top US companies by market cap and volume
+    - International ADRs (Toyota, ASML, Alibaba, etc.)
+    - High-volume ETFs (SPY, QQQ, sector ETFs, etc.)
+
+    Filters out:
+    - Warrants, units, rights, preferred shares
+    - Test issues and delisted companies
+    - Low-volume/obscure ETFs
+
     Args:
         resume: If True, resume from last checkpoint. If False, start fresh.
-    
+
     Returns:
         Dict with statistics
     """
@@ -218,7 +229,8 @@ def populate_all_stocks(resume: bool = True) -> dict:
 
 def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
-    Optimized Bulk Upsert for 8,000 stocks population.
+    Optimized Bulk Upsert for ~6,000 stocks population.
+    Uses PostgreSQL ON CONFLICT for efficient upserts.
     """
     # 1. Pre-fetch all tickers in the batch to get their IDs in one go
     ticker_symbols = df['ticker'].unique().tolist()

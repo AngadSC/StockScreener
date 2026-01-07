@@ -40,7 +40,7 @@ def should_populate():
         print(f"   Database currently has {ticker_count} tickers")
 
         # If less than 100 tickers, database is empty or incomplete
-        if ticker_count < 100:
+        if ticker_count < 1000:
             print("   ⚠️  Database is empty or incomplete (< 100 tickers)")
             return True
         else:

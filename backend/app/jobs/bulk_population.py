@@ -9,6 +9,7 @@ from typing import List
 import pandas as pd
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
+import gc
 
 
 # ============================================
@@ -231,57 +232,45 @@ def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
     Optimized Bulk Upsert for ~6,000 stocks population.
     Uses PostgreSQL ON CONFLICT for efficient upserts.
+    Even more optimized now we use less memory, and
+    initiate junk clean up quicker 
     """
-    # 1. Pre-fetch all tickers in the batch to get their IDs in one go
-    ticker_symbols = df['ticker'].unique().tolist()
-    ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
-    ticker_map = {t.symbol: t.id for t in ticker_objs}
-    
-    # Identify missing tickers and create them
-    missing_symbols = set(ticker_symbols) - set(ticker_map.keys())
-    for symbol in missing_symbols:
-        new_ticker = Ticker(symbol=symbol)
-        db.add(new_ticker)
-    
-    if missing_symbols:
-        db.flush() # Get IDs for new tickers
-        # Refresh the map
-        ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
-        ticker_map = {t.symbol: t.id for t in ticker_objs}
 
-    # 2. Prepare data for Bulk Upsert
-    rows_to_upsert = []
-    for _, row in df.iterrows():
-        t_id = ticker_map.get(row['ticker'])
-        if not t_id: continue
-        
-        rows_to_upsert.append({
-            "ticker_id": t_id,
-            "date": row['date'],
-            "open": float(row['Open']) if pd.notna(row['Open']) else None,
-            "high": float(row['High']) if pd.notna(row['High']) else None,
-            "low": float(row['Low']) if pd.notna(row['Low']) else None,
-            "close": float(row['Close']),
-            "volume": int(row['Volume'])
-        })
+    #Map ticker sybmols to the IDs, to optimize use a vectorized appraoch
+    ticker_symbols = df['ticker'].unique().tolist() 
+    ticker_objs = db.query(Ticker.id, Ticker.symbol).filter(Ticker.symbol.in_(ticker_symbols)).all()
+    ticker_map = {symbol: tid for tid, symbol in ticker_objs}
 
-    # 3. Execute the PostgreSQL Bulk Upsert
+    # add the ticker id to column into our dataframe vectorized
+    df['ticker_id'] = df['ticker'].map(ticker_map)
+
+    #filter out rows that havig a missing ticker id and 
+    upload_df = df.dropna(subset=['ticker_id']).copy()
+    upload_df = upload_df.rename(columns = {
+        'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
+    })
+    #Select the columns we need for the daily OHLCV 
+    final_cols= ['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']
+    rows_to_upsert = upload_df[final_cols].to_dict('records')
+
+    # bulk Upsert
+
     if rows_to_upsert:
         stmt = insert(DailyOHLCV).values(rows_to_upsert)
         stmt = stmt.on_conflict_do_update(
-            index_elements=['ticker_id', 'date'],
-            set_={
-                "open": stmt.excluded.open,
-                "high": stmt.excluded.high,
-                "low": stmt.excluded.low,
-                "close": stmt.excluded.close,
-                "volume": stmt.excluded.volume
-            }
+            index_elements = ['ticker_id','date'],
+            set_={col: getattr(stmt.excluded, col) for col in ["open", "high", "low", "close", "volume"]}
         )
         db.execute(stmt)
         db.commit()
-        
-    return len(rows_to_upsert)
+
+    # memoru clear up 
+    del rows_to_upsert
+    del upload_df
+    gc.collect()
+    return len(df)
+
+    
 
 
 def retry_failed_tickers() -> dict:

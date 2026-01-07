@@ -52,6 +52,32 @@ def should_populate():
         print(f"   Assuming database is empty, will attempt population")
         return True
 
+def clear_old_progress():
+    """Clear old progress records to avoid duplicate key errors"""
+    try:
+        from app.database.connection import SessionLocal
+        from app.database.models import PopulationProgress, FailedTicker
+
+        print("🧹 Clearing old progress records...")
+        db = SessionLocal()
+
+        progress_count = db.query(PopulationProgress).count()
+        failed_count = db.query(FailedTicker).count()
+
+        if progress_count > 0 or failed_count > 0:
+            db.query(PopulationProgress).delete()
+            db.query(FailedTicker).delete()
+            db.commit()
+            print(f"   ✓ Cleared {progress_count} progress records and {failed_count} failed ticker records")
+        else:
+            print("   ✓ No old progress records to clear")
+
+        db.close()
+
+    except Exception as e:
+        print(f"   ⚠️  Error clearing progress: {e}")
+        print("   Continuing anyway...")
+
 def run_bulk_population():
     """Run the bulk population job"""
     print("\n" + "="*80)
@@ -60,9 +86,13 @@ def run_bulk_population():
     print("   Progress will be shown below")
     print("="*80 + "\n")
 
+    # Clear old progress records first to avoid duplicate key errors
+    clear_old_progress()
+    print()
+
     try:
         from app.jobs.bulk_population import populate_all_stocks
-        stats = populate_all_stocks(resume=True)
+        stats = populate_all_stocks(resume=False)  # Changed to False since we just cleared progress
 
         print("\n" + "="*80)
         print("✅ BULK POPULATION COMPLETE")

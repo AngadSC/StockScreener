@@ -230,44 +230,43 @@ def populate_all_stocks(resume: bool = True) -> dict:
 
 def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
-    Optimized Bulk Upsert for ~6,000 stocks population.
-    Uses PostgreSQL ON CONFLICT for efficient upserts.
-    Even more optimized now we use less memory, and
-    initiate junk clean up quicker 
+    Optimized Bulk Upsert with sub-batching to avoid Postgres parameter limits.
     """
-
-    #Map ticker sybmols to the IDs, to optimize use a vectorized appraoch
-    ticker_symbols = df['ticker'].unique().tolist() 
-    ticker_objs = db.query(Ticker.id, Ticker.symbol).filter(Ticker.symbol.in_(ticker_symbols)).all()
-    ticker_map = {symbol: tid for tid, symbol in ticker_objs}
-
-    # add the ticker id to column into our dataframe vectorized
+    ticker_symbols = df['ticker'].unique().tolist()
+    ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
+    ticker_map = {t.symbol: t.id for t in ticker_objs}
+    
+    # Vectorized data preparation
     df['ticker_id'] = df['ticker'].map(ticker_map)
-
-    #filter out rows that havig a missing ticker id and 
     upload_df = df.dropna(subset=['ticker_id']).copy()
-    upload_df = upload_df.rename(columns = {
+    upload_df = upload_df.rename(columns={
         'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
     })
-    #Select the columns we need for the daily OHLCV 
-    final_cols= ['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']
-    rows_to_upsert = upload_df[final_cols].to_dict('records')
+    
+    rows = upload_df[['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']].to_dict('records')
 
-    # bulk Upsert
-
-    if rows_to_upsert:
-        stmt = insert(DailyOHLCV).values(rows_to_upsert)
-        stmt = stmt.on_conflict_do_update(
-            index_elements = ['ticker_id','date'],
-            set_={col: getattr(stmt.excluded, col) for col in ["open", "high", "low", "close", "volume"]}
-        )
-        db.execute(stmt)
-        db.commit()
-
-    # memoru clear up 
-    del rows_to_upsert
+    # Sub-batching: Max ~9,000 rows to stay under 65k parameter limit (7 cols * 9000 < 65k)
+    chunk_size = 5000 
+    for i in range(0, len(rows), chunk_size):
+        chunk = rows[i:i + chunk_size]
+        try:
+            stmt = insert(DailyOHLCV).values(chunk)
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['ticker_id', 'date'],
+                set_={col: getattr(stmt.excluded, col) for col in ["open", "high", "low", "close", "volume"]}
+            )
+            db.execute(stmt)
+            db.commit() # Commit each chunk separately
+        except Exception as e:
+            db.rollback() # CRITICAL: Reset the connection state so next commands work
+            print(f"   ✗ Sub-batch insertion failed: {e}")
+            raise e
+    
+    # Clean up memory
+    del rows
     del upload_df
     gc.collect()
+            
     return len(df)
 
     

@@ -115,13 +115,26 @@ def populate_all_stocks(resume: bool = True) -> dict:
             print(f"📦 Processing batch {batch_num}/{stats['total_batches']} ({len(batch)} tickers)...")
             
             # Create progress record
-            progress = PopulationProgress(
-                batch_number=batch_num,
-                ticker_list=batch,
-                start_time=datetime.now(),
-                status='in_progress'
-            )
-            db.add(progress)
+            progress = db.query(PopulationProgress).filter(
+                PopulationProgress.batch_number == batch_num
+            ).first()
+
+            if progress:
+                # Update the existing "stuck" record
+                progress.status = 'in_progress'
+                progress.start_time = datetime.now()
+                progress.error_message = None
+                progress.records_inserted = 0
+            else:
+                # Create a new record if it's the first time seeing this batch
+                progress = PopulationProgress(
+                    batch_number=batch_num,
+                    ticker_list=batch,
+                    start_time=datetime.now(),
+                    status='in_progress'
+                )
+                db.add(progress)
+            
             db.commit()
             
             try:

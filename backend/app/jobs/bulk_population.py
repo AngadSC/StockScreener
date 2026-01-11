@@ -69,8 +69,8 @@ def populate_all_stocks(resume: bool = True) -> dict:
         
         stats['total_tickers'] = len(all_tickers)
         
-        # Batch into groups of 100
-        batch_size = 100
+        # Batch into groups of 50 (reduced from 100 to minimize WAL pressure)
+        batch_size = 50
         batches = [all_tickers[i:i+batch_size] for i in range(0, len(all_tickers), batch_size)]
         stats['total_batches'] = len(batches)
         
@@ -276,10 +276,15 @@ def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
 
     rows = upload_df[['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']].to_dict('records')
 
-    # Sub-batching: Max ~9,000 rows to stay under 65k parameter limit (7 cols * 9000 < 65k)
-    chunk_size = 5000
+    # Sub-batching: Reduced to 1000 rows to minimize WAL file growth
+    # This prevents "No space left on device" errors on smaller volumes
+    chunk_size = 1000
+    total_chunks = (len(rows) + chunk_size - 1) // chunk_size
+
     for i in range(0, len(rows), chunk_size):
         chunk = rows[i:i + chunk_size]
+        chunk_num = (i // chunk_size) + 1
+
         try:
             stmt = insert(DailyOHLCV).values(chunk)
             stmt = stmt.on_conflict_do_update(
@@ -287,7 +292,11 @@ def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
                 set_={col: getattr(stmt.excluded, col) for col in ["open", "high", "low", "close", "volume"]}
             )
             db.execute(stmt)
-            db.commit() # Commit each chunk separately
+            db.commit() # Commit each chunk separately to checkpoint WAL
+
+            # Progress indicator for large batches
+            if chunk_num % 5 == 0 or chunk_num == total_chunks:
+                print(f"      Progress: {chunk_num}/{total_chunks} chunks ({len(rows):,} total records)")
         except Exception as e:
             db.rollback() # CRITICAL: Reset the connection state so next commands work
             print(f"   ✗ Sub-batch insertion failed: {e}")

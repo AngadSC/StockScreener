@@ -244,22 +244,40 @@ def populate_all_stocks(resume: bool = True) -> dict:
 def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
     Optimized Bulk Upsert with sub-batching to avoid Postgres parameter limits.
+    NOW CREATES TICKER RECORDS if they don't exist.
     """
     ticker_symbols = df['ticker'].unique().tolist()
+
+    # Get existing tickers
     ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
     ticker_map = {t.symbol: t.id for t in ticker_objs}
-    
+    existing_symbols = set(ticker_map.keys())
+
+    # CREATE NEW TICKER RECORDS for tickers that don't exist yet
+    new_symbols = set(ticker_symbols) - existing_symbols
+    if new_symbols:
+        print(f"   📝 Creating {len(new_symbols)} new ticker records...")
+        for symbol in new_symbols:
+            new_ticker = Ticker(symbol=symbol)
+            db.add(new_ticker)
+
+        db.flush()  # Get IDs for newly created tickers
+
+        # Re-query to get all tickers including newly created ones
+        ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
+        ticker_map = {t.symbol: t.id for t in ticker_objs}
+
     # Vectorized data preparation
     df['ticker_id'] = df['ticker'].map(ticker_map)
     upload_df = df.dropna(subset=['ticker_id']).copy()
     upload_df = upload_df.rename(columns={
         'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
     })
-    
+
     rows = upload_df[['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']].to_dict('records')
 
     # Sub-batching: Max ~9,000 rows to stay under 65k parameter limit (7 cols * 9000 < 65k)
-    chunk_size = 5000 
+    chunk_size = 5000
     for i in range(0, len(rows), chunk_size):
         chunk = rows[i:i + chunk_size]
         try:
@@ -274,12 +292,12 @@ def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
             db.rollback() # CRITICAL: Reset the connection state so next commands work
             print(f"   ✗ Sub-batch insertion failed: {e}")
             raise e
-    
+
     # Clean up memory
     del rows
     del upload_df
     gc.collect()
-            
+
     return len(df)
 
     

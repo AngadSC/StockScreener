@@ -1,34 +1,34 @@
 import sys
 import os
+from sqlalchemy import text
 
 # Ensure the backend directory is in the path
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database.connection import SessionLocal
-from app.database.models import (
-    Ticker, DailyOHLCV, StockFundamental, 
-    StockSplit, Dividend, PopulationProgress, FailedTicker
-)
 
 def clear_all_data():
     db = SessionLocal()
     try:
-        print("🧹 Clearing data from tables (keeping schema)...")
+        print("🧹 Truncating tables (instant wipe, keeping schema)...")
         
-        # Order matters because of Foreign Key constraints
-        # Delete from child tables first
-        db.query(DailyOHLCV).delete()
-        db.query(StockFundamental).delete()
-        db.query(StockSplit).delete()
-        db.query(Dividend).delete()
-        db.query(PopulationProgress).delete()
-        db.query(FailedTicker).delete()
+        # Use TRUNCATE with CASCADE to handle foreign keys and reset IDs
+        # This is much faster than DELETE and won't time out
+        truncate_query = text("""
+            TRUNCATE TABLE 
+                daily_ohlcv, 
+                stock_fundamentals, 
+                stock_splits, 
+                dividends, 
+                population_progress, 
+                failed_tickers, 
+                tickers 
+            RESTART IDENTITY CASCADE;
+        """)
         
-        # Finally delete from parent table
-        db.query(Ticker).delete()
-        
+        db.execute(truncate_query)
         db.commit()
-        print("✅ All data cleared successfully!")
+        print("✅ Database cleared successfully!")
         
     except Exception as e:
         db.rollback()

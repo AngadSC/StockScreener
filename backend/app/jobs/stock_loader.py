@@ -75,7 +75,7 @@ def update_all_stocks_batch(manual_trigger: bool = False):
 
         # NOTE: Using get_active_tickers() - only updates stocks with fundamentals
         # To update ALL stocks in DB (including those without fundamentals), use get_all_tickers()
-        active_tickers = get_active_tickers(db)
+        active_tickers = get_all_tickers(db)
         if not active_tickers:
             print("📋 No active stocks to update yet")
             print("    Run bulk_population.py or fundamentals_updater.py first to populate fundamental data")

@@ -5,7 +5,8 @@ Startup script: Run bulk population if needed, then start API server
 This script:
 1. Checks if database has been populated (< 100 tickers = empty)
 2. Runs bulk population if database is empty (~2-3 hours)
-3. Starts the FastAPI server
+3. Loads fundamentals for all stocks
+4. Starts the FastAPI server
 
 Usage:
     python3 run_once_then_serve.py
@@ -114,6 +115,33 @@ def run_bulk_population():
         print("   You can manually run bulk population later")
         return False
 
+def run_fundamentals_update():
+    """Load fundamentals for all stocks"""
+    print("\n" + "="*80)
+    print("📊 STARTING FUNDAMENTALS UPDATE")
+    print("   This will load fundamental data for all stocks")
+    print("   Progress will be shown below")
+    print("="*80 + "\n")
+
+    try:
+        from app.jobs.fundamentals_updater import update_fundamentals_daily
+        update_fundamentals_daily()
+
+        print("\n" + "="*80)
+        print("✅ FUNDAMENTALS UPDATE COMPLETE")
+        print("="*80 + "\n")
+
+        return True
+
+    except Exception as e:
+        print("\n" + "="*80)
+        print("❌ FUNDAMENTALS UPDATE FAILED")
+        print(f"   Error: {e}")
+        print("="*80 + "\n")
+        print("⚠️  Starting API server anyway...")
+        print("   You can manually run fundamentals update later")
+        return False
+
 def start_api_server():
     """Start the FastAPI server"""
     print("\n" + "="*80)
@@ -140,9 +168,12 @@ if __name__ == "__main__":
     # Step 1: Check if we need to populate
     if should_populate():
         # Step 2: Run bulk population
-        run_bulk_population()
+        population_success = run_bulk_population()
+        
+        # Step 3: Run fundamentals update (even if population partially failed)
+        run_fundamentals_update()
     else:
         print("✓ Skipping bulk population (database already has data)\n")
 
-    # Step 3: Start API server (this never returns)
+    # Step 4: Start API server (this never returns)
     start_api_server()

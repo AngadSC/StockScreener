@@ -11,6 +11,7 @@ import json
 # FUNDAMENTALS UPDATER JOB
 # Updates fundamental data for 1/7th of stocks daily
 # Full refresh cycle = 7 days
+# NOW ALSO UPDATES TICKER NAMES AND EXCHANGES
 # ============================================
 
 def update_fundamentals_daily():
@@ -97,6 +98,9 @@ def update_fundamentals_daily():
                     if not ticker_obj:
                         continue
                     
+                    # Update ticker name and exchange (NEW!)
+                    _update_ticker_info(db, ticker_obj, fund_data)
+                    
                     # Upsert fundamentals
                     _upsert_fundamentals(db, ticker_obj.id, fund_data)
                     updated_count += 1
@@ -138,6 +142,37 @@ def update_fundamentals_daily():
         
     finally:
         db.close()
+
+
+def _update_ticker_info(db: Session, ticker_obj: Ticker, fund_data: Dict[str, Any]):
+    """
+    Update ticker name and exchange from fundamental data
+    
+    Args:
+        db: Database session
+        ticker_obj: Ticker object to update
+        fund_data: Fundamental data dict containing additional_data
+    """
+    try:
+        # Extract name and exchange from additional_data.price
+        price_data = fund_data.get('additional_data', {}).get('price', {})
+        
+        # Update name if available and currently empty
+        short_name = price_data.get('shortName')
+        if short_name and not ticker_obj.name:
+            ticker_obj.name = short_name
+        
+        # Update exchange if available and currently empty
+        exchange = price_data.get('exchange')
+        if exchange and not ticker_obj.exchange:
+            ticker_obj.exchange = exchange
+        
+        db.commit()
+        
+    except Exception as e:
+        # Don't fail the whole update if name/exchange update fails
+        print(f"   ⚠️  Could not update name/exchange for {ticker_obj.symbol}: {e}")
+        db.rollback()
 
 
 def _upsert_fundamentals(db: Session, ticker_id: int, fund_data: Dict[str, Any]):
@@ -232,7 +267,10 @@ def update_single_ticker_fundamentals(ticker_symbol: str) -> bool:
             print(f"✗ No fundamental data for {ticker_symbol}")
             return False
         
-        # Upsert
+        # Update ticker info (name/exchange)
+        _update_ticker_info(db, ticker, fund_data)
+        
+        # Upsert fundamentals
         _upsert_fundamentals(db, ticker.id, fund_data)
         
         # Clear cache

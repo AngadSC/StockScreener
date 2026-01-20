@@ -7,6 +7,8 @@ from app.utils.market_calendar import get_last_trading_day
 from datetime import datetime, timedelta, date
 from typing import List
 import pandas as pd
+import io 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
 import gc
@@ -243,63 +245,98 @@ def populate_all_stocks(resume: bool = True) -> dict:
 
 def _insert_batch_data(db: Session, df: pd.DataFrame) -> int:
     """
-    Optimized Bulk Upsert with sub-batching to avoid Postgres parameter limits.
-    NOW CREATES TICKER RECORDS if they don't exist.
+    SUPER-OPTIMIZED: Uses Postgres COPY protocol + Temp Table
+    Bypasses slow SQL inserts to fix Railway memory issues.
     """
     ticker_symbols = df['ticker'].unique().tolist()
 
-    # Get existing tickers
+    # ---------------------------------------------------------
+    # PART 1: Ensure Tickers Exist (Same as before)
+    # ---------------------------------------------------------
     ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
     ticker_map = {t.symbol: t.id for t in ticker_objs}
     existing_symbols = set(ticker_map.keys())
 
-    # CREATE NEW TICKER RECORDS for tickers that don't exist yet
     new_symbols = set(ticker_symbols) - existing_symbols
     if new_symbols:
         print(f"   📝 Creating {len(new_symbols)} new ticker records...")
         for symbol in new_symbols:
             new_ticker = Ticker(symbol=symbol)
             db.add(new_ticker)
-
-        db.flush()  # Get IDs for newly created tickers
-
-        # Re-query to get all tickers including newly created ones
+        db.flush()
+        
+        # Refresh map
         ticker_objs = db.query(Ticker).filter(Ticker.symbol.in_(ticker_symbols)).all()
         ticker_map = {t.symbol: t.id for t in ticker_objs}
 
-    # Vectorized data preparation
+    # ---------------------------------------------------------
+    # PART 2: The Fast "COPY" Strategy
+    # ---------------------------------------------------------
+    # Map IDs and prepare clean dataframe
     df['ticker_id'] = df['ticker'].map(ticker_map)
     upload_df = df.dropna(subset=['ticker_id']).copy()
-    upload_df = upload_df.rename(columns={
-        'Open': 'open', 'High': 'high', 'Low': 'low', 'Close': 'close', 'Volume': 'volume'
-    })
 
-    rows = upload_df[['ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume']].to_dict('records')
+    # Create an in-memory CSV buffer
+    csv_buffer = io.StringIO()
+    
+    # Write dataframe to buffer (Tab-separated is faster/safer for COPY)
+    # Columns must match the order in cursor.copy_from below
+    upload_df[['ticker_id', 'date', 'Open', 'High', 'Low', 'Close', 'Volume']].to_csv(
+        csv_buffer, 
+        sep='\t', 
+        header=False, 
+        index=False
+    )
+    csv_buffer.seek(0) # Rewind buffer to start
 
-    # Sub-batching: Max ~9,000 rows to stay under 65k parameter limit (7 cols * 9000 < 65k)
-    chunk_size = 5000
-    for i in range(0, len(rows), chunk_size):
-        chunk = rows[i:i + chunk_size]
-        try:
-            stmt = insert(DailyOHLCV).values(chunk)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['ticker_id', 'date'],
-                set_={col: getattr(stmt.excluded, col) for col in ["open", "high", "low", "close", "volume"]}
-            )
-            db.execute(stmt)
-            db.commit() # Commit each chunk separately
-        except Exception as e:
-            db.rollback() # CRITICAL: Reset the connection state so next commands work
-            print(f"   ✗ Sub-batch insertion failed: {e}")
-            raise e
+    try:
+        # Access raw psycopg2 connection
+        connection = db.connection().connection
+        cursor = connection.cursor()
 
-    # Clean up memory
-    del rows
-    del upload_df
-    gc.collect()
+        # A. Create Temp Table (matches daily_ohlcv structure)
+        # "ON COMMIT DROP" means it cleans itself up automatically
+        db.execute(text("""
+            CREATE TEMP TABLE IF NOT EXISTS temp_ohlcv 
+            (LIKE daily_ohlcv INCLUDING DEFAULTS) 
+            ON COMMIT DROP;
+        """))
 
-    return len(df)
+        # B. Bulk Upload to Temp Table (The Fast Part)
+        # This streams data directly without parsing SQL
+        cursor.copy_from(
+            csv_buffer, 
+            'temp_ohlcv', 
+            columns=('ticker_id', 'date', 'open', 'high', 'low', 'close', 'volume')
+        )
 
+        # C. UPSERT from Temp to Main Table (One single atomic transaction)
+        db.execute(text("""
+            INSERT INTO daily_ohlcv (ticker_id, date, open, high, low, close, volume)
+            SELECT ticker_id, date, open, high, low, close, volume
+            FROM temp_ohlcv
+            ON CONFLICT (ticker_id, date) DO UPDATE SET
+                open = EXCLUDED.open,
+                high = EXCLUDED.high,
+                low = EXCLUDED.low,
+                close = EXCLUDED.close,
+                volume = EXCLUDED.volume;
+        """))
+
+        # D. Clear temp table for next batch
+        db.execute(text("TRUNCATE temp_ohlcv"))
+        db.commit()
+
+        return len(upload_df)
+
+    except Exception as e:
+        db.rollback()
+        print(f"   ✗ Bulk copy failed: {e}")
+        raise e
+    finally:
+        csv_buffer.close()
+        del upload_df
+        gc.collect()
     
 
 

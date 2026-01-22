@@ -1,6 +1,5 @@
 'use client';
 
-import { use } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { stocksAPI } from '@/lib/api';
 import StockChart from '@/components/stock/StockChart';
@@ -12,9 +11,14 @@ import { ArrowLeft, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { formatCurrency, formatMarketCap, getChangeColor } from '@/lib/utils';
 
-export default function StockDetailPage({ params }: { params: Promise<{ ticker: string }> }) {
-  const resolvedParams = use(params);
-  const ticker = resolvedParams.ticker.toUpperCase();
+// FIX: Remove 'Promise' and 'use' - Next.js 14 passes params directly
+interface PageProps {
+  params: { ticker: string };
+}
+
+export default function StockDetailPage({ params }: PageProps) {
+  // FIX: Access ticker directly from params (no resolvedParams needed)
+  const ticker = params.ticker.toUpperCase();
 
   // Fetch stock data
   const { data: stock, isLoading: stockLoading } = useQuery({

@@ -30,57 +30,73 @@ export default function StockChart({ data, ticker }: StockChartProps) {
   }, [data]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{ticker} Price History</CardTitle>
-        <CardDescription>
+    <div className="terminal-border bg-card">
+      {/* Header */}
+      <div className="border-b border-border px-4 py-2 bg-muted/20">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold">PRICE_HISTORY [{ticker}]</span>
           {data.length > 0 && (
-            <span>
-              {formatDate(data[0].date)} - {formatDate(data[data.length - 1].date)}
+            <div className="text-xs text-muted-foreground">
+              {formatDate(data[0].date)} → {formatDate(data[data.length - 1].date)}
               {priceChange && (
-                <span className={priceChange.change >= 0 ? 'text-green-600 ml-4' : 'text-red-600 ml-4'}>
+                <span className={`ml-3 font-mono ${priceChange.change >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                  {priceChange.change >= 0 ? '▲' : '▼'}
                   {priceChange.change >= 0 ? '+' : ''}
                   {formatCurrency(priceChange.change)} ({priceChange.changePercent.toFixed(2)}%)
                 </span>
               )}
-            </span>
+            </div>
           )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </div>
+      </div>
+
+      {/* Chart */}
+      <div className="p-4">
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis 
-              dataKey="date" 
-              tick={{ fontSize: 12 }}
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
               interval="preserveStartEnd"
+              stroke="hsl(var(--border))"
             />
-            <YAxis 
+            <YAxis
               domain={['auto', 'auto']}
-              tick={{ fontSize: 12 }}
-              tickFormatter={(value) => `$${value.toFixed(2)}`}
+              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              tickFormatter={(value) => `$${value.toFixed(0)}`}
+              stroke="hsl(var(--border))"
             />
-            <Tooltip 
+            <Tooltip
               formatter={(value: number | undefined) => {
-
-                if (value === undefined) return ['N/A', 'Price'];
-                return [`$${value.toFixed(2)}`, 'Price'];
+                if (value === undefined) return ['N/A', 'PRICE'];
+                return [`$${value.toFixed(2)}`, 'CLOSE'];
               }}
-              labelStyle={{ color: '#000' }}
+              contentStyle={{
+                backgroundColor: 'hsl(var(--card))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: '0',
+                fontFamily: 'monospace',
+                fontSize: '11px',
+              }}
+              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
             />
-            <Legend />
-            <Line 
-              type="monotone" 
-              dataKey="price" 
-              stroke="#2563eb" 
+            <Line
+              type="monotone"
+              dataKey="price"
+              stroke="hsl(var(--primary))"
               strokeWidth={2}
               dot={false}
-              name="Close Price"
+              name="CLOSE_PRICE"
             />
           </LineChart>
         </ResponsiveContainer>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-border px-4 py-2 bg-muted/20 text-xs text-muted-foreground">
+        DATA_POINTS: {data.length} | INTERVAL: DAILY
+      </div>
+    </div>
   );
 }

@@ -73,23 +73,28 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
   ];
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {metrics.map((section) => (
-        <Card key={section.category}>
-          <CardHeader>
-            <CardTitle className="text-lg">{section.category}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <dl className="space-y-2">
-              {section.items.map((item) => (
-                <div key={item.label} className="flex justify-between text-sm">
-                  <dt className="text-muted-foreground">{item.label}</dt>
-                  <dd className="font-medium">{item.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </CardContent>
-        </Card>
+        <div key={section.category} className="terminal-border bg-card">
+          {/* Category Header */}
+          <div className="border-b border-border px-3 py-2 bg-muted/20">
+            <span className="text-xs font-bold">{section.category.toUpperCase().replace(' ', '_')}</span>
+          </div>
+
+          {/* Metrics List */}
+          <div className="p-3 space-y-2 text-xs">
+            {section.items.map((item, idx) => (
+              <div key={item.label} className="flex justify-between items-center py-1 border-b border-border/30 last:border-0">
+                <span className="text-muted-foreground font-mono">
+                  {item.label.toUpperCase().replace(/\s/g, '_').replace(/\//g, '_')}
+                </span>
+                <span className="font-mono font-bold text-primary">
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );

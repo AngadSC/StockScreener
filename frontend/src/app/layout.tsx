@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/react-query";
 import Header from "@/components/layout/Header";
-
-const inter = Inter({ subsets: ["latin"] });
+import CommandPalette from "@/components/ui/command-palette";
+import KeyboardShortcuts from "@/components/ui/keyboard-shortcuts";
 
 export const metadata: Metadata = {
-  title: "Stock Screener - Find Your Perfect Stock",
+  title: "STOCK_SCREENER.EXE - Terminal Market Analysis",
   description: "Advanced stock screener with backtesting and ML features",
 };
 
@@ -17,11 +16,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="en" className="dark">
+      <body className="font-mono antialiased">
         <ReactQueryProvider>
           <Header />
           <main>{children}</main>
+          <CommandPalette />
+          <KeyboardShortcuts />
         </ReactQueryProvider>
       </body>
     </html>

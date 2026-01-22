@@ -130,13 +130,13 @@ export default function HomePage() {
                 <div>
                   <div className="text-sm font-bold">[{idx + 1}] {stock.ticker}</div>
                   <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                    {stock.company_name}
+                    {stock.name || stock.company_name || 'N/A'}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm">${stock.current_price?.toFixed(2)}</div>
                   <div className="text-xs text-primary">
-                    +{stock.change_percent?.toFixed(2)}%
+                    {stock.change_percent ? `+${stock.change_percent.toFixed(2)}%` : 'N/A'}
                   </div>
                 </div>
               </Link>
@@ -163,13 +163,13 @@ export default function HomePage() {
                 <div>
                   <div className="text-sm font-bold">[{idx + 1}] {stock.ticker}</div>
                   <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                    {stock.company_name}
+                    {stock.name || stock.company_name || 'N/A'}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm">${stock.current_price?.toFixed(2)}</div>
                   <div className="text-xs text-destructive">
-                    {stock.change_percent?.toFixed(2)}%
+                    {stock.change_percent ? `${stock.change_percent.toFixed(2)}%` : 'N/A'}
                   </div>
                 </div>
               </Link>
@@ -196,13 +196,13 @@ export default function HomePage() {
                 <div>
                   <div className="text-sm font-bold">[{idx + 1}] {stock.ticker}</div>
                   <div className="text-xs text-muted-foreground truncate max-w-[150px]">
-                    {stock.company_name}
+                    {stock.name || stock.company_name || 'N/A'}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-sm">${stock.current_price?.toFixed(2)}</div>
                   <div className="text-xs text-muted-foreground">
-                    VOL: {(stock.volume / 1000000).toFixed(1)}M
+                    VOL: {stock.volume ? (stock.volume / 1000000).toFixed(1) + 'M' : 'N/A'}
                   </div>
                 </div>
               </Link>

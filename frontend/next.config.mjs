@@ -2,17 +2,21 @@
 const nextConfig = {
   reactStrictMode: true,
   
-  // Allow images from external sources (for stock logos if needed)
   images: {
     domains: ['logo.clearbit.com', 'assets.coingecko.com'],
   },
   
-  // API proxy (optional - helps with CORS in development)
   async rewrites() {
+    // 1. Get the API URL from environment, OR fallback to your Railway URL
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://stockscreenerapi-production.up.railway.app/api/v1';
+    
+    // 2. Log it so you can see it in the Vercel Build Logs
+    console.log('Using API URL:', apiUrl);
+
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL}/:path*`,
+        destination: `${apiUrl}/:path*`,
       },
     ];
   },

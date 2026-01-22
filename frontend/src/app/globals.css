@@ -4,48 +4,53 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    /* Terminal Amber Theme - Retro IBM/Amber Monitor */
+    --background: 25 20% 4%;        /* Deep dark brown-black #0d0a08 */
+    --foreground: 36 100% 70%;      /* Bright amber #ffbf66 */
+    --card: 25 25% 6%;              /* Slightly lighter dark #120d0a */
+    --card-foreground: 36 100% 70%;
+    --popover: 25 30% 8%;
+    --popover-foreground: 36 100% 70%;
+    --primary: 33 100% 60%;         /* Vibrant amber #ff9933 */
+    --primary-foreground: 25 20% 4%;
+    --secondary: 30 40% 25%;        /* Muted amber-brown #665233 */
+    --secondary-foreground: 36 100% 75%;
+    --muted: 30 30% 20%;            /* Dark amber-gray #4d3d2e */
+    --muted-foreground: 35 50% 50%; /* Medium amber #b38947 */
+    --accent: 33 100% 50%;          /* Pure orange #ff8800 */
+    --accent-foreground: 25 20% 4%;
+    --destructive: 0 80% 55%;       /* Red for errors */
+    --destructive-foreground: 36 100% 90%;
+    --border: 30 40% 15%;           /* Subtle amber border #3d2e1f */
+    --input: 30 40% 15%;
+    --ring: 33 100% 60%;
+    --radius: 0rem;                 /* Sharp corners for terminal feel */
+
+    /* Terminal-specific colors */
+    --terminal-glow: 33 100% 60%;
+    --scan-line: 30 100% 70%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    --background: 25 20% 4%;
+    --foreground: 36 100% 70%;
+    --card: 25 25% 6%;
+    --card-foreground: 36 100% 70%;
+    --popover: 25 30% 8%;
+    --popover-foreground: 36 100% 70%;
+    --primary: 33 100% 60%;
+    --primary-foreground: 25 20% 4%;
+    --secondary: 30 40% 25%;
+    --secondary-foreground: 36 100% 75%;
+    --muted: 30 30% 20%;
+    --muted-foreground: 35 50% 50%;
+    --accent: 33 100% 50%;
+    --accent-foreground: 25 20% 4%;
+    --destructive: 0 80% 55%;
+    --destructive-foreground: 36 100% 90%;
+    --border: 30 40% 15%;
+    --input: 30 40% 15%;
+    --ring: 33 100% 60%;
   }
 }
 
@@ -53,7 +58,129 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-variant-ligatures: normal;
+  }
+
+  /* Terminal text glow effect */
+  h1, h2, h3, h4, h5, h6 {
+    text-shadow: 0 0 10px hsl(var(--terminal-glow) / 0.5);
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Subtle scan line effect overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      to bottom,
+      transparent 50%,
+      rgba(255, 153, 51, 0.02) 50%
+    );
+    background-size: 100% 4px;
+    pointer-events: none;
+    z-index: 9999;
+    animation: scan 8s linear infinite;
+  }
+
+  @keyframes scan {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(4px); }
+  }
+
+  /* CRT screen curvature simulation (subtle) */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(
+      ellipse at center,
+      transparent 0%,
+      rgba(13, 10, 8, 0.3) 100%
+    );
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  /* Monospace for all numbers and data */
+  .mono, td, th, input[type="number"] {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Terminal window border effect */
+  .terminal-border {
+    border: 2px solid hsl(var(--border));
+    box-shadow:
+      0 0 0 1px hsl(var(--border) / 0.5),
+      inset 0 0 20px hsl(var(--terminal-glow) / 0.05);
+  }
+
+  /* ASCII border styles */
+  .ascii-border-top::before {
+    content: '─────────────────────────────────────────────────────────────────────────';
+    display: block;
+    color: hsl(var(--border));
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  .ascii-border-bottom::after {
+    content: '─────────────────────────────────────────────────────────────────────────';
+    display: block;
+    color: hsl(var(--border));
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    line-height: 1;
+  }
+
+  /* Terminal prompt style */
+  .terminal-prompt::before {
+    content: '$ ';
+    color: hsl(var(--primary));
+    margin-right: 0.5rem;
+  }
+
+  /* Blinking cursor */
+  .cursor::after {
+    content: '▊';
+    color: hsl(var(--primary));
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+  }
+}
+
+@layer utilities {
+  /* Text glow utility */
+  .text-glow {
+    text-shadow: 0 0 10px hsl(var(--terminal-glow) / 0.6);
+  }
+
+  .text-glow-strong {
+    text-shadow:
+      0 0 5px hsl(var(--terminal-glow) / 0.8),
+      0 0 10px hsl(var(--terminal-glow) / 0.6),
+      0 0 15px hsl(var(--terminal-glow) / 0.4);
   }
 }

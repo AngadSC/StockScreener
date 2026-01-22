@@ -18,6 +18,10 @@ const config = {
   		}
   	},
   	extend: {
+  		fontFamily: {
+  			mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+  			terminal: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
+  		},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
@@ -58,6 +62,9 @@ const config = {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
+  			},
+  			terminal: {
+  				glow: 'hsl(var(--terminal-glow))',
   			}
   		},
   		borderRadius: {
@@ -81,11 +88,26 @@ const config = {
   				to: {
   					height: '0'
   				}
+  			},
+  			'scan': {
+  				'0%': { transform: 'translateY(0)' },
+  				'100%': { transform: 'translateY(4px)' }
+  			},
+  			'blink': {
+  				'0%, 50%': { opacity: '1' },
+  				'51%, 100%': { opacity: '0' }
+  			},
+  			'flicker': {
+  				'0%, 100%': { opacity: '1' },
+  				'50%': { opacity: '0.95' }
   			}
   		},
   		animation: {
   			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
+  			'accordion-up': 'accordion-up 0.2s ease-out',
+  			'scan': 'scan 8s linear infinite',
+  			'blink': 'blink 1s step-end infinite',
+  			'flicker': 'flicker 0.15s ease-in-out infinite'
   		}
   	}
   },

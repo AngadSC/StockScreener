@@ -3,7 +3,8 @@
 export interface Stock {
   ticker: string;
   name: string | null;
-  
+  company_name?: string | null; // Alternative field name from API
+
   // Basic info
   sector: string | null;
   industry: string | null;
@@ -41,6 +42,7 @@ export interface Stock {
   // Trading
   current_price: number | null;
   day_change_percent: number | null;
+  change_percent?: number | null; // Alternative field name from API
   volume: number | null;
   avg_volume: number | null;
   beta: number | null;

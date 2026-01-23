@@ -34,8 +34,11 @@ export default function StockDetailPage({ params }: PageProps) {
 
   if (stockLoading) {
     return (
-      <div className="container py-8 flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container py-8">
+        <div className="terminal-border bg-card p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-xs text-muted-foreground">LOADING_STOCK_DATA...</p>
+        </div>
       </div>
     );
   }
@@ -43,108 +46,133 @@ export default function StockDetailPage({ params }: PageProps) {
   if (!stock) {
     return (
       <div className="container py-8">
-        <Card>
-          <CardContent className="py-12 text-center">
-            <h2 className="text-2xl font-bold mb-2">Stock Not Found</h2>
-            <p className="text-muted-foreground mb-4">
-              {ticker} is not in our database
-            </p>
-            <Link href="/screener">
-              <Button>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Screener
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
+        <div className="terminal-border bg-card p-12 text-center">
+          <p className="text-destructive font-bold mb-2">ERROR: STOCK_NOT_FOUND</p>
+          <p className="text-xs text-muted-foreground mb-6">
+            Ticker [{ticker}] not indexed in database
+          </p>
+          <Link href="/screener">
+            <button className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 transition-colors">
+              &lt; RETURN_TO_SCREENER
+            </button>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="container py-8 space-y-8">
-      {/* Header */}
-      <div>
-        <Link href="/screener">
-          <Button variant="ghost" size="sm" className="mb-4">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Screener
-          </Button>
-        </Link>
+  const changePercent = stock.day_change_percent || stock.change_percent;
+  const isPositive = changePercent !== null && changePercent !== undefined && changePercent >= 0;
 
+  return (
+    <div className="container py-6 space-y-6">
+      {/* Back Button */}
+      <Link href="/screener">
+        <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
+          &lt; BACK_TO_SCREENER
+        </button>
+      </Link>
+
+      {/* Stock Header */}
+      <div className="terminal-border bg-card p-6">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">
-              {stock.ticker}
-            </h1>
-            <p className="text-xl text-muted-foreground mb-4">
+          <div className="flex-1">
+            <div className="flex items-baseline gap-4 mb-2">
+              <h1 className="text-4xl font-bold text-glow">{stock.ticker}</h1>
+              <span className="text-xs text-muted-foreground">EQUITY_DATA</span>
+            </div>
+            <p className="text-lg text-muted-foreground mb-4">
               {stock.name}
             </p>
-            <div className="flex gap-2">
-              {stock.sector && <Badge variant="secondary">{stock.sector}</Badge>}
-              {stock.industry && <Badge variant="outline">{stock.industry}</Badge>}
+            <div className="flex gap-3 text-xs">
+              {stock.sector && (
+                <div className="px-2 py-1 border border-primary/50 text-primary">
+                  SECTOR: {stock.sector}
+                </div>
+              )}
+              {stock.industry && (
+                <div className="px-2 py-1 border border-border text-muted-foreground">
+                  INDUSTRY: {stock.industry}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="text-right">
-            <p className="text-3xl font-bold">
-              {formatCurrency(stock.current_price)}
+          <div className="text-right border-l border-border pl-6">
+            <div className="text-xs text-muted-foreground mb-2">CURRENT_PRICE</div>
+            <p className="text-4xl font-bold font-mono">
+              ${stock.current_price?.toFixed(2) || 'N/A'}
             </p>
-            {stock.day_change_percent !== null && (
-              <div className={`flex items-center justify-end gap-1 mt-2 ${getChangeColor(stock.day_change_percent)}`}>
-                {stock.day_change_percent >= 0 ? (
-                  <TrendingUp className="h-5 w-5" />
-                ) : (
-                  <TrendingDown className="h-5 w-5" />
-                )}
-                <span className="text-lg font-semibold">
-                  {stock.day_change_percent >= 0 ? '+' : ''}
-                  {stock.day_change_percent.toFixed(2)}%
+            {changePercent !== null && changePercent !== undefined && (
+              <div className={`flex items-center justify-end gap-2 mt-3 font-mono ${
+                isPositive ? 'text-primary' : 'text-destructive'
+              }`}>
+                {isPositive ? '▲' : '▼'}
+                <span className="text-lg font-bold">
+                  {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
                 </span>
               </div>
             )}
-            <p className="text-sm text-muted-foreground mt-2">
-              Market Cap: {formatMarketCap(stock.market_cap)}
-            </p>
+            <div className="text-xs text-muted-foreground mt-3 space-y-1">
+              <p>MKT_CAP: {formatMarketCap(stock.market_cap)}</p>
+              <p>VOLUME: {stock.volume ? (stock.volume / 1000000).toFixed(2) + 'M' : 'N/A'}</p>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Price Chart */}
       {priceLoading ? (
-        <Card>
-          <CardContent className="py-12 flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </CardContent>
-        </Card>
+        <div className="terminal-border bg-card p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-xs text-muted-foreground">LOADING_PRICE_HISTORY...</p>
+        </div>
       ) : priceData && priceData.data.length > 0 ? (
         <StockChart data={priceData.data} ticker={ticker} />
-      ) : null}
+      ) : (
+        <div className="terminal-border bg-card p-8 text-center">
+          <p className="text-xs text-muted-foreground">NO_PRICE_DATA_AVAILABLE</p>
+        </div>
+      )}
 
       {/* Metrics */}
       <div>
-        <h2 className="text-2xl font-bold mb-6">Fundamentals</h2>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="text-lg font-bold text-glow">FUNDAMENTAL_METRICS</h2>
+          <div className="flex-1 border-b border-border"></div>
+        </div>
         <StockMetrics stock={stock} />
       </div>
 
-      {/* Backtest Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Advanced Analysis</CardTitle>
-          <CardDescription>
-            Access backtesting data and ML features for {ticker}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Coming soon: Backtest trading strategies and access ML-ready datasets
+      {/* Advanced Analysis Section */}
+      <div className="terminal-border bg-card">
+        <div className="border-b border-border px-4 py-2 bg-muted/20">
+          <span className="text-xs font-bold">ADVANCED_ANALYSIS</span>
+          <span className="ml-3 text-xs text-muted-foreground">[COMING_SOON]</span>
+        </div>
+        <div className="p-6 space-y-4">
+          <p className="text-xs text-muted-foreground">
+            $ ./backtest --ticker={ticker} --strategy=&lt;STRATEGY_NAME&gt;
           </p>
-          <div className="flex gap-4">
-            <Button disabled>Backtest Strategy</Button>
-            <Button variant="outline" disabled>Get ML Features</Button>
+          <p className="text-xs text-muted-foreground">
+            $ ./ml-features --ticker={ticker} --indicators=all
+          </p>
+          <div className="flex gap-3 mt-6">
+            <button
+              disabled
+              className="px-4 py-2 border border-border text-muted-foreground cursor-not-allowed opacity-50"
+            >
+              RUN_BACKTEST
+            </button>
+            <button
+              disabled
+              className="px-4 py-2 border border-border text-muted-foreground cursor-not-allowed opacity-50"
+            >
+              EXPORT_ML_DATA
+            </button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

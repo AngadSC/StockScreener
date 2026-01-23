@@ -1,14 +1,30 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { TrendingUp, Search, Star, LogIn, LogOut, User } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Command } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
-  const isLoggedIn = typeof window !== 'undefined' && localStorage.getItem('access_token');
+  const [time, setTime] = useState('');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // Update time every second
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('en-US', { hour12: false }));
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check login status
+  useEffect(() => {
+    setIsLoggedIn(!!localStorage.getItem('access_token'));
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
@@ -16,70 +32,103 @@ export default function Header() {
   };
 
   const navItems = [
-    { href: '/', label: 'Home', icon: TrendingUp },
-    { href: '/screener', label: 'Screener', icon: Search },
-    { href: '/watchlist', label: 'Watchlist', icon: Star },
+    { href: '/', label: 'DASHBOARD', key: 'D' },
+    { href: '/screener', label: 'SCREENER', key: 'S' },
+    { href: '/watchlist', label: 'WATCHLIST', key: 'W' },
   ];
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2">
-          <TrendingUp className="h-6 w-6 text-primary" />
-          <span className="text-xl font-bold">StockScreener</span>
-        </Link>
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
+      <div className="container">
+        {/* Top bar - terminal title bar style */}
+        <div className="flex h-12 items-center justify-between text-xs border-b border-border/50">
+          {/* Left: System name */}
+          <div className="flex items-center gap-4">
+            <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors">
+              <span className="text-base font-bold tracking-tight">STOCK_TERMINAL</span>
+              <span className="text-muted-foreground">[v2.1.0]</span>
+            </Link>
+          </div>
 
-        {/* Navigation */}
-        <nav className="flex items-center space-x-6">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.href;
-            
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center space-x-2 text-sm font-medium transition-colors hover:text-primary",
-                  isActive ? "text-primary" : "text-muted-foreground"
-                )}
+          {/* Right: Status indicators */}
+          <div className="flex items-center gap-4 text-muted-foreground">
+            <span>SYS_TIME: {time}</span>
+            <span className="hidden sm:inline">|</span>
+            <span className="hidden sm:inline">
+              STATUS: <span className="text-primary">ONLINE</span>
+            </span>
+            <span className="hidden md:inline">|</span>
+            <span className="hidden md:inline">
+              USER: {isLoggedIn ? <span className="text-primary">AUTHENTICATED</span> : 'GUEST'}
+            </span>
+          </div>
+        </div>
+
+        {/* Bottom bar - navigation */}
+        <div className="flex h-10 items-center justify-between text-xs">
+          {/* Navigation links */}
+          <nav className="flex items-center gap-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-3 py-1 transition-colors ${
+                    isActive
+                      ? 'text-primary bg-primary/10 border-b-2 border-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  [{item.key}] {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* Command palette hint + auth */}
+          <div className="flex items-center gap-3">
+            <button
+              className="flex items-center gap-2 px-2 py-1 text-muted-foreground hover:text-primary transition-colors border border-border/50 hover:border-primary/50"
+              onClick={() => {
+                const event = new KeyboardEvent('keydown', {
+                  key: 'k',
+                  metaKey: true,
+                  bubbles: true,
+                });
+                window.dispatchEvent(event);
+              }}
+            >
+              <Command className="h-3 w-3" />
+              <span className="hidden sm:inline">COMMAND</span>
+              <kbd className="hidden md:inline px-1 text-xs">⌘K</kbd>
+            </button>
+
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="px-2 py-1 text-muted-foreground hover:text-destructive transition-colors"
               >
-                <Icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Auth buttons */}
-        <div className="flex items-center space-x-4">
-          {isLoggedIn ? (
-            <>
-              <Button variant="ghost" size="sm">
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </>
-          ) : (
-            <>
-              <Link href="/auth/login">
-                <Button variant="ghost" size="sm">
-                  <LogIn className="h-4 w-4 mr-2" />
-                  Login
-                </Button>
-              </Link>
-              <Link href="/auth/register">
-                <Button size="sm">
-                  Sign Up
-                </Button>
-              </Link>
-            </>
-          )}
+                [LOGOUT]
+              </button>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/auth/login"
+                  className="px-2 py-1 text-muted-foreground hover:text-primary transition-colors"
+                >
+                  [LOGIN]
+                </Link>
+                <Link
+                  href="/auth/register"
+                  className="px-2 py-1 text-primary hover:text-primary/80 transition-colors border border-primary/50"
+                >
+                  [SIGNUP]
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

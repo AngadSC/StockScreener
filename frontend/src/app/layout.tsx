@@ -17,10 +17,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="font-mono antialiased">
+      <body className="antialiased">
         <ReactQueryProvider>
           <Header />
-          <main>{children}</main>
+          <main className="min-h-screen">{children}</main>
           <CommandPalette />
           <KeyboardShortcuts />
         </ReactQueryProvider>

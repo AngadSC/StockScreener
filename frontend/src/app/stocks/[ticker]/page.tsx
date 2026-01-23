@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { stocksAPI } from '@/lib/api';
-import StockChart from '@/components/stock/StockChart';
+import TradingViewChart from '@/components/stock/TradingViewChart';
 import StockMetrics from '@/components/stock/StockMetrics';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,12 +24,6 @@ export default function StockDetailPage({ params }: PageProps) {
   const { data: stock, isLoading: stockLoading } = useQuery({
     queryKey: ['stock', ticker],
     queryFn: () => stocksAPI.getStock(ticker),
-  });
-
-  // Fetch price history
-  const { data: priceData, isLoading: priceLoading } = useQuery({
-    queryKey: ['prices', ticker],
-    queryFn: () => stocksAPI.getPriceHistory(ticker, '1y'),
   });
 
   if (stockLoading) {
@@ -74,66 +68,63 @@ export default function StockDetailPage({ params }: PageProps) {
       </Link>
 
       {/* Stock Header */}
-      <div className="terminal-border bg-card p-6">
-        <div className="flex items-start justify-between">
+      <div className="terminal-border bg-card p-8">
+        <div className="flex items-start justify-between gap-8">
           <div className="flex-1">
-            <div className="flex items-baseline gap-4 mb-2">
-              <h1 className="text-4xl font-bold text-glow">{stock.ticker}</h1>
-              <span className="text-xs text-muted-foreground">EQUITY_DATA</span>
+            <div className="flex items-baseline gap-4 mb-3">
+              <h1 className="text-5xl font-bold text-glow">{stock.ticker}</h1>
+              <span className="text-xs text-muted-foreground tracking-wider">EQUITY_DATA</span>
             </div>
-            <p className="text-lg text-muted-foreground mb-4">
+            <p className="text-xl text-foreground/90 mb-6 font-light">
               {stock.name}
             </p>
             <div className="flex gap-3 text-xs">
               {stock.sector && (
-                <div className="px-2 py-1 border border-primary/50 text-primary">
+                <div className="px-3 py-1.5 border border-primary/50 bg-primary/5 text-primary rounded-sm">
                   SECTOR: {stock.sector}
                 </div>
               )}
               {stock.industry && (
-                <div className="px-2 py-1 border border-border text-muted-foreground">
+                <div className="px-3 py-1.5 border border-border bg-muted/20 text-muted-foreground rounded-sm">
                   INDUSTRY: {stock.industry}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="text-right border-l border-border pl-6">
-            <div className="text-xs text-muted-foreground mb-2">CURRENT_PRICE</div>
-            <p className="text-4xl font-bold font-mono">
+          <div className="text-right border-l border-border pl-8 min-w-[240px]">
+            <div className="text-xs text-muted-foreground mb-3 tracking-wider">CURRENT_PRICE</div>
+            <p className="text-5xl font-bold font-mono mb-2">
               ${stock.current_price?.toFixed(2) || 'N/A'}
             </p>
             {changePercent !== null && changePercent !== undefined && (
-              <div className={`flex items-center justify-end gap-2 mt-3 font-mono ${
-                isPositive ? 'text-primary' : 'text-destructive'
+              <div className={`flex items-center justify-end gap-2 mt-4 mb-6 font-mono ${
+                isPositive ? 'text-success' : 'text-destructive'
               }`}>
                 {isPositive ? '▲' : '▼'}
-                <span className="text-lg font-bold">
+                <span className="text-xl font-bold">
                   {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
                 </span>
               </div>
             )}
-            <div className="text-xs text-muted-foreground mt-3 space-y-1">
-              <p>MKT_CAP: {formatMarketCap(stock.market_cap)}</p>
-              <p>VOLUME: {stock.volume ? (stock.volume / 1000000).toFixed(2) + 'M' : 'N/A'}</p>
+            <div className="text-xs text-muted-foreground space-y-2 border-t border-border pt-4">
+              <div className="flex justify-between gap-4">
+                <span>MKT_CAP:</span>
+                <span className="font-mono text-foreground/80">{formatMarketCap(stock.market_cap)}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span>VOLUME:</span>
+                <span className="font-mono text-foreground/80">
+                  {stock.volume ? (stock.volume / 1000000).toFixed(2) + 'M' : 'N/A'}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Price Chart */}
-      {priceLoading ? (
-        <div className="terminal-border bg-card p-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-xs text-muted-foreground">LOADING_PRICE_HISTORY...</p>
-        </div>
-      ) : priceData && priceData.data.length > 0 ? (
-        <StockChart data={priceData.data} ticker={ticker} />
-      ) : (
-        <div className="terminal-border bg-card p-8 text-center">
-          <p className="text-xs text-muted-foreground">NO_PRICE_DATA_AVAILABLE</p>
-        </div>
-      )}
+      {/* Advanced Price Chart with TradingView */}
+      <TradingViewChart ticker={ticker} />
 
       {/* Metrics */}
       <div>

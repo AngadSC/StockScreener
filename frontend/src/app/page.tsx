@@ -44,9 +44,11 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       <div className="container-custom py-8 space-y-8">
         {/* Hero Section */}
-        <div className="space-y-2">
-          <h1 className="text-4xl font-semibold">Market Overview</h1>
-          <p className="text-muted-foreground text-lg">
+        <div className="space-y-3 pb-2">
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Market Overview
+          </h1>
+          <p className="text-muted-foreground text-xl font-light">
             Track top movers, analyze trends, and discover opportunities
           </p>
         </div>

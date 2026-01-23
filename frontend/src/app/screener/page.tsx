@@ -43,22 +43,22 @@ export default function ScreenerPage() {
   return (
     <div className="container py-6">
       {/* Terminal Header */}
-      <div className="border-b border-border pb-4 mb-6">
+      <div className="border-b border-border pb-6 mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-glow">STOCK_SCREENER.EXE</h1>
-            <p className="text-xs text-muted-foreground mt-1">
-              Query database: {data?.total.toLocaleString() || '8,247'} records indexed
+            <h1 className="text-3xl font-bold text-glow mb-2">STOCK_SCREENER.EXE</h1>
+            <p className="text-sm text-muted-foreground font-mono">
+              DATABASE: {data?.total.toLocaleString() || '8,247'} records indexed
             </p>
           </div>
           {data && (
-            <div className="text-right text-xs">
-              <p className="text-muted-foreground">
-                RESULTS: <span className="text-primary font-mono">{data.results.length}</span> / {data.total.toLocaleString()}
+            <div className="text-right text-sm terminal-border bg-card px-4 py-3">
+              <p className="text-muted-foreground font-mono">
+                RESULTS: <span className="text-primary font-bold">{data.results.length}</span> / {data.total.toLocaleString()}
               </p>
               {data.cached && (
-                <p className="text-muted-foreground mt-1">
-                  SOURCE: <span className="text-primary">CACHE</span>
+                <p className="text-muted-foreground mt-1.5 font-mono">
+                  SOURCE: <span className="text-primary font-bold">CACHE</span>
                 </p>
               )}
             </div>

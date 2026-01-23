@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/pathname';
+import { usePathname } from 'next/navigation';
 import { TrendingUp, Search, Star, LogIn, LogOut } from 'lucide-react';
 
 export default function Header() {

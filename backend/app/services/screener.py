@@ -1,8 +1,16 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, asc
+from sqlalchemy import and_, desc, asc, or_
 from app.database.models import Ticker, StockFundamental
 from app.models.stock import StockFilter
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
+
+
+def _resolve_company_name(ticker: Ticker, fundamental: StockFundamental) -> Optional[str]:
+    if ticker.name:
+        return ticker.name
+    additional = fundamental.additional_data if isinstance(fundamental.additional_data, dict) else {}
+    price = additional.get('price', {}) if isinstance(additional, dict) else {}
+    return price.get('shortName') or price.get('longName')
 
 def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any]], int]:
     """
@@ -49,6 +57,17 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if filters.max_price is not None:
         conditions.append(StockFundamental.current_price <= filters.max_price)
 
+    # Search by ticker symbol or company name (case-insensitive)
+    if filters.search:
+        term = filters.search.strip()
+        if term:
+            conditions.append(
+                or_(
+                    Ticker.symbol.ilike(f"%{term}%"),
+                    Ticker.name.ilike(f"%{term}%")
+                )
+            )
+
     # Apply all conditions
     if conditions:
         query = query.filter(and_(*conditions))
@@ -72,7 +91,7 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     for ticker, fundamental in results:
         stocks.append({
             'ticker': ticker.symbol,
-            'name': ticker.name,
+            'name': _resolve_company_name(ticker, fundamental),
             'sector': fundamental.sector,
             'industry': fundamental.industry,
             'market_cap': fundamental.market_cap,

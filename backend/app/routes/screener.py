@@ -11,6 +11,9 @@ router = APIRouter(prefix="/screener", tags=["screener"])
 
 @router.get("/screen")
 def screen_stocks_endpoint(
+    # Search
+    search: Optional[str] = Query(None, description="Search by ticker or company name"),
+
     # Valuation filters
     min_pe: Optional[float] = Query(None, description="Minimum P/E ratio"),
     max_pe: Optional[float] = Query(None, description="Maximum P/E ratio"),
@@ -39,7 +42,7 @@ def screen_stocks_endpoint(
     
     db: Session = Depends(get_db)
 ):
-    cache_key = f"screener:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{min_price}:{max_price}:{skip}:{limit}:{sort_by}:{sort_order}"
+    cache_key = f"screener:{search}:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{min_price}:{max_price}:{skip}:{limit}:{sort_by}:{sort_order}"
 
     # tyr the redis first 
 
@@ -52,6 +55,7 @@ def screen_stocks_endpoint(
         }
     
     filters = StockFilter(
+        search=search,
         min_pe=min_pe,
         max_pe=max_pe,
         min_market_cap=min_market_cap,

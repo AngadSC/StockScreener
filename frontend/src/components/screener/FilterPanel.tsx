@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { ScreenerFilters } from '@/types/stock';
@@ -9,14 +9,23 @@ import { Play, RotateCcw } from 'lucide-react';
 interface FilterPanelProps {
   onFilterChange: (filters: ScreenerFilters) => void;
   onReset: () => void;
+  search?: string;
 }
 
-export default function FilterPanel({ onFilterChange, onReset }: FilterPanelProps) {
+export default function FilterPanel({ onFilterChange, onReset, search }: FilterPanelProps) {
   const [filters, setFilters] = useState<ScreenerFilters>({
     limit: 50,
     sort_by: 'market_cap',
     sort_order: 'desc',
+    search,
   });
+
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      search,
+    }));
+  }, [search]);
 
   const handleInputChange = (field: keyof ScreenerFilters, value: any) => {
     const newFilters = { ...filters, [field]: value };
@@ -32,6 +41,7 @@ export default function FilterPanel({ onFilterChange, onReset }: FilterPanelProp
       limit: 50,
       sort_by: 'market_cap',
       sort_order: 'desc',
+      search,
     };
     setFilters(resetFilters);
     onReset();

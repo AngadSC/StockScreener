@@ -65,6 +65,9 @@ class StockFilter(BaseModel):
     max_pe: Optional[float] = None
     min_market_cap: Optional[int] = None
     max_market_cap: Optional[int] = None
+
+    # Search
+    search: Optional[str] = None
     
     # Sector/Industry
     sectors: Optional[List[str]] = None

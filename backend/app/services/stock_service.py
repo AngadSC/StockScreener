@@ -14,6 +14,14 @@ import pandas as pd
 # PostgreSQL-first architecture
 # ============================================
 
+def _resolve_company_name(ticker_obj: Ticker, fundamentals: StockFundamental) -> Optional[str]:
+    if ticker_obj.name:
+        return ticker_obj.name
+    additional = fundamentals.additional_data if isinstance(fundamentals.additional_data, dict) else {}
+    price = additional.get('price', {}) if isinstance(additional, dict) else {}
+    return price.get('shortName') or price.get('longName')
+
+
 def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
     """
     Get stock data with fundamentals
@@ -56,7 +64,7 @@ def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True
     # Build response
     stock_data = {
         'ticker': ticker_obj.symbol,
-        'name': ticker_obj.name,
+        'name': _resolve_company_name(ticker_obj, fundamentals),
         
         # Valuation
         'pe_ratio': fundamentals.pe_ratio,

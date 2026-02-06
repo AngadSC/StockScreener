@@ -106,6 +106,7 @@ export interface BacktestDataResponse {
 }
 
 export interface ScreenerFilters {
+  search?: string;
   min_pe?: number;
   max_pe?: number;
   min_market_cap?: number;

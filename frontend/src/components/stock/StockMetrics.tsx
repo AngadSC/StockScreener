@@ -13,7 +13,8 @@ const hasNumber = (value: number | null | undefined): boolean => {
 
 const formatPercent = (value: number | null | undefined): string => {
   if (!hasNumber(value)) return 'N/A';
-  return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
+  const numeric = value as number;
+  return `${numeric >= 0 ? '+' : ''}${(numeric * 100).toFixed(2)}%`;
 };
 
 const numberItem = (label: string, value: number | null | undefined) => ({

@@ -5,9 +5,12 @@ from app.models.stock import StockFilter
 from typing import List, Tuple, Dict, Any, Optional
 
 
-def _resolve_company_name(ticker: Ticker, fundamental: StockFundamental) -> Optional[str]:
+def _resolve_company_name(ticker: Ticker, fundamental: Optional[StockFundamental]) -> Optional[str]:
     if ticker.name:
         return ticker.name
+
+    if not fundamental:
+        return None
 
     additional = fundamental.additional_data if isinstance(fundamental.additional_data, dict) else {}
     if not isinstance(additional, dict):
@@ -20,6 +23,13 @@ def _resolve_company_name(ticker: Ticker, fundamental: StockFundamental) -> Opti
         if name:
             return name
 
+    # YahooQuery summary module sometimes contains names
+    summary = additional.get('summary')
+    if isinstance(summary, dict):
+        name = summary.get('shortName') or summary.get('longName') or summary.get('name')
+        if name:
+            return name
+
     # YFinance structure: additional_data.{shortName,longName,displayName}
     for key in ('shortName', 'longName', 'displayName', 'name'):
         name = additional.get(key)
@@ -27,6 +37,42 @@ def _resolve_company_name(ticker: Ticker, fundamental: StockFundamental) -> Opti
             return name
 
     return None
+
+def _build_search_filter(term: str):
+    like_term = f"%{term}%"
+    return or_(
+        Ticker.symbol.ilike(like_term),
+        Ticker.name.ilike(like_term),
+        StockFundamental.additional_data['price']['shortName'].astext.ilike(like_term),
+        StockFundamental.additional_data['price']['longName'].astext.ilike(like_term),
+        StockFundamental.additional_data['summary']['shortName'].astext.ilike(like_term),
+        StockFundamental.additional_data['summary']['longName'].astext.ilike(like_term),
+        StockFundamental.additional_data['shortName'].astext.ilike(like_term),
+        StockFundamental.additional_data['longName'].astext.ilike(like_term),
+        StockFundamental.additional_data['displayName'].astext.ilike(like_term),
+    )
+
+def get_search_suggestions(
+    db: Session,
+    term: str,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    query = db.query(Ticker, StockFundamental).outerjoin(
+        StockFundamental,
+        Ticker.id == StockFundamental.ticker_id
+    )
+
+    query = query.filter(_build_search_filter(term))
+    results = query.order_by(Ticker.symbol.asc()).limit(limit).all()
+
+    suggestions = []
+    for ticker, fundamental in results:
+        suggestions.append({
+            'ticker': ticker.symbol,
+            'name': _resolve_company_name(ticker, fundamental)
+        })
+
+    return suggestions
 
 def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any]], int]:
     """
@@ -77,18 +123,7 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if filters.search:
         term = filters.search.strip()
         if term:
-            like_term = f"%{term}%"
-            conditions.append(
-                or_(
-                    Ticker.symbol.ilike(like_term),
-                    Ticker.name.ilike(like_term),
-                    StockFundamental.additional_data['price']['shortName'].astext.ilike(like_term),
-                    StockFundamental.additional_data['price']['longName'].astext.ilike(like_term),
-                    StockFundamental.additional_data['shortName'].astext.ilike(like_term),
-                    StockFundamental.additional_data['longName'].astext.ilike(like_term),
-                    StockFundamental.additional_data['displayName'].astext.ilike(like_term),
-                )
-            )
+            conditions.append(_build_search_filter(term))
 
     # Apply all conditions
     if conditions:

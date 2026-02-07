@@ -131,3 +131,8 @@ export interface ScreenerResponse {
   total_pages: number;
   cached?: boolean;
 }
+
+export interface StockSuggestion {
+  ticker: string;
+  name: string | null;
+}

@@ -4,7 +4,8 @@ import type {
   ScreenerFilters, 
   ScreenerResponse,
   PriceHistoryResponse,
-  BacktestDataResponse
+  BacktestDataResponse,
+  StockSuggestion
 } from '@/types/stock';
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
@@ -159,6 +160,16 @@ export const screenerAPI = {
   screenStocks: async (filters: ScreenerFilters): Promise<ScreenerResponse> => {
     const response = await api.get<ScreenerResponse>('/screener/screen', {
       params: filters,
+    });
+    return response.data;
+  },
+
+  suggestStocks: async (
+    query: string,
+    limit: number = 10
+  ): Promise<{ query: string; results: StockSuggestion[]; count: number }> => {
+    const response = await api.get('/screener/suggest', {
+      params: { q: query, limit },
     });
     return response.data;
   },

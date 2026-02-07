@@ -27,6 +27,12 @@ def _resolve_company_name(ticker_obj: Ticker, fundamentals: StockFundamental) ->
         if name:
             return name
 
+    summary = additional.get('summary')
+    if isinstance(summary, dict):
+        name = summary.get('shortName') or summary.get('longName') or summary.get('name')
+        if name:
+            return name
+
     for key in ('shortName', 'longName', 'displayName', 'name'):
         name = additional.get(key)
         if name:

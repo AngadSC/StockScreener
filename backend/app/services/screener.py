@@ -74,6 +74,11 @@ def get_search_suggestions(
 
     return suggestions
 
+def _get_field(obj: Optional[StockFundamental], field: str):
+    if not obj:
+        return None
+    return getattr(obj, field)
+
 def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any]], int]:
     """
     Screen stocks based on filters (pure SQL - FAST).
@@ -81,8 +86,8 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     Returns:
         Tuple of (matching stock dicts, total count)
     """
-    # Join Ticker and StockFundamental
-    query = db.query(Ticker, StockFundamental).join(
+    # Join Ticker and StockFundamental (outer join to allow search by name even if fundamentals missing)
+    query = db.query(Ticker, StockFundamental).outerjoin(
         StockFundamental,
         Ticker.id == StockFundamental.ticker_id
     )
@@ -149,35 +154,35 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
         stocks.append({
             'ticker': ticker.symbol,
             'name': _resolve_company_name(ticker, fundamental),
-            'sector': fundamental.sector,
-            'industry': fundamental.industry,
-            'market_cap': fundamental.market_cap,
-            'pe_ratio': fundamental.pe_ratio,
-            'forward_pe': fundamental.forward_pe,
-            'peg_ratio': fundamental.peg_ratio,
-            'pb_ratio': fundamental.price_to_book,
-            'ps_ratio': fundamental.price_to_sales,
-            'ev_to_ebitda': fundamental.ev_to_ebitda,
-            'profit_margin': fundamental.profit_margin,
-            'operating_margin': fundamental.operating_margin,
-            'roe': fundamental.roe,
-            'roa': fundamental.roa,
-            'revenue_growth': fundamental.revenue_growth,
-            'earnings_growth': fundamental.earnings_growth,
-            'debt_to_equity': fundamental.debt_to_equity,
-            'current_ratio': fundamental.current_ratio,
-            'quick_ratio': fundamental.quick_ratio,
-            'dividend_yield': fundamental.dividend_yield,
-            'dividend_rate': fundamental.dividend_rate,
-            'payout_ratio': fundamental.payout_ratio,
-            'current_price': fundamental.current_price,
-            'day_change_percent': fundamental.day_change_percent,
-            'volume': fundamental.volume,
-            'avg_volume': fundamental.avg_volume,
-            'beta': fundamental.beta,
-            'fifty_two_week_high': fundamental.fifty_two_week_high,
-            'fifty_two_week_low': fundamental.fifty_two_week_low,
-            'last_updated': fundamental.last_updated.isoformat() if fundamental.last_updated else None
+            'sector': _get_field(fundamental, 'sector'),
+            'industry': _get_field(fundamental, 'industry'),
+            'market_cap': _get_field(fundamental, 'market_cap'),
+            'pe_ratio': _get_field(fundamental, 'pe_ratio'),
+            'forward_pe': _get_field(fundamental, 'forward_pe'),
+            'peg_ratio': _get_field(fundamental, 'peg_ratio'),
+            'pb_ratio': _get_field(fundamental, 'price_to_book'),
+            'ps_ratio': _get_field(fundamental, 'price_to_sales'),
+            'ev_to_ebitda': _get_field(fundamental, 'ev_to_ebitda'),
+            'profit_margin': _get_field(fundamental, 'profit_margin'),
+            'operating_margin': _get_field(fundamental, 'operating_margin'),
+            'roe': _get_field(fundamental, 'roe'),
+            'roa': _get_field(fundamental, 'roa'),
+            'revenue_growth': _get_field(fundamental, 'revenue_growth'),
+            'earnings_growth': _get_field(fundamental, 'earnings_growth'),
+            'debt_to_equity': _get_field(fundamental, 'debt_to_equity'),
+            'current_ratio': _get_field(fundamental, 'current_ratio'),
+            'quick_ratio': _get_field(fundamental, 'quick_ratio'),
+            'dividend_yield': _get_field(fundamental, 'dividend_yield'),
+            'dividend_rate': _get_field(fundamental, 'dividend_rate'),
+            'payout_ratio': _get_field(fundamental, 'payout_ratio'),
+            'current_price': _get_field(fundamental, 'current_price'),
+            'day_change_percent': _get_field(fundamental, 'day_change_percent'),
+            'volume': _get_field(fundamental, 'volume'),
+            'avg_volume': _get_field(fundamental, 'avg_volume'),
+            'beta': _get_field(fundamental, 'beta'),
+            'fifty_two_week_high': _get_field(fundamental, 'fifty_two_week_high'),
+            'fifty_two_week_low': _get_field(fundamental, 'fifty_two_week_low'),
+            'last_updated': fundamental.last_updated.isoformat() if fundamental and fundamental.last_updated else None
         })
 
     return stocks, total

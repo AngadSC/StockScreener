@@ -47,7 +47,8 @@ def screen_stocks_endpoint(
 
     # tyr the redis first 
 
-    if settings.SCREENER_USE_CACHE:
+    # Never use cache when search is provided (avoid stale results)
+    if settings.SCREENER_USE_CACHE and not search:
         cached = cache_service.get(cache_key)
         if cached:
             return {
@@ -87,7 +88,7 @@ def screen_stocks_endpoint(
     }
 
     #cache for 1 hour 
-    if settings.SCREENER_USE_CACHE:
+    if settings.SCREENER_USE_CACHE and not search:
         cache_service.set(cache_key, result, ttl=3600)
     
     return result

@@ -8,9 +8,25 @@ from typing import List, Tuple, Dict, Any, Optional
 def _resolve_company_name(ticker: Ticker, fundamental: StockFundamental) -> Optional[str]:
     if ticker.name:
         return ticker.name
+
     additional = fundamental.additional_data if isinstance(fundamental.additional_data, dict) else {}
-    price = additional.get('price', {}) if isinstance(additional, dict) else {}
-    return price.get('shortName') or price.get('longName')
+    if not isinstance(additional, dict):
+        return None
+
+    # YahooQuery structure: additional_data.price.{shortName,longName}
+    price = additional.get('price')
+    if isinstance(price, dict):
+        name = price.get('shortName') or price.get('longName') or price.get('name')
+        if name:
+            return name
+
+    # YFinance structure: additional_data.{shortName,longName,displayName}
+    for key in ('shortName', 'longName', 'displayName', 'name'):
+        name = additional.get(key)
+        if name:
+            return name
+
+    return None
 
 def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any]], int]:
     """
@@ -61,10 +77,16 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if filters.search:
         term = filters.search.strip()
         if term:
+            like_term = f"%{term}%"
             conditions.append(
                 or_(
-                    Ticker.symbol.ilike(f"%{term}%"),
-                    Ticker.name.ilike(f"%{term}%")
+                    Ticker.symbol.ilike(like_term),
+                    Ticker.name.ilike(like_term),
+                    StockFundamental.additional_data['price']['shortName'].astext.ilike(like_term),
+                    StockFundamental.additional_data['price']['longName'].astext.ilike(like_term),
+                    StockFundamental.additional_data['shortName'].astext.ilike(like_term),
+                    StockFundamental.additional_data['longName'].astext.ilike(like_term),
+                    StockFundamental.additional_data['displayName'].astext.ilike(like_term),
                 )
             )
 
@@ -98,8 +120,8 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
             'pe_ratio': fundamental.pe_ratio,
             'forward_pe': fundamental.forward_pe,
             'peg_ratio': fundamental.peg_ratio,
-            'price_to_book': fundamental.price_to_book,
-            'price_to_sales': fundamental.price_to_sales,
+            'pb_ratio': fundamental.price_to_book,
+            'ps_ratio': fundamental.price_to_sales,
             'ev_to_ebitda': fundamental.ev_to_ebitda,
             'profit_margin': fundamental.profit_margin,
             'operating_margin': fundamental.operating_margin,

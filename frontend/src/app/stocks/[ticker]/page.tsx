@@ -123,7 +123,7 @@ export default function StockDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Advanced Price Chart with TradingView */}git
+      {/* Advanced Price Chart with TradingView */}
       <TradingViewChart ticker={ticker} />
 
       {/* Metrics */}

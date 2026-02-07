@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/react-query";
 import Header from "@/components/layout/Header";
@@ -19,7 +20,9 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className="antialiased">
         <ReactQueryProvider>
-          <Header />
+          <Suspense fallback={<div className="h-16 border-b border-border bg-card" />}>
+            <Header />
+          </Suspense>
           <main className="min-h-screen">{children}</main>
           <CommandPalette />
           <KeyboardShortcuts />

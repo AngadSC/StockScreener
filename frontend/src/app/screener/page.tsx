@@ -1,19 +1,32 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
 import { screenerAPI } from '@/lib/api';
 import { ScreenerFilters } from '@/types/stock';
 import { Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 export default function ScreenerPage() {
-  const [filters, setFilters] = useState<ScreenerFilters>({
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get('search')?.trim() || undefined;
+
+  const [filters, setFilters] = useState<ScreenerFilters>(() => ({
     limit: 50,
     sort_by: 'market_cap',
     sort_order: 'desc',
-  });
+    search: searchQuery,
+  }));
+
+  useEffect(() => {
+    setFilters((prev) => ({
+      ...prev,
+      search: searchQuery,
+      skip: 0,
+    }));
+  }, [searchQuery]);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['screener', filters],
@@ -29,6 +42,7 @@ export default function ScreenerPage() {
       limit: 50,
       sort_by: 'market_cap',
       sort_order: 'desc',
+      search: searchQuery,
     });
   };
 
@@ -72,6 +86,7 @@ export default function ScreenerPage() {
           <FilterPanel
             onFilterChange={handleFilterChange}
             onReset={handleReset}
+            search={filters.search}
           />
         </div>
 

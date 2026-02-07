@@ -106,6 +106,7 @@ export interface BacktestDataResponse {
 }
 
 export interface ScreenerFilters {
+  search?: string;
   min_pe?: number;
   max_pe?: number;
   min_market_cap?: number;
@@ -129,4 +130,9 @@ export interface ScreenerResponse {
   per_page: number;
   total_pages: number;
   cached?: boolean;
+}
+
+export interface StockSuggestion {
+  ticker: string;
+  name: string | null;
 }

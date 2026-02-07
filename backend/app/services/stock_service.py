@@ -14,6 +14,33 @@ import pandas as pd
 # PostgreSQL-first architecture
 # ============================================
 
+def _resolve_company_name(ticker_obj: Ticker, fundamentals: StockFundamental) -> Optional[str]:
+    if ticker_obj.name:
+        return ticker_obj.name
+    additional = fundamentals.additional_data if isinstance(fundamentals.additional_data, dict) else {}
+    if not isinstance(additional, dict):
+        return None
+
+    price = additional.get('price')
+    if isinstance(price, dict):
+        name = price.get('shortName') or price.get('longName') or price.get('name')
+        if name:
+            return name
+
+    summary = additional.get('summary')
+    if isinstance(summary, dict):
+        name = summary.get('shortName') or summary.get('longName') or summary.get('name')
+        if name:
+            return name
+
+    for key in ('shortName', 'longName', 'displayName', 'name'):
+        name = additional.get(key)
+        if name:
+            return name
+
+    return None
+
+
 def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
     """
     Get stock data with fundamentals
@@ -56,14 +83,14 @@ def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True
     # Build response
     stock_data = {
         'ticker': ticker_obj.symbol,
-        'name': ticker_obj.name,
+        'name': _resolve_company_name(ticker_obj, fundamentals),
         
         # Valuation
         'pe_ratio': fundamentals.pe_ratio,
         'forward_pe': fundamentals.forward_pe,
         'peg_ratio': fundamentals.peg_ratio,
-        'price_to_book': fundamentals.price_to_book,
-        'price_to_sales': fundamentals.price_to_sales,
+        'pb_ratio': fundamentals.price_to_book,
+        'ps_ratio': fundamentals.price_to_sales,
         'ev_to_ebitda': fundamentals.ev_to_ebitda,
         
         # Profitability

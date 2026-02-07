@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
-from app.services.screener import screen_stocks
+from app.services.screener import screen_stocks, get_search_suggestions
 from app.services.cache import cache_service
+from app.config import settings
 from app.models.stock import StockFilter, StockDetail
 from typing import List, Optional
 
@@ -11,6 +12,9 @@ router = APIRouter(prefix="/screener", tags=["screener"])
 
 @router.get("/screen")
 def screen_stocks_endpoint(
+    # Search
+    search: Optional[str] = Query(None, description="Search by ticker or company name"),
+
     # Valuation filters
     min_pe: Optional[float] = Query(None, description="Minimum P/E ratio"),
     max_pe: Optional[float] = Query(None, description="Maximum P/E ratio"),
@@ -39,19 +43,20 @@ def screen_stocks_endpoint(
     
     db: Session = Depends(get_db)
 ):
-    cache_key = f"screener:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{min_price}:{max_price}:{skip}:{limit}:{sort_by}:{sort_order}"
+    cache_key = f"screener:{search}:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{min_price}:{max_price}:{skip}:{limit}:{sort_by}:{sort_order}"
 
     # tyr the redis first 
 
-    cached = cache_service.get(cache_key)
-
-    if cached:
-        return {
-            "cached": True,
-            **cached
-        }
+    if settings.SCREENER_USE_CACHE:
+        cached = cache_service.get(cache_key)
+        if cached:
+            return {
+                "cached": True,
+                **cached
+            }
     
     filters = StockFilter(
+        search=search,
         min_pe=min_pe,
         max_pe=max_pe,
         min_market_cap=min_market_cap,
@@ -82,9 +87,23 @@ def screen_stocks_endpoint(
     }
 
     #cache for 1 hour 
-    cache_service.set(cache_key, result, ttl=3600)
+    if settings.SCREENER_USE_CACHE:
+        cache_service.set(cache_key, result, ttl=3600)
     
     return result
+
+@router.get("/suggest")
+def suggest_stocks(
+    q: str = Query(..., min_length=1, max_length=100, description="Search term"),
+    limit: int = Query(10, ge=1, le=25, description="Max suggestions"),
+    db: Session = Depends(get_db)
+):
+    suggestions = get_search_suggestions(db, q.strip(), limit=limit)
+    return {
+        "query": q,
+        "results": suggestions,
+        "count": len(suggestions)
+    }
 
 @router.get("/sectors")
 def get_available_sectors(db: Session = Depends(get_db)):

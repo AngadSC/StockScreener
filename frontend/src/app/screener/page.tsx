@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
@@ -9,7 +9,7 @@ import { ScreenerFilters } from '@/types/stock';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
-export default function ScreenerPage() {
+function ScreenerPageContent() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('search')?.trim() || undefined;
 
@@ -127,5 +127,13 @@ export default function ScreenerPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ScreenerPage() {
+  return (
+    <Suspense fallback={<div className="container py-6" />}>
+      <ScreenerPageContent />
+    </Suspense>
   );
 }

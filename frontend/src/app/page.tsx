@@ -1,10 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { screenerAPI } from '@/lib/api';
 import { TrendingUp, TrendingDown, Activity, Search, Star } from 'lucide-react';
+import type { Stock } from '@/types/stock';
+
+function getChangePercent(stock: Stock): number | null {
+  if (typeof stock.day_change_percent === 'number') return stock.day_change_percent;
+  if (typeof stock.change_percent === 'number') return stock.change_percent;
+  return null;
+}
 
 export default function HomePage() {
   // Fetch market movers
@@ -12,7 +19,7 @@ export default function HomePage() {
     queryKey: ['gainers'],
     queryFn: () => screenerAPI.screenStocks({
       limit: 10,
-      sort_by: 'change_percent',
+      sort_by: 'day_change_percent',
       sort_order: 'desc',
       min_price: 5,
       min_market_cap: 1000000000
@@ -23,7 +30,7 @@ export default function HomePage() {
     queryKey: ['losers'],
     queryFn: () => screenerAPI.screenStocks({
       limit: 10,
-      sort_by: 'change_percent',
+      sort_by: 'day_change_percent',
       sort_order: 'asc',
       min_price: 5,
       min_market_cap: 1000000000
@@ -39,6 +46,28 @@ export default function HomePage() {
       min_market_cap: 1000000000
     }),
   });
+
+  const topGainers = useMemo(() => {
+    const stocks = gainers?.results ?? [];
+    return [...stocks]
+      .filter((stock) => {
+        const value = getChangePercent(stock);
+        return value !== null && value > 0;
+      })
+      .sort((a, b) => (getChangePercent(b) ?? -Infinity) - (getChangePercent(a) ?? -Infinity))
+      .slice(0, 5);
+  }, [gainers]);
+
+  const topLosers = useMemo(() => {
+    const stocks = losers?.results ?? [];
+    return [...stocks]
+      .filter((stock) => {
+        const value = getChangePercent(stock);
+        return value !== null && value < 0;
+      })
+      .sort((a, b) => (getChangePercent(a) ?? Infinity) - (getChangePercent(b) ?? Infinity))
+      .slice(0, 5);
+  }, [losers]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,30 +106,33 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {gainers?.results.slice(0, 5).map((stock) => (
-                    <Link
-                      key={stock.ticker}
-                      href={`/stocks/${stock.ticker}`}
-                      className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-foreground">{stock.ticker}</div>
-                          <div className="text-sm text-muted-foreground truncate">
-                            {stock.name || stock.company_name || 'N/A'}
+                  {topGainers.map((stock) => {
+                    const changePercent = getChangePercent(stock);
+                    return (
+                      <Link
+                        key={stock.ticker}
+                        href={`/stocks/${stock.ticker}`}
+                        className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-foreground">{stock.ticker}</div>
+                            <div className="text-sm text-muted-foreground truncate">
+                              {stock.name || stock.company_name || 'N/A'}
+                            </div>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="font-semibold">
+                              ${stock.current_price?.toFixed(2)}
+                            </div>
+                            <div className="text-sm font-medium text-success">
+                              {changePercent !== null ? `+${changePercent.toFixed(2)}%` : 'N/A'}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right ml-4">
-                          <div className="font-semibold">
-                            ${stock.current_price?.toFixed(2)}
-                          </div>
-                          <div className="text-sm font-medium text-success">
-                            +{stock.change_percent?.toFixed(2)}%
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -128,30 +160,33 @@ export default function HomePage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {losers?.results.slice(0, 5).map((stock) => (
-                    <Link
-                      key={stock.ticker}
-                      href={`/stocks/${stock.ticker}`}
-                      className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-foreground">{stock.ticker}</div>
-                          <div className="text-sm text-muted-foreground truncate">
-                            {stock.name || stock.company_name || 'N/A'}
+                  {topLosers.map((stock) => {
+                    const changePercent = getChangePercent(stock);
+                    return (
+                      <Link
+                        key={stock.ticker}
+                        href={`/stocks/${stock.ticker}`}
+                        className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-foreground">{stock.ticker}</div>
+                            <div className="text-sm text-muted-foreground truncate">
+                              {stock.name || stock.company_name || 'N/A'}
+                            </div>
+                          </div>
+                          <div className="text-right ml-4">
+                            <div className="font-semibold">
+                              ${stock.current_price?.toFixed(2)}
+                            </div>
+                            <div className="text-sm font-medium text-destructive">
+                              {changePercent !== null ? `${changePercent.toFixed(2)}%` : 'N/A'}
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right ml-4">
-                          <div className="font-semibold">
-                            ${stock.current_price?.toFixed(2)}
-                          </div>
-                          <div className="text-sm font-medium text-destructive">
-                            {stock.change_percent?.toFixed(2)}%
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -2,7 +2,13 @@ from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List, Union
 from pathlib import Path 
-import os
+import json
+
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "https://quantorsignal.com",
+    "https://www.quantorsignal.com",
+]
 
 class Settings(BaseSettings):
     # Database
@@ -21,7 +27,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Stock Screener API"
     
     # CORS
-    BACKEND_CORS_ORIGINS: Union[str, List[str]] = "http://localhost:3000"
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = DEFAULT_CORS_ORIGINS
     
     # ===== DATA PROVIDERS =====
     HISTORICAL_PROVIDER: str = "yfinance"
@@ -63,10 +69,26 @@ class Settings(BaseSettings):
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors(cls, v):
-        """Convert comma-separated string to list of origins"""
+        """Accept JSON array or comma-separated origins and normalize them."""
+        parsed_origins: List[str] = []
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(',')]
-        return v
+            value = v.strip()
+            if value.startswith("["):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        parsed_origins = [str(origin).strip().rstrip("/") for origin in parsed if str(origin).strip()]
+                except json.JSONDecodeError:
+                    pass
+            if not parsed_origins:
+                parsed_origins = [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+        elif isinstance(v, list):
+            parsed_origins = [str(origin).strip().rstrip("/") for origin in v if str(origin).strip()]
+
+        merged = [origin.rstrip("/") for origin in [*DEFAULT_CORS_ORIGINS, *parsed_origins] if origin]
+        # De-duplicate while preserving order
+        unique_origins = list(dict.fromkeys(merged))
+        return unique_origins
     
     class Config:
         env_file = Path(__file__).parent.parent / ".env"

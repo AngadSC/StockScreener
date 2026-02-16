@@ -18,8 +18,16 @@ export default function Header() {
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const latestQueryRef = useRef(0);
 
+  const hasAccessToken = () => {
+    try {
+      return !!window.localStorage.getItem('access_token');
+    } catch {
+      return false;
+    }
+  };
+
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem('access_token'));
+    setIsLoggedIn(hasAccessToken());
   }, []);
 
   useEffect(() => {
@@ -59,7 +67,11 @@ export default function Header() {
   }, [searchQuery]);
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
+    try {
+      window.localStorage.removeItem('access_token');
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
     window.location.href = '/auth/login';
   };
 

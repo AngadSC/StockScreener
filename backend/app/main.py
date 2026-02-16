@@ -19,6 +19,7 @@ async def lifespan(app: FastAPI):
     print(" Starting up Stock Screener API...")
     print(f"   Environment: {settings.ENVIRONMENT}")
     print(f"   Database: Connected")
+    print(f"   CORS origins: {settings.BACKEND_CORS_ORIGINS}")
     
     # Start the background job scheduler
     start_scheduler()

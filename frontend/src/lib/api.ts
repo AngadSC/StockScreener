@@ -11,6 +11,34 @@ import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types
 import type { WatchlistResponse } from '@/types/watchlist';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+const TOKEN_KEY = 'access_token';
+
+const safeStorage = {
+  get(key: string): string | null {
+    if (typeof window === 'undefined') return null;
+    try {
+      return window.localStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key: string, value: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(key, value);
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
+  },
+  remove(key: string): void {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
+  },
+};
 
 // Create axios instance
 const api = axios.create({
@@ -22,11 +50,9 @@ const api = axios.create({
 
 // Request interceptor to add auth token
 api.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('access_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+  const token = safeStorage.get(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -37,8 +63,10 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       // Unauthorized - clear token and redirect to login
-      localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      safeStorage.remove(TOKEN_KEY);
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth/login';
+      }
     }
     return Promise.reject(error);
   }
@@ -65,7 +93,7 @@ export const authAPI = {
     });
 
     // Store token
-    localStorage.setItem('access_token', response.data.access_token);
+    safeStorage.set(TOKEN_KEY, response.data.access_token);
 
     return response.data;
   },
@@ -76,8 +104,10 @@ export const authAPI = {
   },
 
   logout: () => {
-    localStorage.removeItem('access_token');
-    window.location.href = '/login';
+    safeStorage.remove(TOKEN_KEY);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/login';
+    }
   },
 };
 

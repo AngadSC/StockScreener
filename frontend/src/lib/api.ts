@@ -11,60 +11,26 @@ import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types
 import type { WatchlistResponse } from '@/types/watchlist';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
-const TOKEN_KEY = 'access_token';
-
-const safeStorage = {
-  get(key: string): string | null {
-    if (typeof window === 'undefined') return null;
-    try {
-      return window.localStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-  set(key: string, value: string): void {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(key, value);
-    } catch {
-      // Ignore storage errors in restricted browser contexts.
-    }
-  },
-  remove(key: string): void {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.removeItem(key);
-    } catch {
-      // Ignore storage errors in restricted browser contexts.
-    }
-  },
-};
 
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use((config) => {
-  const token = safeStorage.get(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 // Response interceptor for error handling
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
+    const requestUrl = typeof error.config?.url === 'string' ? error.config.url : '';
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+    const isSessionCheck = requestUrl.includes('/auth/me');
     if (error.response?.status === 401) {
-      // Unauthorized - clear token and redirect to login
-      safeStorage.remove(TOKEN_KEY);
-      if (typeof window !== 'undefined') {
+      // Redirect to login on unauthorized, except during auth requests.
+      if (typeof window !== 'undefined' && !isAuthEndpoint && !isSessionCheck) {
         window.location.href = '/auth/login';
       }
     }
@@ -92,9 +58,6 @@ export const authAPI = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
 
-    // Store token
-    safeStorage.set(TOKEN_KEY, response.data.access_token);
-
     return response.data;
   },
 
@@ -103,11 +66,9 @@ export const authAPI = {
     return response.data;
   },
 
-  logout: () => {
-    safeStorage.remove(TOKEN_KEY);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/auth/login';
-    }
+  logout: async () => {
+    await api.post('/auth/logout');
+    if (typeof window !== 'undefined') window.location.href = '/auth/login';
   },
 };
 

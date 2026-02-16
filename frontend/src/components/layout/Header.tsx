@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { TrendingUp, Search, Star, LogIn, LogOut } from 'lucide-react';
-import { screenerAPI } from '@/lib/api';
+import { authAPI, screenerAPI } from '@/lib/api';
 import type { StockSuggestion } from '@/types/stock';
 
 export default function Header() {
@@ -18,17 +18,24 @@ export default function Header() {
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const latestQueryRef = useRef(0);
 
-  const hasAccessToken = () => {
-    try {
-      return !!window.localStorage.getItem('access_token');
-    } catch {
-      return false;
-    }
-  };
-
   useEffect(() => {
-    setIsLoggedIn(hasAccessToken());
-  }, []);
+    let isMounted = true;
+
+    const loadSession = async () => {
+      try {
+        await authAPI.getCurrentUser();
+        if (isMounted) setIsLoggedIn(true);
+      } catch {
+        if (isMounted) setIsLoggedIn(false);
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const query = searchParams.get('search') || '';
@@ -66,13 +73,13 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     try {
-      window.localStorage.removeItem('access_token');
+      await authAPI.logout();
+      setIsLoggedIn(false);
     } catch {
-      // Ignore storage errors in restricted browser contexts.
+      window.location.href = '/auth/login';
     }
-    window.location.href = '/auth/login';
   };
 
   const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {

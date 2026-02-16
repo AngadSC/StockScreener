@@ -1,8 +1,10 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from app.jobs.bulk_population import populate_all_stocks, retry_failed_tickers
 from app.jobs.daily_sync import daily_delta_sync
 from app.jobs.fundamentals_updater import update_fundamentals_daily, update_single_ticker_fundamentals
 from app.jobs.stock_loader import update_all_stocks_batch
+from app.database.models import User
+from app.services.auth import get_current_admin_user
 from typing import Dict, Any
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -12,7 +14,11 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 # ============================================
 
 @router.post("/populate-all-stocks")
-async def trigger_bulk_population(background_tasks: BackgroundTasks, resume: bool = True) -> Dict[str, str]:
+async def trigger_bulk_population(
+    background_tasks: BackgroundTasks,
+    resume: bool = True,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, str]:
     """
     Trigger bulk population of all US stocks (5 years history)
     
@@ -32,7 +38,10 @@ async def trigger_bulk_population(background_tasks: BackgroundTasks, resume: boo
 
 
 @router.post("/retry-failed-tickers")
-async def trigger_retry_failed(background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def trigger_retry_failed(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, str]:
     """Retry tickers that failed during bulk population"""
     background_tasks.add_task(retry_failed_tickers)
     
@@ -43,7 +52,10 @@ async def trigger_retry_failed(background_tasks: BackgroundTasks) -> Dict[str, s
 
 
 @router.post("/daily-sync")
-async def trigger_daily_sync(background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def trigger_daily_sync(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, str]:
     """Manually trigger daily delta sync"""
     background_tasks.add_task(daily_delta_sync)
     
@@ -54,7 +66,10 @@ async def trigger_daily_sync(background_tasks: BackgroundTasks) -> Dict[str, str
 
 
 @router.post("/update-fundamentals")
-async def trigger_fundamentals_update(background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def trigger_fundamentals_update(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, str]:
     """Manually trigger fundamentals update (today's 1/7th segment)"""
     background_tasks.add_task(update_fundamentals_daily)
     
@@ -65,7 +80,10 @@ async def trigger_fundamentals_update(background_tasks: BackgroundTasks) -> Dict
 
 
 @router.post("/update-fundamentals/{ticker}")
-async def trigger_single_fundamentals_update(ticker: str) -> Dict[str, Any]:
+async def trigger_single_fundamentals_update(
+    ticker: str,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, Any]:
     """Update fundamentals for a single ticker (on-demand)"""
     success = update_single_ticker_fundamentals(ticker)
 
@@ -80,7 +98,10 @@ async def trigger_single_fundamentals_update(ticker: str) -> Dict[str, Any]:
 
 
 @router.post("/batch-update")
-async def trigger_batch_update(background_tasks: BackgroundTasks) -> Dict[str, str]:
+async def trigger_batch_update(
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_admin_user),
+) -> Dict[str, str]:
     """
     Manually trigger batch update of all active stocks
 

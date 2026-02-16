@@ -15,6 +15,29 @@ import pandas as pd
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
+def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int) -> tuple:
+    """
+    Parse YYYY-MM-DD date strings and enforce sane request bounds.
+    """
+    try:
+        from datetime import datetime as dt
+        start = dt.strptime(start_date, "%Y-%m-%d").date()
+        end = dt.strptime(end_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    if start > end:
+        raise HTTPException(status_code=400, detail="start_date must be before or equal to end_date.")
+
+    if (end - start).days > max_days:
+        raise HTTPException(status_code=400, detail=f"Date range too large. Maximum is {max_days} days.")
+
+    today = datetime.now().date()
+    if end > today:
+        raise HTTPException(status_code=400, detail="end_date cannot be in the future.")
+
+    return start, end
+
 @router.get("/{ticker}", response_model=StockDetail)
 def get_stock_detail(ticker: str, db: Session = Depends(get_db)):
     """Get detailed stock information including fundamentals"""
@@ -132,10 +155,7 @@ def get_backtest_data(
         # Use the historical provider (yfinance)
         provider = ProviderFactory.get_historical_provider()
 
-        # Convert string dates to date objects
-        from datetime import datetime as dt
-        start = dt.strptime(start_date, "%Y-%m-%d").date()
-        end = dt.strptime(end_date, "%Y-%m-%d").date()
+        start, end = _parse_and_validate_date_range(start_date, end_date, max_days=3650)
 
         df = provider.get_historical_prices(ticker, start, end)
 
@@ -178,9 +198,10 @@ def get_backtest_data(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Backtest data fetch error for {ticker}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error fetching backtest data: {str(e)}"
+            detail="Failed to fetch backtest data"
         )
 
 @router.post("/{ticker}/ml-features")
@@ -235,10 +256,7 @@ def get_ml_features(
         # Use the historical provider
         provider = ProviderFactory.get_historical_provider()
 
-        # Convert string dates to date objects
-        from datetime import datetime as dt
-        start = dt.strptime(start_date, "%Y-%m-%d").date()
-        end = dt.strptime(end_date, "%Y-%m-%d").date()
+        start, end = _parse_and_validate_date_range(start_date, end_date, max_days=1825)
 
         df = provider.get_historical_prices(ticker, start, end)
 
@@ -315,9 +333,10 @@ def get_ml_features(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"ML feature generation error for {ticker}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error generating ML features: {str(e)}"
+            detail="Failed to generate ML features"
         )
 
        
@@ -395,8 +414,9 @@ def get_intraday_data(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Intraday data fetch error for {ticker}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error fetching intraday data: {str(e)}"
+            detail="Failed to fetch intraday data"
         )       
        

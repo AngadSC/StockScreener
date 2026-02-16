@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    AUTH_COOKIE_NAME: str = "access_token"
     
     # API
     API_V1_PREFIX: str = "/api/v1"
@@ -62,6 +63,14 @@ class Settings(BaseSettings):
     
     # ===== RATE LIMITING =====
     RATE_LIMIT_ENABLED: bool = True
+    RATE_LIMIT_LOGIN_PER_MINUTE: int = 10
+    RATE_LIMIT_REGISTER_PER_5_MINUTES: int = 20
+    RATE_LIMIT_HEAVY_PER_MINUTE: int = 20
+    RATE_LIMIT_SCREENER_PER_MINUTE: int = 120
+    RATE_LIMIT_DEFAULT_PER_MINUTE: int = 300
+
+    # ===== ADMIN ACCESS =====
+    ADMIN_EMAILS: Union[str, List[str]] = []
     
     # Environment
     ENVIRONMENT: str = "development"
@@ -89,6 +98,28 @@ class Settings(BaseSettings):
         # De-duplicate while preserving order
         unique_origins = list(dict.fromkeys(merged))
         return unique_origins
+
+    @field_validator('ADMIN_EMAILS', mode='before')
+    @classmethod
+    def parse_admin_emails(cls, v):
+        """Accept JSON array or comma-separated admin emails."""
+        parsed: List[str] = []
+        if isinstance(v, str):
+            value = v.strip()
+            if not value:
+                return []
+            if value.startswith("["):
+                try:
+                    maybe_list = json.loads(value)
+                    if isinstance(maybe_list, list):
+                        parsed = [str(email).strip().lower() for email in maybe_list if str(email).strip()]
+                except json.JSONDecodeError:
+                    pass
+            if not parsed:
+                parsed = [email.strip().lower() for email in value.split(",") if email.strip()]
+        elif isinstance(v, list):
+            parsed = [str(email).strip().lower() for email in v if str(email).strip()]
+        return list(dict.fromkeys(parsed))
     
     class Config:
         env_file = Path(__file__).parent.parent / ".env"

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
@@ -27,18 +27,20 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     
     Returns user object with JWT token
     """
+    normalized_email = user_data.email.strip().lower()
+
     # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    existing_user = db.query(User).filter(User.email == normalized_email).first()
     if existing_user:
         raise HTTPException(
             status_code=400,
-            detail="Email already registered"
+            detail="Unable to create account"
         )
     
     # Create new user
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
-        email=user_data.email,
+        email=normalized_email,
         password_hash=hashed_password,
         tier="free",
         is_active=True
@@ -52,6 +54,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=Token)
 def login(
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
@@ -62,7 +65,8 @@ def login(
     Token expires after 30 minutes (configurable).
     """
     # Find user by email (username field in OAuth2 form)
-    user = db.query(User).filter(User.email == form_data.username).first()
+    login_email = form_data.username.strip().lower()
+    user = db.query(User).filter(User.email == login_email).first()
     
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
@@ -84,11 +88,28 @@ def login(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
+
+    cookie_max_age = settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    is_production = settings.ENVIRONMENT.lower() == "production"
+    response.set_cookie(
+        key=settings.AUTH_COOKIE_NAME,
+        value=access_token,
+        max_age=cookie_max_age,
+        httponly=True,
+        secure=is_production,
+        samesite="none" if is_production else "lax",
+        path="/",
+    )
     
     return {
         "access_token": access_token,
         "token_type": "bearer"
     }
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key=settings.AUTH_COOKIE_NAME, path="/")
+    return {"message": "Logged out"}
 
 
 @router.get("/me", response_model=UserResponse)

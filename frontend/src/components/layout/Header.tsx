@@ -113,7 +113,7 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
             <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="text-xl font-semibold">StockScreener</span>
+            <span className="text-xl font-semibold">QuantorSignal</span>
           </Link>
 
           <div className="flex flex-1 items-center justify-center gap-4">

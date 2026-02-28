@@ -119,10 +119,28 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
         conditions.append(StockFundamental.debt_to_equity <= filters.max_debt_to_equity)
         conditions.append(StockFundamental.debt_to_equity != None)
 
+    if filters.max_beta is not None:
+        conditions.append(StockFundamental.beta <= filters.max_beta)
+        conditions.append(StockFundamental.beta != None)
+
+    if filters.min_roe is not None:
+        conditions.append(StockFundamental.roe >= filters.min_roe)
+        conditions.append(StockFundamental.roe != None)
+
+    if filters.min_revenue_growth is not None:
+        conditions.append(StockFundamental.revenue_growth >= filters.min_revenue_growth)
+        conditions.append(StockFundamental.revenue_growth != None)
+
     if filters.min_price is not None:
         conditions.append(StockFundamental.current_price >= filters.min_price)
     if filters.max_price is not None:
         conditions.append(StockFundamental.current_price <= filters.max_price)
+    if filters.min_volume is not None:
+        conditions.append(StockFundamental.volume >= filters.min_volume)
+        conditions.append(StockFundamental.volume != None)
+    if filters.min_avg_volume is not None:
+        conditions.append(StockFundamental.avg_volume >= filters.min_avg_volume)
+        conditions.append(StockFundamental.avg_volume != None)
 
     # Search by ticker symbol or company name (case-insensitive)
     if filters.search:
@@ -141,9 +159,9 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if hasattr(StockFundamental, filters.sort_by):
         sort_column = getattr(StockFundamental, filters.sort_by)
         if filters.sort_order == "desc":
-            query = query.order_by(desc(sort_column))
+            query = query.order_by(desc(sort_column).nullslast(), Ticker.symbol.asc())
         else:
-            query = query.order_by(asc(sort_column))
+            query = query.order_by(asc(sort_column).nullslast(), Ticker.symbol.asc())
 
     # Pagination
     results = query.offset(filters.skip).limit(filters.limit).all()

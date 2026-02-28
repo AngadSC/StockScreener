@@ -28,10 +28,15 @@ def screen_stocks_endpoint(
     # Financial health
     min_dividend_yield: Optional[float] = Query(None, description="Minimum dividend yield (%)"),
     max_debt_to_equity: Optional[float] = Query(None, description="Maximum debt-to-equity ratio"),
+    max_beta: Optional[float] = Query(None, description="Maximum beta"),
+    min_roe: Optional[float] = Query(None, description="Minimum return on equity (decimal, e.g. 0.15 for 15%)"),
+    min_revenue_growth: Optional[float] = Query(None, description="Minimum revenue growth (decimal, e.g. 0.10 for 10%)"),
     
     # Price filters
     min_price: Optional[float] = Query(None, description="Minimum stock price ($)"),
     max_price: Optional[float] = Query(None, description="Maximum stock price ($)"),
+    min_volume: Optional[int] = Query(None, description="Minimum daily volume"),
+    min_avg_volume: Optional[int] = Query(None, description="Minimum average daily volume"),
     
     # Pagination
     skip: int = Query(0, ge=0, description="Number of results to skip"),
@@ -43,7 +48,12 @@ def screen_stocks_endpoint(
     
     db: Session = Depends(get_db)
 ):
-    cache_key = f"screener:{search}:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{min_price}:{max_price}:{skip}:{limit}:{sort_by}:{sort_order}"
+    cache_key = (
+        f"screener:{search}:{min_pe}:{max_pe}:{min_market_cap}:{max_market_cap}:"
+        f"{sectors}:{industries}:{min_dividend_yield}:{max_debt_to_equity}:{max_beta}:"
+        f"{min_roe}:{min_revenue_growth}:{min_price}:{max_price}:{min_volume}:{min_avg_volume}:"
+        f"{skip}:{limit}:{sort_by}:{sort_order}"
+    )
 
     # tyr the redis first 
 
@@ -66,8 +76,13 @@ def screen_stocks_endpoint(
         industries=industries,
         min_dividend_yield=min_dividend_yield,
         max_debt_to_equity=max_debt_to_equity,
+        max_beta=max_beta,
+        min_roe=min_roe,
+        min_revenue_growth=min_revenue_growth,
         min_price=min_price,
         max_price=max_price,
+        min_volume=min_volume,
+        min_avg_volume=min_avg_volume,
         skip=skip,
         limit=limit,
         sort_by=sort_by,

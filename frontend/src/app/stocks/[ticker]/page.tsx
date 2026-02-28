@@ -1,26 +1,20 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { stocksAPI } from '@/lib/api';
+import { Loader2 } from 'lucide-react';
 import TradingViewChart from '@/components/stock/TradingViewChart';
 import StockMetrics from '@/components/stock/StockMetrics';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
-import Link from 'next/link';
-import { formatCurrency, formatMarketCap, getChangeColor } from '@/lib/utils';
+import { stocksAPI } from '@/lib/api';
+import { formatMarketCap, formatPercent, normalizePercentValue } from '@/lib/utils';
 
-// FIX: Remove 'Promise' and 'use' - Next.js 14 passes params directly
 interface PageProps {
   params: { ticker: string };
 }
 
 export default function StockDetailPage({ params }: PageProps) {
-  // FIX: Access ticker directly from params (no resolvedParams needed)
   const ticker = params.ticker.toUpperCase();
 
-  // Fetch stock data
   const { data: stock, isLoading: stockLoading } = useQuery({
     queryKey: ['stock', ticker],
     queryFn: () => stocksAPI.getStock(ticker),
@@ -55,19 +49,18 @@ export default function StockDetailPage({ params }: PageProps) {
     );
   }
 
-  const changePercent = stock.day_change_percent || stock.change_percent;
-  const isPositive = changePercent !== null && changePercent !== undefined && changePercent >= 0;
+  const rawChangePercent = stock.day_change_percent ?? stock.change_percent;
+  const changePercent = normalizePercentValue(rawChangePercent, 'auto');
+  const isPositive = changePercent !== null && changePercent >= 0;
 
   return (
     <div className="container py-6 space-y-6">
-      {/* Back Button */}
       <Link href="/screener">
         <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
           &lt; BACK_TO_SCREENER
         </button>
       </Link>
 
-      {/* Stock Header */}
       <div className="terminal-border bg-card p-8">
         <div className="flex items-start justify-between gap-8">
           <div className="flex-1">
@@ -95,15 +88,19 @@ export default function StockDetailPage({ params }: PageProps) {
           <div className="text-right border-l border-border pl-8 min-w-[240px]">
             <div className="text-xs text-muted-foreground mb-3 tracking-wider">CURRENT_PRICE</div>
             <p className="text-5xl font-bold font-mono mb-2">
-              ${stock.current_price?.toFixed(2) || 'N/A'}
+              {stock.current_price !== null && stock.current_price !== undefined
+                ? `$${stock.current_price.toFixed(2)}`
+                : 'N/A'}
             </p>
-            {changePercent !== null && changePercent !== undefined && (
-              <div className={`flex items-center justify-end gap-2 mt-4 mb-6 font-mono ${
-                isPositive ? 'text-success' : 'text-destructive'
-              }`}>
-                {isPositive ? '▲' : '▼'}
+            {changePercent !== null && (
+              <div
+                className={`flex items-center justify-end gap-2 mt-4 mb-6 font-mono ${
+                  isPositive ? 'text-success' : 'text-destructive'
+                }`}
+              >
+                {isPositive ? 'UP' : 'DOWN'}
                 <span className="text-xl font-bold">
-                  {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
+                  {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                 </span>
               </div>
             )}
@@ -123,10 +120,8 @@ export default function StockDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Advanced Price Chart with TradingView */}
       <TradingViewChart ticker={ticker} />
 
-      {/* Metrics */}
       <div>
         <div className="flex items-center gap-3 mb-4">
           <h2 className="text-lg font-bold text-glow">FUNDAMENTAL_METRICS</h2>
@@ -135,7 +130,6 @@ export default function StockDetailPage({ params }: PageProps) {
         <StockMetrics stock={stock} />
       </div>
 
-      {/* Advanced Analysis Section */}
       <div className="terminal-border bg-card">
         <div className="border-b border-border px-4 py-2 bg-muted/20">
           <span className="text-xs font-bold">ADVANCED_ANALYSIS</span>

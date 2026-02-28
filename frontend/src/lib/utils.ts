@@ -43,10 +43,29 @@ export function formatNumber(value: number | null | undefined): string {
   }).format(value);
 }
 
-export function formatPercent(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(value)) return 'N/A';
-  
-  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+export function normalizePercentValue(
+  value: number | null | undefined,
+  mode: 'auto' | 'ratio' | 'percent' = 'auto'
+): number | null {
+  if (value === null || value === undefined || isNaN(value)) return null;
+
+  if (mode === 'ratio') return value * 100;
+  if (mode === 'percent') return value;
+
+  // Auto mode: supports both ratio storage (0.4 -> 40%) and percent storage (4 -> 4%).
+  return Math.abs(value) <= 1 ? value * 100 : value;
+}
+
+export function formatPercent(
+  value: number | null | undefined,
+  options: { mode?: 'auto' | 'ratio' | 'percent'; withSign?: boolean } = {}
+): string {
+  const normalized = normalizePercentValue(value, options.mode ?? 'auto');
+  if (normalized === null) return 'N/A';
+
+  const showSign = options.withSign ?? true;
+  const signPrefix = showSign && normalized >= 0 ? '+' : '';
+  return `${signPrefix}${normalized.toFixed(2)}%`;
 }
 
 export function formatVolume(value: number | null | undefined): string {

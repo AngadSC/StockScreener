@@ -4,12 +4,17 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { screenerAPI } from '@/lib/api';
+import { formatPercent, normalizePercentValue } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Activity, Search, Star } from 'lucide-react';
 import type { Stock } from '@/types/stock';
 
 function getChangePercent(stock: Stock): number | null {
-  if (typeof stock.day_change_percent === 'number') return stock.day_change_percent;
-  if (typeof stock.change_percent === 'number') return stock.change_percent;
+  if (typeof stock.day_change_percent === 'number') {
+    return normalizePercentValue(stock.day_change_percent, 'auto');
+  }
+  if (typeof stock.change_percent === 'number') {
+    return normalizePercentValue(stock.change_percent, 'auto');
+  }
   return null;
 }
 
@@ -18,7 +23,7 @@ export default function HomePage() {
   const { data: gainers, isLoading: gainersLoading } = useQuery({
     queryKey: ['gainers'],
     queryFn: () => screenerAPI.screenStocks({
-      limit: 10,
+      limit: 25,
       sort_by: 'day_change_percent',
       sort_order: 'desc',
       min_price: 5,
@@ -29,7 +34,7 @@ export default function HomePage() {
   const { data: losers, isLoading: losersLoading } = useQuery({
     queryKey: ['losers'],
     queryFn: () => screenerAPI.screenStocks({
-      limit: 10,
+      limit: 25,
       sort_by: 'day_change_percent',
       sort_order: 'asc',
       min_price: 5,
@@ -126,7 +131,7 @@ export default function HomePage() {
                               ${stock.current_price?.toFixed(2)}
                             </div>
                             <div className="text-sm font-medium text-success">
-                              {changePercent !== null ? `+${changePercent.toFixed(2)}%` : 'N/A'}
+                              {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                             </div>
                           </div>
                         </div>
@@ -180,7 +185,7 @@ export default function HomePage() {
                               ${stock.current_price?.toFixed(2)}
                             </div>
                             <div className="text-sm font-medium text-destructive">
-                              {changePercent !== null ? `${changePercent.toFixed(2)}%` : 'N/A'}
+                              {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                             </div>
                           </div>
                         </div>

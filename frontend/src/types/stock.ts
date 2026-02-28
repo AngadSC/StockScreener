@@ -115,8 +115,13 @@ export interface ScreenerFilters {
   industries?: string[];
   min_dividend_yield?: number;
   max_debt_to_equity?: number;
+  max_beta?: number;
+  min_roe?: number;
+  min_revenue_growth?: number;
   min_price?: number;
   max_price?: number;
+  min_volume?: number;
+  min_avg_volume?: number;
   skip?: number;
   limit?: number;
   sort_by?: string;

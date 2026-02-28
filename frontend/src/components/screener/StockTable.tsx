@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { Stock } from '@/types/stock';
-import { ArrowUp, ArrowDown, ChevronRight } from 'lucide-react';
+import { formatMarketCap, formatPercent } from '@/lib/utils';
+import { ArrowUp, ChevronRight } from 'lucide-react';
 
 interface StockTableProps {
   stocks: Stock[];
@@ -36,14 +37,6 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
       </div>
     );
   }
-
-  const formatMarketCap = (value: number | null | undefined) => {
-    if (!value) return 'N/A';
-    if (value >= 1e12) return `$${(value / 1e12).toFixed(2)}T`;
-    if (value >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
-    if (value >= 1e6) return `$${(value / 1e6).toFixed(2)}M`;
-    return `$${value.toLocaleString()}`;
-  };
 
   return (
     <div className="terminal-border bg-card overflow-hidden">
@@ -84,7 +77,7 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
       {/* Data Rows */}
       <div className="divide-y divide-border/50">
         {stocks.map((stock, idx) => {
-          const changePercent = stock.day_change_percent || stock.change_percent;
+          const changePercent = stock.day_change_percent ?? stock.change_percent;
           const isPositive = changePercent !== null && changePercent !== undefined && changePercent >= 0;
 
           return (
@@ -99,7 +92,12 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
 
               {/* Ticker */}
               <div className="col-span-1 font-bold text-primary">
-                {stock.ticker}
+                <Link
+                  href={`/stocks/${stock.ticker}`}
+                  className="hover:underline underline-offset-4"
+                >
+                  {stock.ticker}
+                </Link>
               </div>
 
               {/* Company Name */}
@@ -109,7 +107,10 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
 
               {/* Price */}
               <div className="col-span-2 text-right font-mono">
-                {stock.current_price ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
+                {stock.current_price !== null && stock.current_price !== undefined
+                  ? `$${stock.current_price.toFixed(2)}`
+                  : 'N/A'
+                }
               </div>
 
               {/* Change % */}
@@ -118,10 +119,7 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
                   ? isPositive ? 'text-primary' : 'text-destructive'
                   : 'text-muted-foreground'
               }`}>
-                {changePercent !== null && changePercent !== undefined
-                  ? `${isPositive ? '+' : ''}${changePercent.toFixed(2)}%`
-                  : 'N/A'
-                }
+                {formatPercent(changePercent, { mode: 'auto', withSign: true })}
               </div>
 
               {/* Market Cap */}

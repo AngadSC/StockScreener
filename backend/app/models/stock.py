@@ -78,10 +78,15 @@ class StockFilter(BaseModel):
     
     # Financial health
     max_debt_to_equity: Optional[float] = None
+    max_beta: Optional[float] = None
+    min_roe: Optional[float] = None
+    min_revenue_growth: Optional[float] = None
     
     # Price
     min_price: Optional[float] = None
     max_price: Optional[float] = None
+    min_volume: Optional[int] = None
+    min_avg_volume: Optional[int] = None
     
     # Pagination
     skip: int = Field(default=0, ge=0)

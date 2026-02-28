@@ -54,24 +54,22 @@ export default function HomePage() {
 
   const topGainers = useMemo(() => {
     const stocks = gainers?.results ?? [];
-    return [...stocks]
-      .filter((stock) => {
-        const value = getChangePercent(stock);
-        return value !== null && value > 0;
-      })
-      .sort((a, b) => (getChangePercent(b) ?? -Infinity) - (getChangePercent(a) ?? -Infinity))
-      .slice(0, 5);
+    const sorted = [...stocks]
+      .filter((stock) => getChangePercent(stock) !== null)
+      .sort((a, b) => (getChangePercent(b) ?? -Infinity) - (getChangePercent(a) ?? -Infinity));
+
+    const positiveOnly = sorted.filter((stock) => (getChangePercent(stock) ?? 0) > 0);
+    return (positiveOnly.length > 0 ? positiveOnly : sorted).slice(0, 5);
   }, [gainers]);
 
   const topLosers = useMemo(() => {
     const stocks = losers?.results ?? [];
-    return [...stocks]
-      .filter((stock) => {
-        const value = getChangePercent(stock);
-        return value !== null && value < 0;
-      })
-      .sort((a, b) => (getChangePercent(a) ?? Infinity) - (getChangePercent(b) ?? Infinity))
-      .slice(0, 5);
+    const sorted = [...stocks]
+      .filter((stock) => getChangePercent(stock) !== null)
+      .sort((a, b) => (getChangePercent(a) ?? Infinity) - (getChangePercent(b) ?? Infinity));
+
+    const negativeOnly = sorted.filter((stock) => (getChangePercent(stock) ?? 0) < 0);
+    return (negativeOnly.length > 0 ? negativeOnly : sorted).slice(0, 5);
   }, [losers]);
 
   return (
@@ -113,6 +111,7 @@ export default function HomePage() {
                 <div className="space-y-3">
                   {topGainers.map((stock) => {
                     const changePercent = getChangePercent(stock);
+                    const isPositive = (changePercent ?? 0) >= 0;
                     return (
                       <Link
                         key={stock.ticker}
@@ -130,7 +129,7 @@ export default function HomePage() {
                             <div className="font-semibold">
                               ${stock.current_price?.toFixed(2)}
                             </div>
-                            <div className="text-sm font-medium text-success">
+                            <div className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
                               {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                             </div>
                           </div>
@@ -167,6 +166,7 @@ export default function HomePage() {
                 <div className="space-y-3">
                   {topLosers.map((stock) => {
                     const changePercent = getChangePercent(stock);
+                    const isPositive = (changePercent ?? 0) >= 0;
                     return (
                       <Link
                         key={stock.ticker}
@@ -184,7 +184,7 @@ export default function HomePage() {
                             <div className="font-semibold">
                               ${stock.current_price?.toFixed(2)}
                             </div>
-                            <div className="text-sm font-medium text-destructive">
+                            <div className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
                               {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                             </div>
                           </div>

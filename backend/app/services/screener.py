@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, asc, or_
+from sqlalchemy import and_, desc, asc, or_, nulls_last
 from app.database.models import Ticker, StockFundamental
 from app.models.stock import StockFilter
 from typing import List, Tuple, Dict, Any, Optional
@@ -152,6 +152,10 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if conditions:
         query = query.filter(and_(*conditions))
 
+    # Market movers should not be dominated by NULL rows.
+    if filters.sort_by == "day_change_percent":
+        query = query.filter(StockFundamental.day_change_percent != None)
+
     # Get total count
     total = query.count()
 
@@ -159,9 +163,9 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if hasattr(StockFundamental, filters.sort_by):
         sort_column = getattr(StockFundamental, filters.sort_by)
         if filters.sort_order == "desc":
-            query = query.order_by(desc(sort_column).nullslast(), Ticker.symbol.asc())
+            query = query.order_by(nulls_last(desc(sort_column)), Ticker.symbol.asc())
         else:
-            query = query.order_by(asc(sort_column).nullslast(), Ticker.symbol.asc())
+            query = query.order_by(nulls_last(asc(sort_column)), Ticker.symbol.asc())
 
     # Pagination
     results = query.offset(filters.skip).limit(filters.limit).all()

@@ -57,8 +57,10 @@ def screen_stocks_endpoint(
 
     # tyr the redis first 
 
-    # Never use cache when search is provided (avoid stale results)
-    if settings.SCREENER_USE_CACHE and not search:
+    use_cache = settings.SCREENER_USE_CACHE and not search and sort_by != "day_change_percent"
+
+    # Never use cache when search is provided or when sorting market movers.
+    if use_cache:
         cached = cache_service.get(cache_key)
         if cached:
             return {
@@ -103,7 +105,7 @@ def screen_stocks_endpoint(
     }
 
     #cache for 1 hour 
-    if settings.SCREENER_USE_CACHE and not search:
+    if use_cache:
         cache_service.set(cache_key, result, ttl=3600)
     
     return result

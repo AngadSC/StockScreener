@@ -1,0 +1,10 @@
+Starting Container
+INFO:     Started server process [1]
+INFO:     Waiting for application startup.
+ Starting up Stock Screener API...
+   Environment: production
+   Database: Connected
+   CORS origins: ['http://localhost:3000', 'https://quantorsignal.com', 'https://www.quantorsignal.com']
+✓ Scheduler initialized
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)

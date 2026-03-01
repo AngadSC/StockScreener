@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, asc, or_, nulls_last, func
+from sqlalchemy import and_, desc, asc, or_, nulls_last
 from app.database.models import Ticker, StockFundamental
 from app.models.stock import StockFilter
 from typing import List, Tuple, Dict, Any, Optional
@@ -167,7 +167,6 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     if filters.sort_by == "day_change_percent":
         query = query.filter(
             StockFundamental.day_change_percent != None,
-            ~func.isnan(StockFundamental.day_change_percent),
             StockFundamental.day_change_percent < 1000,
             StockFundamental.day_change_percent > -1000,
         )

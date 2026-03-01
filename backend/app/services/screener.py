@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, asc, or_, nulls_last
+from sqlalchemy import and_, desc, asc, or_, nulls_last, func
 from app.database.models import Ticker, StockFundamental
 from app.models.stock import StockFilter
 from typing import List, Tuple, Dict, Any, Optional
+import math
 
 
 def _resolve_company_name(ticker: Ticker, fundamental: Optional[StockFundamental]) -> Optional[str]:
@@ -79,6 +80,16 @@ def _get_field(obj: Optional[StockFundamental], field: str):
         return None
     return getattr(obj, field)
 
+
+def _json_safe_value(value: Any) -> Any:
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+def _json_safe_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: _json_safe_value(value) for key, value in row.items()}
+
 def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any]], int]:
     """
     Screen stocks based on filters (pure SQL - FAST).
@@ -154,7 +165,12 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
 
     # Market movers should not be dominated by NULL rows.
     if filters.sort_by == "day_change_percent":
-        query = query.filter(StockFundamental.day_change_percent != None)
+        query = query.filter(
+            StockFundamental.day_change_percent != None,
+            ~func.isnan(StockFundamental.day_change_percent),
+            StockFundamental.day_change_percent < 1000,
+            StockFundamental.day_change_percent > -1000,
+        )
 
     # Get total count
     total = query.count()
@@ -173,7 +189,7 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     # Convert to dicts for API response
     stocks = []
     for ticker, fundamental in results:
-        stocks.append({
+        stock_row = {
             'ticker': ticker.symbol,
             'name': _resolve_company_name(ticker, fundamental),
             'sector': _get_field(fundamental, 'sector'),
@@ -205,6 +221,7 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
             'fifty_two_week_high': _get_field(fundamental, 'fifty_two_week_high'),
             'fifty_two_week_low': _get_field(fundamental, 'fifty_two_week_low'),
             'last_updated': fundamental.last_updated.isoformat() if fundamental and fundamental.last_updated else None
-        })
+        }
+        stocks.append(_json_safe_row(stock_row))
 
     return stocks, total

@@ -163,12 +163,13 @@ def update_all_stocks_batch(manual_trigger: bool = False):
         historical_provider = ProviderFactory.get_historical_provider()
         price_batch_size = settings.YFINANCE_BATCH_SIZE
 
-        end_date = today
+        # yfinance treats `end` as exclusive, so use next day to include today's close.
+        end_date = today + timedelta(days=1)
         # IMPORTANT: Use get_previous_trading_day() to ensure start_date < end_date
         # This prevents Yahoo Finance "startDate == endDate" errors
         start_date = get_previous_trading_day(today) if not manual_trigger else today - timedelta(days=5)
 
-        print(f"📅 Fetching prices from {start_date} to {end_date}\n")
+        print(f"📅 Fetching prices from {start_date} to {end_date} (end-exclusive)\n")
 
         for i in range(0, total, price_batch_size):
             batch = active_tickers[i:i + price_batch_size]

@@ -133,22 +133,22 @@ export default function StockDetailPage({ params }: PageProps) {
       <div className="terminal-border bg-card">
         <div className="border-b border-border px-4 py-2 bg-muted/20">
           <span className="text-xs font-bold">ADVANCED_ANALYSIS</span>
-          <span className="ml-3 text-xs text-muted-foreground">[COMING_SOON]</span>
+          <span className="ml-3 text-xs text-primary">[LIVE]</span>
         </div>
         <div className="p-6 space-y-4">
           <p className="text-xs text-muted-foreground">
-            $ ./backtest --ticker={ticker} --strategy=&lt;STRATEGY_NAME&gt;
+            $ ./backtest --ticker={ticker} --mode=indicator-lab
           </p>
           <p className="text-xs text-muted-foreground">
-            $ ./ml-features --ticker={ticker} --indicators=all
+            DB_FIRST=true YFINANCE_FALLBACK=true PLOTS=enabled
           </p>
           <div className="flex gap-3 mt-6">
-            <button
-              disabled
-              className="px-4 py-2 border border-border text-muted-foreground cursor-not-allowed opacity-50"
+            <Link
+              href={`/stocks/${ticker}/backtest`}
+              className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 transition-colors"
             >
               RUN_BACKTEST
-            </button>
+            </Link>
             <button
               disabled
               className="px-4 py-2 border border-border text-muted-foreground cursor-not-allowed opacity-50"

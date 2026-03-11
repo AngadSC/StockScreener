@@ -95,7 +95,7 @@ export interface BacktestDataPoint {
 
 export interface BacktestDataResponse {
   ticker: string;
-  source: 'cache' | 'yfinance';
+  source: 'cache' | 'database' | 'yfinance';
   cached: boolean;
   start_date: string;
   end_date: string;
@@ -103,6 +103,47 @@ export interface BacktestDataResponse {
   indicators_included: boolean;
   columns: string[];
   data: BacktestDataPoint[];
+}
+
+export interface BacktestIndicatorConfig {
+  enabled: boolean;
+  weight: number;
+  params: Record<string, number | boolean>;
+}
+
+export interface BacktestGateConfig {
+  enabled: boolean;
+  params: Record<string, number | boolean>;
+}
+
+export interface BacktestRunRequest {
+  start_date: string;
+  end_date: string;
+  indicators: Record<string, BacktestIndicatorConfig>;
+  atr_gate?: BacktestGateConfig;
+  long_threshold: number;
+  short_threshold: number;
+  exec_lag: number;
+  tc_bps: number;
+  allow_position_hold: boolean;
+  generate_plots: boolean;
+  generate_roc: boolean;
+}
+
+export interface BacktestRunResponse {
+  ticker: string;
+  source: 'database' | 'yfinance';
+  cached: boolean;
+  start_date: string;
+  end_date: string;
+  warnings: string[];
+  selected_indicators: string[];
+  stats: Record<string, number>;
+  equity_curve: Array<Record<string, string | number | null>>;
+  results: Array<Record<string, string | number | null>>;
+  equity_curve_image?: string | null;
+  roc_auc?: number | null;
+  roc_curve_image?: string | null;
 }
 
 export interface ScreenerFilters {

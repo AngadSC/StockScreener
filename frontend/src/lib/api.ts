@@ -5,6 +5,8 @@ import type {
   ScreenerResponse,
   PriceHistoryResponse,
   BacktestDataResponse,
+  BacktestRunRequest,
+  BacktestRunResponse,
   StockSuggestion
 } from '@/types/stock';
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
@@ -109,6 +111,17 @@ export const stocksAPI = {
           include_indicators: includeIndicators,
         },
       }
+    );
+    return response.data;
+  },
+
+  runBacktest: async (
+    ticker: string,
+    config: BacktestRunRequest
+  ): Promise<BacktestRunResponse> => {
+    const response = await api.post<BacktestRunResponse>(
+      `/stocks/${ticker}/backtest`,
+      config
     );
     return response.data;
   },

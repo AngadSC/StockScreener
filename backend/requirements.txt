@@ -25,6 +25,9 @@ yahooquery==2.4.1
 pandas==2.2.3
 numpy==2.2.1
 httpx==0.28.1
+ta==0.11.0
+scikit-learn==1.6.1
+matplotlib==3.10.0
 
 # Market Calendar
 pandas-market-calendars==4.3.0

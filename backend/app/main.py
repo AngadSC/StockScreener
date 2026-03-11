@@ -70,7 +70,7 @@ def _resolve_rate_limit(path: str):
         return ("login", settings.RATE_LIMIT_LOGIN_PER_MINUTE, 60)
     if path == f"{api_prefix}/auth/register":
         return ("register", settings.RATE_LIMIT_REGISTER_PER_5_MINUTES, 300)
-    if path.endswith("/backtest-data") or path.endswith("/ml-features") or path.endswith("/intraday"):
+    if path.endswith("/backtest-data") or path.endswith("/backtest") or path.endswith("/ml-features") or path.endswith("/intraday"):
         return ("heavy", settings.RATE_LIMIT_HEAVY_PER_MINUTE, 60)
     if path.startswith(f"{api_prefix}/screener"):
         return ("screener", settings.RATE_LIMIT_SCREENER_PER_MINUTE, 60)

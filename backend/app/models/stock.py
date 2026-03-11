@@ -113,13 +113,55 @@ class StockWithPrices(StockDetail):
 # Response models for new endpoints
 class BacktestDataResponse(BaseModel):
     ticker: str
-    source: str  # "cache" or "yfinance"
+    source: str  # "cache", "database", or "yfinance"
+    cached: bool = False
     start_date: str
     end_date: str
     data_points: int
     indicators_included: bool
     columns: List[str]
     data: List[Dict[str, Any]]
+
+
+class BacktestIndicatorConfig(BaseModel):
+    enabled: bool = False
+    weight: float = 1.0
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BacktestGateConfig(BaseModel):
+    enabled: bool = False
+    params: Dict[str, Any] = Field(default_factory=dict)
+
+
+class BacktestRunRequest(BaseModel):
+    start_date: str
+    end_date: str
+    indicators: Dict[str, BacktestIndicatorConfig] = Field(default_factory=dict)
+    atr_gate: Optional[BacktestGateConfig] = None
+    long_threshold: float = 0.5
+    short_threshold: float = -0.5
+    exec_lag: int = Field(default=1, ge=0, le=10)
+    tc_bps: float = Field(default=5.0, ge=0.0, le=500.0)
+    allow_position_hold: bool = True
+    generate_plots: bool = True
+    generate_roc: bool = True
+
+
+class BacktestRunResponse(BaseModel):
+    ticker: str
+    source: str
+    cached: bool = False
+    start_date: str
+    end_date: str
+    warnings: List[str] = Field(default_factory=list)
+    selected_indicators: List[str] = Field(default_factory=list)
+    stats: Dict[str, Any]
+    equity_curve: List[Dict[str, Any]]
+    results: List[Dict[str, Any]]
+    equity_curve_image: Optional[str] = None
+    roc_auc: Optional[float] = None
+    roc_curve_image: Optional[str] = None
 
 class MLFeaturesResponse(BaseModel):
     ticker: str

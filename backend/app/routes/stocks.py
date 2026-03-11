@@ -1,26 +1,36 @@
+import hashlib
+import json
+from datetime import datetime, timedelta
+
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.database.connection import get_db
-from app.database.models import Ticker, DailyOHLCV, StockFundamental
-from app.services.cache import cache_service
-from app.services.stock_service import get_stock_with_fundamentals, get_price_history
-from app.providers.factory import ProviderFactory
-from app.utils.data_fetcher import add_technical_indicators
 
-from app.models.stock import StockDetail, BacktestDataResponse, MLFeaturesResponse
-from datetime import datetime, timedelta
-from typing import List, Dict, Any
-import pandas as pd
+from app.backtests.data import load_backtest_market_data
+from app.backtests.indicator_lab import run_indicator_backtest
+from app.database.connection import get_db
+from app.database.models import Ticker
+from app.models.stock import (
+    BacktestDataResponse,
+    BacktestRunRequest,
+    BacktestRunResponse,
+    MLFeaturesResponse,
+    StockDetail,
+)
+from app.providers.factory import ProviderFactory
+from app.services.cache import cache_service
+from app.services.stock_service import get_price_history, get_stock_with_fundamentals
+from app.utils.data_fetcher import add_technical_indicators
 
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
+
 def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int) -> tuple:
-    """
-    Parse YYYY-MM-DD date strings and enforce sane request bounds.
-    """
+    """Parse YYYY-MM-DD date strings and enforce sane request bounds."""
     try:
         from datetime import datetime as dt
+
         start = dt.strptime(start_date, "%Y-%m-%d").date()
         end = dt.strptime(end_date, "%Y-%m-%d").date()
     except ValueError:
@@ -38,53 +48,45 @@ def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int
 
     return start, end
 
+
 @router.get("/{ticker}", response_model=StockDetail)
 def get_stock_detail(ticker: str, db: Session = Depends(get_db)):
-    """Get detailed stock information including fundamentals"""
+    """Get detailed stock information including fundamentals."""
     ticker = ticker.upper()
-
-    # Use the stock service which handles caching and DB queries
     stock_data = get_stock_with_fundamentals(db, ticker, use_cache=True)
 
     if not stock_data:
         raise HTTPException(
             status_code=404,
-            detail=f"Stock {ticker} not found. Try the screener to find valid tickers."
+            detail=f"Stock {ticker} not found. Try the screener to find valid tickers.",
         )
 
     return StockDetail(**stock_data)
+
 
 @router.get("/{ticker}/prices")
 def get_stock_prices(
     ticker: str,
     period: str = Query("1y", regex="^(1mo|3mo|6mo|1y)$", description="Time period"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """Get historical price data for a stock"""
+    """Get historical price data for a stock."""
     ticker = ticker.upper()
     cache_key = f"prices:{ticker}:{period}"
 
-    # Check the redis cache
     cached = cache_service.get(cache_key)
     if cached:
         return cached
 
-    # Calculate the date range
     period_map = {"1mo": 30, "3mo": 90, "6mo": 180, "1y": 365}
     days = period_map[period]
     start_date = datetime.now().date() - timedelta(days=days)
     end_date = datetime.now().date()
 
-    # Use the price history service
     df = get_price_history(db, ticker, start_date, end_date, use_cache=False)
-
     if df.empty:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No price data found for {ticker}"
-        )
+        raise HTTPException(status_code=404, detail=f"No price data found for {ticker}")
 
-    # Format the response
     df_reset = df.reset_index()
     result = {
         "ticker": ticker,
@@ -92,220 +94,214 @@ def get_stock_prices(
         "data_points": len(df_reset),
         "data": [
             {
-                "date": row['date'].isoformat() if hasattr(row['date'], 'isoformat') else str(row['date']),
-                "open": row['Open'],
-                "high": row['High'],
-                "low": row['Low'],
-                "close": row['Close'],
-                "volume": row['Volume']
+                "date": row["date"].isoformat() if hasattr(row["date"], "isoformat") else str(row["date"]),
+                "open": row["Open"],
+                "high": row["High"],
+                "low": row["Low"],
+                "close": row["Close"],
+                "volume": row["Volume"],
             }
             for _, row in df_reset.iterrows()
-        ]
+        ],
     }
 
-    # Cache for an hour
     cache_service.set(cache_key, result, ttl=3600)
+    return result
 
-    return result 
 
-@router.post("/{ticker}/backtest-data")
+@router.post("/{ticker}/backtest-data", response_model=BacktestDataResponse)
 def get_backtest_data(
     ticker: str,
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
     end_date: str = Query(..., description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
-    include_indicators: bool = Query(True, description="Include technical indicators (SMA, RSI, MACD, etc.)"),
-    db: Session = Depends(get_db)
+    include_indicators: bool = Query(True, description="Include technical indicators"),
+    db: Session = Depends(get_db),
 ):
     """
-     ON-DEMAND: Fetch extended historical data for backtesting.
-    
-    - Makes API call to yfinance (rate limited to 30/min)
-    - Returns up to 10 years of daily OHLCV data
-    - Optionally adds 15+ technical indicators
-    - Cached for 2 hours (historical data doesn't change)
-    
-    Use cases:
-    - Backtesting trading strategies
-    - Historical analysis
-    - Training ML models
+    Fetch extended historical data for backtesting.
+
+    Reads PostgreSQL first and falls back to yfinance when needed.
     """
     ticker = ticker.upper()
     cache_key = f"backtest:{ticker}:{start_date}:{end_date}:{include_indicators}"
-    
-    # Check Redis cache first
+
     cached = cache_service.get(cache_key)
     if cached:
         return {
             "ticker": ticker,
-            "source": "cache",
             "cached": True,
-            **cached
+            **cached,
         }
-    
+
     ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
     if not ticker_obj:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Stock {ticker} not found in database"
-        )
-    
+        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found in database")
+
     try:
-        print(f"🔄 Fetching backtest data for {ticker} from yfinance...")
-
-        # Use the historical provider (yfinance)
-        provider = ProviderFactory.get_historical_provider()
-
         start, end = _parse_and_validate_date_range(start_date, end_date, max_days=3650)
-
-        df = provider.get_historical_prices(ticker, start, end)
-
-        if df is None or df.empty:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No historical data available for {ticker} in the specified period"
-            )
-        
-        #ad technical indicators as neeeded
+        df, source, _warnings = load_backtest_market_data(db, ticker, start, end)
 
         if include_indicators:
             df = add_technical_indicators(df)
-        
-        #convert to tte json serializable format 
-        df_reset = df.reset_index()
-        df_reset['Date'] = df_reset['Date'].astype(str)  # Convert datetime to string
-        data = df_reset.to_dict(orient='records')
 
-        #perpare response
+        df_reset = df.reset_index()
+        if "Date" not in df_reset.columns:
+            df_reset = df_reset.rename(columns={df_reset.columns[0]: "Date"})
+        df_reset["Date"] = df_reset["Date"].astype(str)
+
         result = {
+            "source": source,
             "start_date": start_date,
             "end_date": end_date,
-            "data_points": len(data),
+            "data_points": len(df_reset),
             "indicators_included": include_indicators,
             "columns": list(df.columns),
-            "data": data
+            "data": df_reset.to_dict(orient="records"),
         }
-
-        #cache for 2 hours 
         cache_service.set(cache_key, result, ttl=7200)
-        
-        return {
-            "ticker": ticker,
-            "source": "yfinance",
-            "cached": False,
-            **result
-        }
-        
+        return {"ticker": ticker, "cached": False, **result}
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Backtest data fetch error for {ticker}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to fetch backtest data"
+    except Exception as exc:
+        print(f"Backtest data fetch error for {ticker}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch backtest data")
+
+
+@router.post("/{ticker}/backtest", response_model=BacktestRunResponse)
+def run_backtest(
+    ticker: str,
+    request: BacktestRunRequest,
+    db: Session = Depends(get_db),
+):
+    """Run the indicator backtester for a single stock."""
+    ticker = ticker.upper()
+
+    if not db.query(Ticker).filter(Ticker.symbol == ticker).first():
+        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
+
+    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
+    request_dump = request.model_dump(mode="json")
+    cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
+    cache_key = f"backtest_run:{ticker}:{cache_suffix}"
+
+    cached = cache_service.get(cache_key)
+    if cached:
+        return {
+            **cached,
+            "cached": True,
+        }
+
+    try:
+        market_data, source, warnings = load_backtest_market_data(db, ticker, start, end)
+        result = run_indicator_backtest(
+            market_data,
+            {key: value.model_dump(mode="json") for key, value in request.indicators.items()},
+            request.atr_gate.model_dump(mode="json") if request.atr_gate else None,
+            long_threshold=request.long_threshold,
+            short_threshold=request.short_threshold,
+            exec_lag=request.exec_lag,
+            tc_bps=request.tc_bps,
+            allow_position_hold=request.allow_position_hold,
+            generate_plots=request.generate_plots,
+            generate_roc=request.generate_roc,
         )
+        response = {
+            "ticker": ticker,
+            "source": source,
+            "cached": False,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "warnings": warnings,
+            **result,
+        }
+        cache_service.set(cache_key, response, ttl=3600)
+        return response
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"Backtest run error for {ticker}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to run backtest")
+
 
 @router.post("/{ticker}/ml-features")
 def get_ml_features(
     ticker: str,
     start_date: str = Query(..., description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
     end_date: str = Query(..., description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
-    ON-DEMAND: Generate ML-ready feature set for a stock.
-    
-    Returns:
-    - OHLCV data
-    - 23 technical indicators and features
-    - Returns, volatility, momentum metrics
-    - Ready for sklearn, TensorFlow, PyTorch
-    
-    Features included:
-    - Price features (OHLCV)
-    - Technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
-    - Returns (1d, 5d, 20d)
-    - Volatility (20d, 50d)
-    - Momentum (10d, 20d)
-    - Volume ratio
-    
-    Use case: Training machine learning models for price prediction
+    Generate ML-ready feature set for a stock.
+
+    Returns OHLCV data plus technical, volatility, and momentum features.
     """
     ticker = ticker.upper()
     cache_key = f"ml:{ticker}:{start_date}:{end_date}"
-    
-    # Check cache
+
     cached = cache_service.get(cache_key)
     if cached:
         return {
             "ticker": ticker,
             "source": "cache",
             "cached": True,
-            **cached
+            **cached,
         }
-    
-    # Check if we have the ticker
 
     ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
     if not ticker_obj:
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
-    
+
     try:
-        # Fetch data from yfinance (rate limited)
-        print(f"🤖 Generating ML features for {ticker}...")
-
-        # Use the historical provider
         provider = ProviderFactory.get_historical_provider()
-
         start, end = _parse_and_validate_date_range(start_date, end_date, max_days=1825)
-
         df = provider.get_historical_prices(ticker, start, end)
 
         if df is None or df.empty:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No data available for {ticker}"
-            )
-        
-        # Add technical indicators
+            raise HTTPException(status_code=404, detail=f"No data available for {ticker}")
+
         df = add_technical_indicators(df)
-        
-        # Add ML-specific features
-        # Returns
-        df['Returns_1d'] = df['Close'].pct_change(1)
-        df['Returns_5d'] = df['Close'].pct_change(5)
-        df['Returns_20d'] = df['Close'].pct_change(20)
-        
-        # Volatility
-        df['Volatility_20d'] = df['Returns_1d'].rolling(20).std()
-        df['Volatility_50d'] = df['Returns_1d'].rolling(50).std()
-        
-        # Momentum
-        df['Momentum_10d'] = df['Close'] - df['Close'].shift(10)
-        df['Momentum_20d'] = df['Close'] - df['Close'].shift(20)
-        
-        # Volume features
-        df['Volume_Ratio'] = df['Volume'] / df['Volume_SMA_20']
-        
-        # Drop NaN rows (from rolling calculations)
+        df["Returns_1d"] = df["Close"].pct_change(1)
+        df["Returns_5d"] = df["Close"].pct_change(5)
+        df["Returns_20d"] = df["Close"].pct_change(20)
+        df["Volatility_20d"] = df["Returns_1d"].rolling(20).std()
+        df["Volatility_50d"] = df["Returns_1d"].rolling(50).std()
+        df["Momentum_10d"] = df["Close"] - df["Close"].shift(10)
+        df["Momentum_20d"] = df["Close"] - df["Close"].shift(20)
+        df["Volume_Ratio"] = df["Volume"] / df["Volume_SMA_20"]
+
         df_clean = df.dropna()
-        
-        # Define feature columns
         feature_columns = [
-            'Open', 'High', 'Low', 'Close', 'Volume',
-            'SMA_20', 'SMA_50', 'SMA_200',
-            'EMA_12', 'EMA_26', 'MACD', 'MACD_Signal',
-            'RSI_14', 'BB_Upper', 'BB_Lower',
-            'Returns_1d', 'Returns_5d', 'Returns_20d',
-            'Volatility_20d', 'Volatility_50d',
-            'Momentum_10d', 'Momentum_20d',
-            'Volume_Ratio'
+            "Open",
+            "High",
+            "Low",
+            "Close",
+            "Volume",
+            "SMA_20",
+            "SMA_50",
+            "SMA_200",
+            "EMA_12",
+            "EMA_26",
+            "MACD",
+            "MACD_Signal",
+            "RSI_14",
+            "BB_Upper",
+            "BB_Lower",
+            "Returns_1d",
+            "Returns_5d",
+            "Returns_20d",
+            "Volatility_20d",
+            "Volatility_50d",
+            "Momentum_10d",
+            "Momentum_20d",
+            "Volume_Ratio",
         ]
-        
-        # Convert to JSON
+
         df_reset = df_clean[feature_columns].reset_index()
-        df_reset['Date'] = df_reset['Date'].astype(str)
-        data = df_reset.to_dict(orient='records')
-        
+        df_reset["Date"] = df_reset["Date"].astype(str)
+        data = df_reset.to_dict(orient="records")
+
         result = {
             "data_points": len(data),
             "features": feature_columns,
@@ -316,107 +312,67 @@ def get_ml_features(
                 "momentum_features": 4,
                 "volatility_features": 2,
                 "volume_features": 2,
-                "total_features": len(feature_columns)
-            }
+                "total_features": len(feature_columns),
+            },
         }
-        
-        # Cache for 2 hours
+
         cache_service.set(cache_key, result, ttl=7200)
-        
         return {
             "ticker": ticker,
             "source": "yfinance",
             "cached": False,
-            **result
+            **result,
         }
-        
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"ML feature generation error for {ticker}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to generate ML features"
-        )
+    except Exception as exc:
+        print(f"ML feature generation error for {ticker}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to generate ML features")
 
-       
+
 @router.get("/{ticker}/intraday")
 def get_intraday_data(
     ticker: str,
     interval: str = Query("5m", regex="^(1m|5m|15m|30m|60m)$", description="Time interval"),
     days: int = Query(5, ge=1, le=30, description="Number of days (max 30)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
-    """
-     ON-DEMAND: Get intraday (minute-level) data.
-    
-    - Intervals: 1m, 5m, 15m, 30m, 60m
-    - Max 30 days (yfinance limitation)
-    - Cached for 30 minutes
-    
-    Use case: Intraday pattern analysis, day trading strategies
-    """
+    """Get intraday minute-level data."""
     ticker = ticker.upper()
     cache_key = f"intraday:{ticker}:{interval}:{days}"
-    
-    # Check cache
+
     cached = cache_service.get(cache_key)
     if cached:
         return {
             "ticker": ticker,
             "source": "cache",
-            **cached
+            **cached,
         }
-    
-    # Verify ticker exists
+
     ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
     if not ticker_obj:
         raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
-    
+
     try:
-        # Fetch intraday data from yfinance (interval-specific feature)
         import yfinance as yf
 
         stock = yf.Ticker(ticker)
-        df = stock.history(
-            period=f"{days}d",
-            interval=interval,
-            auto_adjust=True
-        )
-
+        df = stock.history(period=f"{days}d", interval=interval, auto_adjust=True)
         if df is None or df.empty:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No intraday data available for {ticker}"
-            )
-        
-        # Convert to JSON
+            raise HTTPException(status_code=404, detail=f"No intraday data available for {ticker}")
+
         df_reset = df.reset_index()
-        df_reset['Date'] = df_reset['Date'].astype(str)
-        data = df_reset.to_dict(orient='records')
-        
+        df_reset["Date"] = df_reset["Date"].astype(str)
         result = {
             "interval": interval,
             "days": days,
-            "data_points": len(data),
-            "data": data
+            "data_points": len(df_reset),
+            "data": df_reset.to_dict(orient="records"),
         }
-        
-        # Cache for 30 minutes (intraday changes frequently)
         cache_service.set(cache_key, result, ttl=1800)
-        
-        return {
-            "ticker": ticker,
-            "source": "yfinance",
-            **result
-        }
-        
+        return {"ticker": ticker, "source": "yfinance", **result}
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Intraday data fetch error for {ticker}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to fetch intraday data"
-        )       
-       
+    except Exception as exc:
+        print(f"Intraday data fetch error for {ticker}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to fetch intraday data")

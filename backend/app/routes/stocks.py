@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.backtests.data import load_backtest_market_data
-from app.backtests.indicator_lab import run_indicator_backtest
+from app.backtests.portfolio import run_portfolio_backtest
 from app.database.connection import get_db
 from app.database.models import Ticker
 from app.models.stock import (
@@ -47,6 +47,25 @@ def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int
         raise HTTPException(status_code=400, detail="end_date cannot be in the future.")
 
     return start, end
+
+
+def _normalize_backtest_tickers(primary_ticker: str, extra_tickers: list[str]) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for raw in [primary_ticker, *(extra_tickers or [])]:
+        ticker = str(raw).strip().upper()
+        if not ticker or ticker in seen:
+            continue
+        seen.add(ticker)
+        ordered.append(ticker)
+
+    if not ordered:
+        raise HTTPException(status_code=400, detail="Provide at least one ticker for the backtest.")
+
+    if len(ordered) > 25:
+        raise HTTPException(status_code=400, detail="Backtest basket is limited to 25 tickers per run.")
+
+    return ordered
 
 
 @router.get("/{ticker}", response_model=StockDetail)
@@ -173,14 +192,13 @@ def run_backtest(
     request: BacktestRunRequest,
     db: Session = Depends(get_db),
 ):
-    """Run the indicator backtester for a single stock."""
+    """Run a portfolio backtest across one or more tickers."""
     ticker = ticker.upper()
-
-    if not db.query(Ticker).filter(Ticker.symbol == ticker).first():
-        raise HTTPException(status_code=404, detail=f"Stock {ticker} not found")
+    tickers = _normalize_backtest_tickers(ticker, request.tickers)
 
     start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
     request_dump = request.model_dump(mode="json")
+    request_dump["tickers"] = tickers
     cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
     cache_key = f"backtest_run:{ticker}:{cache_suffix}"
 
@@ -192,27 +210,47 @@ def run_backtest(
         }
 
     try:
-        market_data, source, warnings = load_backtest_market_data(db, ticker, start, end)
-        result = run_indicator_backtest(
+        market_data: dict[str, pd.DataFrame] = {}
+        data_sources: dict[str, str] = {}
+        warnings: list[str] = []
+        for symbol in tickers:
+            symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
+            market_data[symbol] = symbol_data
+            data_sources[symbol] = source
+            warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
+
+        result = run_portfolio_backtest(
             market_data,
-            {key: value.model_dump(mode="json") for key, value in request.indicators.items()},
-            request.atr_gate.model_dump(mode="json") if request.atr_gate else None,
-            long_threshold=request.long_threshold,
-            short_threshold=request.short_threshold,
-            exec_lag=request.exec_lag,
+            tickers=tickers,
+            timeframe=request.timeframe,
+            initial_capital=request.initial_capital,
             tc_bps=request.tc_bps,
-            allow_position_hold=request.allow_position_hold,
+            allow_fractional_shares=request.allow_fractional_shares,
+            family=request.strategy.family,
+            strategy_params=request.strategy.params,
+            risk_controls=request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else None,
+            tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
             generate_plots=request.generate_plots,
-            generate_roc=request.generate_roc,
         )
+        overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"
         response = {
             "ticker": ticker,
-            "source": source,
+            "tickers": tickers,
+            "source": overall_source,
+            "data_sources": data_sources,
             "cached": False,
             "start_date": request.start_date,
             "end_date": request.end_date,
+            "timeframe": request.timeframe,
+            "strategy_family": request.strategy.family,
+            "strategy_params": result["strategy_params"],
+            "risk_controls": request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else {},
             "warnings": warnings,
-            **result,
+            "stats": result["stats"],
+            "equity_curve": result["equity_curve"],
+            "trade_log": result["trade_log"],
+            "tuning_summary": result["tuning_summary"],
+            "equity_curve_image": result["equity_curve_image"],
         }
         cache_service.set(cache_key, response, ttl=3600)
         return response

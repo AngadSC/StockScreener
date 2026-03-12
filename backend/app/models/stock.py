@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime, date
 
 class StockBase(BaseModel):
@@ -123,45 +123,87 @@ class BacktestDataResponse(BaseModel):
     data: List[Dict[str, Any]]
 
 
-class BacktestIndicatorConfig(BaseModel):
-    enabled: bool = False
-    weight: float = 1.0
+BacktestStrategyFamily = Literal[
+    "trend_following",
+    "mean_reversion",
+    "momentum_breakout",
+    "oversold_reversal",
+    "moving_average_pullback",
+    "volume_breakout",
+]
+
+
+class BacktestStrategyConfig(BaseModel):
+    family: BacktestStrategyFamily = "trend_following"
     params: Dict[str, Any] = Field(default_factory=dict)
 
 
-class BacktestGateConfig(BaseModel):
+class BacktestRiskControls(BaseModel):
+    stop_loss_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    trailing_stop_pct: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    take_profit_pct: Optional[float] = Field(default=None, ge=0.0, le=5.0)
+
+
+class BacktestTuningRange(BaseModel):
+    values: List[float] = Field(default_factory=list)
+    min: Optional[float] = None
+    max: Optional[float] = None
+    step: Optional[float] = Field(default=None, gt=0.0)
+
+
+BacktestObjective = Literal[
+    "total_return_pct",
+    "cagr_pct",
+    "max_drawdown_pct",
+    "win_rate_pct",
+    "average_trade_return_pct",
+    "profit_factor",
+    "sharpe_ratio",
+    "trade_count",
+    "average_holding_period_bars",
+    "expectancy_pct",
+]
+
+
+class BacktestTuningConfig(BaseModel):
     enabled: bool = False
-    params: Dict[str, Any] = Field(default_factory=dict)
+    objective: BacktestObjective = "sharpe_ratio"
+    max_combinations: int = Field(default=100, ge=1, le=500)
+    parameter_ranges: Dict[str, BacktestTuningRange] = Field(default_factory=dict)
 
 
 class BacktestRunRequest(BaseModel):
     start_date: str
     end_date: str
-    indicators: Dict[str, BacktestIndicatorConfig] = Field(default_factory=dict)
-    atr_gate: Optional[BacktestGateConfig] = None
-    long_threshold: float = 0.5
-    short_threshold: float = -0.5
-    exec_lag: int = Field(default=1, ge=0, le=10)
+    tickers: List[str] = Field(default_factory=list)
+    timeframe: Literal["1d", "1wk", "1mo"] = "1d"
+    initial_capital: float = Field(default=10000.0, gt=0.0)
     tc_bps: float = Field(default=5.0, ge=0.0, le=500.0)
-    allow_position_hold: bool = True
+    allow_fractional_shares: bool = True
+    strategy: BacktestStrategyConfig
+    risk_controls: Optional[BacktestRiskControls] = None
+    tuning: Optional[BacktestTuningConfig] = None
     generate_plots: bool = True
-    generate_roc: bool = True
 
 
 class BacktestRunResponse(BaseModel):
     ticker: str
-    source: str
+    tickers: List[str]
+    source: Literal["database", "yfinance", "mixed"]
+    data_sources: Dict[str, str]
     cached: bool = False
     start_date: str
     end_date: str
+    timeframe: Literal["1d", "1wk", "1mo"]
+    strategy_family: BacktestStrategyFamily
+    strategy_params: Dict[str, Any]
+    risk_controls: Dict[str, Any] = Field(default_factory=dict)
     warnings: List[str] = Field(default_factory=list)
-    selected_indicators: List[str] = Field(default_factory=list)
     stats: Dict[str, Any]
     equity_curve: List[Dict[str, Any]]
-    results: List[Dict[str, Any]]
+    trade_log: List[Dict[str, Any]]
+    tuning_summary: Optional[Dict[str, Any]] = None
     equity_curve_image: Optional[str] = None
-    roc_auc: Optional[float] = None
-    roc_curve_image: Optional[str] = None
 
 class MLFeaturesResponse(BaseModel):
     ticker: str

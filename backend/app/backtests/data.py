@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.providers.factory import ProviderFactory
 from app.services.stock_service import get_price_history
-from app.utils.market_calendar import detect_missing_days
+from app.utils.market_calendar import detect_missing_days, get_trading_days_between
 
 
 def _normalize_market_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -26,6 +26,8 @@ def load_backtest_market_data(
     ticker: str,
     start_date: date,
     end_date: date,
+    *,
+    max_missing_ratio: float = 0.05,
 ) -> Tuple[pd.DataFrame, str, List[str]]:
     """
     Load OHLCV data from PostgreSQL first and fall back to yfinance when the DB
@@ -39,8 +41,18 @@ def load_backtest_market_data(
         missing_days = detect_missing_days(df_db.index.tolist(), start_date, end_date)
         if not missing_days:
             return df_db, "database", warnings
+        expected_days = get_trading_days_between(start_date, end_date)
+        missing_ratio = (len(missing_days) / len(expected_days)) if expected_days else 0.0
+        if missing_ratio <= max_missing_ratio:
+            warnings.append(
+                f"Database range was missing {len(missing_days)} trading day(s) "
+                f"({missing_ratio * 100:.2f}% of trading days); using the partial DB range."
+            )
+            return df_db, "database", warnings
+
         warnings.append(
-            f"Database range was missing {len(missing_days)} trading day(s); used yfinance fallback."
+            f"Database range was missing {len(missing_days)} trading day(s) "
+            f"({missing_ratio * 100:.2f}% of trading days); used yfinance fallback."
         )
 
     provider = ProviderFactory.get_historical_provider()

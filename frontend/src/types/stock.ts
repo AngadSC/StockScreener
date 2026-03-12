@@ -105,45 +105,93 @@ export interface BacktestDataResponse {
   data: BacktestDataPoint[];
 }
 
-export interface BacktestIndicatorConfig {
-  enabled: boolean;
-  weight: number;
-  params: Record<string, number | boolean>;
+export type BacktestStrategyFamily =
+  | 'trend_following'
+  | 'mean_reversion'
+  | 'momentum_breakout'
+  | 'oversold_reversal'
+  | 'moving_average_pullback'
+  | 'volume_breakout';
+
+export interface BacktestStrategyConfig {
+  family: BacktestStrategyFamily;
+  params: Record<string, number>;
 }
 
-export interface BacktestGateConfig {
+export interface BacktestRiskControls {
+  stop_loss_pct?: number | null;
+  trailing_stop_pct?: number | null;
+  take_profit_pct?: number | null;
+}
+
+export interface BacktestTuningRange {
+  values?: number[];
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+}
+
+export type BacktestObjective =
+  | 'total_return_pct'
+  | 'cagr_pct'
+  | 'max_drawdown_pct'
+  | 'win_rate_pct'
+  | 'average_trade_return_pct'
+  | 'profit_factor'
+  | 'sharpe_ratio'
+  | 'trade_count'
+  | 'average_holding_period_bars'
+  | 'expectancy_pct';
+
+export interface BacktestTuningConfig {
   enabled: boolean;
-  params: Record<string, number | boolean>;
+  objective: BacktestObjective;
+  max_combinations: number;
+  parameter_ranges: Record<string, BacktestTuningRange>;
 }
 
 export interface BacktestRunRequest {
   start_date: string;
   end_date: string;
-  indicators: Record<string, BacktestIndicatorConfig>;
-  atr_gate?: BacktestGateConfig;
-  long_threshold: number;
-  short_threshold: number;
-  exec_lag: number;
+  tickers: string[];
+  timeframe: '1d' | '1wk' | '1mo';
+  initial_capital: number;
   tc_bps: number;
-  allow_position_hold: boolean;
+  allow_fractional_shares: boolean;
+  strategy: BacktestStrategyConfig;
+  risk_controls?: BacktestRiskControls;
+  tuning?: BacktestTuningConfig;
   generate_plots: boolean;
-  generate_roc: boolean;
 }
 
 export interface BacktestRunResponse {
   ticker: string;
-  source: 'database' | 'yfinance';
+  tickers: string[];
+  source: 'database' | 'yfinance' | 'mixed';
+  data_sources: Record<string, 'database' | 'yfinance'>;
   cached: boolean;
   start_date: string;
   end_date: string;
+  timeframe: '1d' | '1wk' | '1mo';
+  strategy_family: BacktestStrategyFamily;
+  strategy_params: Record<string, number>;
+  risk_controls: BacktestRiskControls;
   warnings: string[];
-  selected_indicators: string[];
   stats: Record<string, number>;
   equity_curve: Array<Record<string, string | number | null>>;
-  results: Array<Record<string, string | number | null>>;
+  trade_log: Array<Record<string, string | number | null>>;
+  tuning_summary?: {
+    enabled: boolean;
+    objective: BacktestObjective;
+    evaluated_combinations: number;
+    best_params: Record<string, number>;
+    top_trials: Array<{
+      params: Record<string, number>;
+      stats: Record<string, number>;
+      objective_value: number;
+    }>;
+  } | null;
   equity_curve_image?: string | null;
-  roc_auc?: number | null;
-  roc_curve_image?: string | null;
 }
 
 export interface ScreenerFilters {

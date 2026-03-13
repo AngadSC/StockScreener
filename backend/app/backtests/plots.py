@@ -21,17 +21,27 @@ def _figure_to_data_url() -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def generate_equity_curve_plot(dates: Iterable, equity: pd.Series) -> Optional[str]:
+def generate_equity_curve_plot(
+    dates: Iterable,
+    equity: pd.Series,
+    benchmark: Optional[pd.Series] = None,
+) -> Optional[str]:
     if equity.empty:
         return None
 
+    x_values = list(dates)
     plt.figure(figsize=(10, 4.5))
-    plt.plot(list(dates), equity.values, color="#22c55e", linewidth=2.0)
-    plt.fill_between(list(dates), equity.values, 1.0, color="#22c55e", alpha=0.12)
+    plt.plot(x_values, equity.values, color="#22c55e", linewidth=2.0, label="Strategy")
+    plt.fill_between(x_values, equity.values, 1.0, color="#22c55e", alpha=0.12)
+    if benchmark is not None and not benchmark.dropna().empty:
+        benchmark_values = benchmark.reindex(equity.index).astype(float)
+        plt.plot(x_values, benchmark_values.values, color="#38bdf8", linewidth=1.8, linestyle="--", label="Buy & Hold")
     plt.title("Equity Curve")
     plt.xlabel("Date")
     plt.ylabel("Equity")
     plt.grid(alpha=0.2, linestyle="--")
+    if benchmark is not None and not benchmark.dropna().empty:
+        plt.legend()
     return _figure_to_data_url()
 
 

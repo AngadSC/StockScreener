@@ -9,7 +9,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 import numpy as np
 import pandas as pd
 from ta.momentum import RSIIndicator
-from ta.trend import EMAIndicator, SMAIndicator
+from ta.trend import EMAIndicator, MACD, SMAIndicator
 from ta.volatility import BollingerBands
 
 from app.backtests.plots import generate_equity_curve_plot
@@ -27,6 +27,9 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "volume_window": 20,
         "volume_multiplier": 2.0,
     },
+    "golden_cross": {"fast_sma": 50, "slow_sma": 200},
+    "macd_trend": {"fast_ema": 12, "slow_ema": 26, "signal_period": 9},
+    "rsi_trend_filter": {"trend_ma": 200, "rsi_period": 14, "entry_rsi": 55.0, "exit_rsi": 45.0},
 }
 
 PERIODS_PER_YEAR = {"1d": 252, "1wk": 52, "1mo": 12}
@@ -114,6 +117,73 @@ def _cross_below(fast: pd.Series, slow: pd.Series) -> pd.Series:
     return ((prev >= 0) & (curr < 0)).fillna(False)
 
 
+def _cross_value_above(series: pd.Series, threshold: float) -> pd.Series:
+    return ((series.shift(1) <= threshold) & (series > threshold)).fillna(False)
+
+
+def _cross_value_below(series: pd.Series, threshold: float) -> pd.Series:
+    return ((series.shift(1) >= threshold) & (series < threshold)).fillna(False)
+
+
+def _normalize_allocation_weights(
+    tickers: List[str],
+    allocation_weights: Dict[str, Any] | None,
+) -> Tuple[Dict[str, float], float]:
+    if not tickers:
+        raise ValueError("At least one ticker is required to size the portfolio.")
+
+    if not allocation_weights:
+        equal_weight = round(100.0 / len(tickers), 6)
+        normalized = {ticker: equal_weight for ticker in tickers}
+        rounding_diff = round(100.0 - sum(normalized.values()), 6)
+        normalized[tickers[-1]] = round(normalized[tickers[-1]] + rounding_diff, 6)
+        return normalized, 0.0
+
+    normalized_inputs: Dict[str, float] = {}
+    for raw_ticker, raw_weight in allocation_weights.items():
+        ticker = str(raw_ticker).strip().upper()
+        if ticker not in tickers:
+            raise ValueError(f"Allocation weight supplied for unknown ticker '{ticker}'.")
+        weight = _coerce_float(raw_weight, 0.0)
+        if weight < 0:
+            raise ValueError("Allocation weights cannot be negative.")
+        normalized_inputs[ticker] = round(weight, 6)
+
+    specified_total = round(sum(normalized_inputs.values()), 6)
+    if specified_total > 100.0 + 1e-6:
+        raise ValueError("Allocation weights cannot sum to more than 100%.")
+
+    missing = [ticker for ticker in tickers if ticker not in normalized_inputs]
+    remaining_pct = max(0.0, round(100.0 - specified_total, 6))
+
+    normalized = dict(normalized_inputs)
+    if missing:
+        fill = round(remaining_pct / len(missing), 6) if missing else 0.0
+        for ticker in missing:
+            normalized[ticker] = fill
+        rounding_diff = round(100.0 - sum(normalized.values()), 6)
+        if missing:
+            normalized[missing[-1]] = round(normalized[missing[-1]] + rounding_diff, 6)
+        remaining_pct = 0.0
+
+    total_pct = round(sum(normalized.values()), 6)
+    if total_pct > 100.0 + 1e-6:
+        raise ValueError("Allocation weights cannot sum to more than 100%.")
+
+    return normalized, round(max(0.0, 100.0 - total_pct), 6)
+
+
+def _mark_to_market(
+    active_positions: Dict[str, Position],
+    last_prices: Dict[str, float],
+) -> float:
+    market_value = 0.0
+    for ticker, position in active_positions.items():
+        mark_price = last_prices.get(ticker, position.entry_price)
+        market_value += position.shares * mark_price
+    return market_value
+
+
 def _prepare_strategy_frame(
     market_data: pd.DataFrame,
     family: str,
@@ -182,6 +252,43 @@ def _prepare_strategy_frame(
             (df["Close"] > df["rolling_high"]) & (df["Volume"] >= df["avg_volume"] * volume_multiplier)
         ).fillna(False)
         df["exit_signal"] = (df["Close"] < df["rolling_low"]).fillna(False)
+
+    elif family == "golden_cross":
+        fast_sma = _coerce_int(merged.get("fast_sma"), defaults["fast_sma"])
+        slow_sma = _coerce_int(merged.get("slow_sma"), defaults["slow_sma"])
+        df["fast_sma"] = SMAIndicator(df["Close"], window=fast_sma).sma_indicator()
+        df["slow_sma"] = SMAIndicator(df["Close"], window=slow_sma).sma_indicator()
+        df["entry_signal"] = _cross_above(df["fast_sma"], df["slow_sma"])
+        df["exit_signal"] = _cross_below(df["fast_sma"], df["slow_sma"])
+
+    elif family == "macd_trend":
+        fast_ema = _coerce_int(merged.get("fast_ema"), defaults["fast_ema"])
+        slow_ema = _coerce_int(merged.get("slow_ema"), defaults["slow_ema"])
+        signal_period = _coerce_int(merged.get("signal_period"), defaults["signal_period"])
+        macd = MACD(df["Close"], window_fast=fast_ema, window_slow=slow_ema, window_sign=signal_period)
+        df["macd_line"] = macd.macd()
+        df["macd_signal"] = macd.macd_signal()
+        df["entry_signal"] = (_cross_above(df["macd_line"], df["macd_signal"]) & (df["macd_line"] > 0)).fillna(False)
+        df["exit_signal"] = (
+            _cross_below(df["macd_line"], df["macd_signal"]) | (df["macd_line"] < 0)
+        ).fillna(False)
+
+    elif family == "rsi_trend_filter":
+        trend_ma = _coerce_int(merged.get("trend_ma"), defaults["trend_ma"])
+        rsi_period = _coerce_int(merged.get("rsi_period"), defaults["rsi_period"])
+        entry_rsi = _coerce_float(merged.get("entry_rsi"), defaults["entry_rsi"])
+        exit_rsi = _coerce_float(merged.get("exit_rsi"), defaults["exit_rsi"])
+        df["trend_ma"] = SMAIndicator(df["Close"], window=trend_ma).sma_indicator()
+        df["rsi"] = RSIIndicator(df["Close"], window=rsi_period).rsi()
+        df["entry_signal"] = (
+            (df["Close"] > df["trend_ma"]) & _cross_value_above(df["rsi"], entry_rsi)
+        ).fillna(False)
+        df["exit_signal"] = (
+            (df["Close"] < df["trend_ma"]) | _cross_value_below(df["rsi"], exit_rsi)
+        ).fillna(False)
+
+    else:
+        raise ValueError(f"Unsupported strategy family '{family}'.")
 
     return df
 
@@ -279,10 +386,124 @@ def _objective_value(stats: Dict[str, Any], objective: str) -> float:
     return float(value)
 
 
+def _build_buy_and_hold_benchmark(
+    prepared_frames: Dict[str, pd.DataFrame],
+    tickers: List[str],
+    allocation_weights: Dict[str, float],
+    *,
+    all_dates: List[pd.Timestamp],
+    initial_capital: float,
+    tc_bps: float,
+    allow_fractional_shares: bool,
+    periods_per_year: int,
+    generate_plots: bool,
+) -> Dict[str, Any]:
+    fee_rate = tc_bps / 10_000.0
+    active_positions: Dict[str, Position] = {}
+    last_prices: Dict[str, float] = {}
+    cash = float(initial_capital)
+    equity_rows: List[Dict[str, Any]] = []
+
+    for ticker in tickers:
+        frame = prepared_frames.get(ticker)
+        if frame is None or frame.empty:
+            continue
+
+        entry_date = pd.to_datetime(frame.index[0])
+        entry_row = frame.iloc[0]
+        price = float(entry_row["Close"])
+        weight_pct = allocation_weights.get(ticker, 0.0)
+        allocation = initial_capital * (weight_pct / 100.0)
+        if price <= 0 or allocation <= 0:
+            continue
+
+        raw_shares = allocation / (price * (1.0 + fee_rate))
+        shares = raw_shares if allow_fractional_shares else math.floor(raw_shares)
+        if shares <= 0:
+            continue
+
+        gross_cost = shares * price
+        entry_fee = gross_cost * fee_rate
+        total_cost = gross_cost + entry_fee
+        if total_cost > cash:
+            if allow_fractional_shares:
+                shares = cash / (price * (1.0 + fee_rate))
+                gross_cost = shares * price
+                entry_fee = gross_cost * fee_rate
+                total_cost = gross_cost + entry_fee
+            else:
+                max_shares = math.floor(cash / (price * (1.0 + fee_rate)))
+                if max_shares <= 0:
+                    continue
+                shares = max_shares
+                gross_cost = shares * price
+                entry_fee = gross_cost * fee_rate
+                total_cost = gross_cost + entry_fee
+
+        if total_cost <= 0 or total_cost > cash:
+            continue
+
+        cash -= total_cost
+        active_positions[ticker] = Position(
+            ticker=ticker,
+            shares=shares,
+            entry_date=entry_date,
+            entry_price=price,
+            entry_fee=entry_fee,
+            entry_bar=0,
+            highest_price=float(entry_row["High"]),
+        )
+
+    for current_date in all_dates:
+        for ticker, frame in prepared_frames.items():
+            if current_date in frame.index:
+                last_prices[ticker] = float(frame.loc[current_date, "Close"])
+
+        market_value = _mark_to_market(active_positions, last_prices)
+        equity_rows.append(
+            {
+                "Date": pd.to_datetime(current_date),
+                "Cash": cash,
+                "MarketValue": market_value,
+                "Equity": cash + market_value,
+                "ActivePositions": len(active_positions),
+            }
+        )
+
+    benchmark_df = pd.DataFrame(equity_rows).set_index("Date")
+    benchmark_df["DailyReturn"] = benchmark_df["Equity"].pct_change().fillna(0.0)
+    benchmark_df["RollingMax"] = benchmark_df["Equity"].cummax()
+    benchmark_df["DrawdownPct"] = (
+        ((benchmark_df["RollingMax"] - benchmark_df["Equity"]) / benchmark_df["RollingMax"]).fillna(0.0) * 100.0
+    )
+
+    stats = _summarize_portfolio_stats(
+        benchmark_df,
+        [],
+        initial_capital=initial_capital,
+        periods_per_year=periods_per_year,
+    )
+    return {
+        "stats": stats,
+        "equity_curve": _serialize_records(
+            benchmark_df[["Cash", "MarketValue", "Equity", "DailyReturn", "DrawdownPct", "ActivePositions"]]
+        ),
+        "equity_curve_image": (
+            generate_equity_curve_plot(
+                benchmark_df.index,
+                benchmark_df["Equity"],
+            )
+            if generate_plots
+            else None
+        ),
+    }
+
+
 def _run_single_backtest(
     market_data: Dict[str, pd.DataFrame],
     *,
     tickers: List[str],
+    allocation_weights: Dict[str, float],
     timeframe: str,
     initial_capital: float,
     tc_bps: float,
@@ -290,10 +511,12 @@ def _run_single_backtest(
     family: str,
     strategy_params: Dict[str, Any],
     risk_controls: Dict[str, Any] | None,
+    include_buy_and_hold: bool,
     generate_plots: bool,
 ) -> Dict[str, Any]:
     prepared_frames: Dict[str, pd.DataFrame] = {}
     last_prices: Dict[str, float] = {}
+    fee_rate = tc_bps / 10_000.0
 
     for ticker in tickers:
         frame = _prepare_strategy_frame(market_data[ticker], family, strategy_params, timeframe)
@@ -313,6 +536,21 @@ def _run_single_backtest(
     equity_rows: List[Dict[str, Any]] = []
     cash = float(initial_capital)
     risk = risk_controls or {}
+    buy_and_hold = (
+        _build_buy_and_hold_benchmark(
+            prepared_frames,
+            tickers,
+            allocation_weights,
+            all_dates=all_dates,
+            initial_capital=initial_capital,
+            tc_bps=tc_bps,
+            allow_fractional_shares=allow_fractional_shares,
+            periods_per_year=PERIODS_PER_YEAR[timeframe],
+            generate_plots=generate_plots,
+        )
+        if include_buy_and_hold
+        else None
+    )
 
     for bar_number, current_date in enumerate(all_dates):
         for ticker, frame in prepared_frames.items():
@@ -332,7 +570,7 @@ def _run_single_backtest(
                 continue
 
             gross_exit_value = position.shares * exit_price
-            exit_fee = gross_exit_value * (tc_bps / 10_000.0)
+            exit_fee = gross_exit_value * fee_rate
             cash += gross_exit_value - exit_fee
 
             gross_pnl = (exit_price - position.entry_price) * position.shares
@@ -368,20 +606,23 @@ def _run_single_backtest(
             if bool(row.get("entry_signal", False)):
                 entry_candidates.append((ticker, row))
 
-        remaining_candidates = len(entry_candidates)
+        equity_before_entries = cash + _mark_to_market(active_positions, last_prices)
         for ticker, row in entry_candidates:
-            if remaining_candidates <= 0 or cash <= 0:
+            if cash <= 0:
                 break
-            price = float(row["Close"])
-            if price <= 0:
-                remaining_candidates -= 1
+
+            target_weight_pct = allocation_weights.get(ticker, 0.0)
+            target_allocation = equity_before_entries * (target_weight_pct / 100.0)
+            if target_allocation <= 0:
                 continue
 
-            fee_rate = tc_bps / 10_000.0
-            allocation = cash / remaining_candidates
+            price = float(row["Close"])
+            if price <= 0:
+                continue
+
+            allocation = min(target_allocation, cash)
             raw_shares = allocation / (price * (1.0 + fee_rate))
             shares = raw_shares if allow_fractional_shares else math.floor(raw_shares)
-            remaining_candidates -= 1
 
             if shares <= 0:
                 continue
@@ -418,18 +659,22 @@ def _run_single_backtest(
                 highest_price=float(row["High"]),
             )
 
-        market_value = 0.0
-        for ticker, position in active_positions.items():
-            mark_price = last_prices.get(ticker, position.entry_price)
-            market_value += position.shares * mark_price
-
+        market_value = _mark_to_market(active_positions, last_prices)
         equity = cash + market_value
+        benchmark_equity = None
+        benchmark_drawdown_pct = None
+        if buy_and_hold and bar_number < len(buy_and_hold["equity_curve"]):
+            benchmark_row = buy_and_hold["equity_curve"][bar_number]
+            benchmark_equity = benchmark_row.get("Equity")
+            benchmark_drawdown_pct = benchmark_row.get("DrawdownPct")
         equity_rows.append(
             {
                 "Date": pd.to_datetime(current_date),
                 "Cash": cash,
                 "MarketValue": market_value,
                 "Equity": equity,
+                "BuyHoldEquity": benchmark_equity,
+                "BuyHoldDrawdownPct": benchmark_drawdown_pct,
                 "ActivePositions": len(active_positions),
             }
         )
@@ -439,7 +684,7 @@ def _run_single_backtest(
         for ticker, position in list(active_positions.items()):
             exit_price = last_prices.get(ticker, position.entry_price)
             gross_exit_value = position.shares * exit_price
-            exit_fee = gross_exit_value * (tc_bps / 10_000.0)
+            exit_fee = gross_exit_value * fee_rate
             gross_pnl = (exit_price - position.entry_price) * position.shares
             net_pnl = gross_pnl - position.entry_fee - exit_fee
             capital_committed = (position.entry_price * position.shares) + position.entry_fee
@@ -474,10 +719,32 @@ def _run_single_backtest(
         periods_per_year=PERIODS_PER_YEAR[timeframe],
     )
 
-    plot = generate_equity_curve_plot(equity_df.index, equity_df["Equity"]) if generate_plots else None
+    plot = (
+        generate_equity_curve_plot(
+            equity_df.index,
+            equity_df["Equity"],
+            benchmark=equity_df["BuyHoldEquity"] if include_buy_and_hold else None,
+        )
+        if generate_plots
+        else None
+    )
     return {
         "stats": stats,
-        "equity_curve": _serialize_records(equity_df[["Cash", "MarketValue", "Equity", "DailyReturn", "DrawdownPct", "ActivePositions"]]),
+        "equity_curve": _serialize_records(
+            equity_df[
+                [
+                    "Cash",
+                    "MarketValue",
+                    "Equity",
+                    "BuyHoldEquity",
+                    "DailyReturn",
+                    "DrawdownPct",
+                    "BuyHoldDrawdownPct",
+                    "ActivePositions",
+                ]
+            ]
+        ),
+        "buy_and_hold": buy_and_hold,
         "trade_log": [{key: _clean_numeric(value) for key, value in trade.items()} for trade in trade_log],
         "equity_curve_image": plot,
     }
@@ -563,6 +830,7 @@ def run_portfolio_backtest(
     market_data: Dict[str, pd.DataFrame],
     *,
     tickers: List[str],
+    allocation_weights: Dict[str, Any] | None,
     timeframe: str,
     initial_capital: float,
     tc_bps: float,
@@ -571,10 +839,12 @@ def run_portfolio_backtest(
     strategy_params: Dict[str, Any],
     risk_controls: Dict[str, Any] | None,
     tuning: Dict[str, Any] | None,
+    include_buy_and_hold: bool,
     generate_plots: bool,
 ) -> Dict[str, Any]:
     selected_params = dict(strategy_params)
     tuning_summary = None
+    normalized_weights, cash_reserve_pct = _normalize_allocation_weights(tickers, allocation_weights)
 
     if tuning and tuning.get("enabled"):
         combinations = _build_parameter_grid(
@@ -590,6 +860,7 @@ def run_portfolio_backtest(
             outcome = _run_single_backtest(
                 market_data,
                 tickers=tickers,
+                allocation_weights=normalized_weights,
                 timeframe=timeframe,
                 initial_capital=initial_capital,
                 tc_bps=tc_bps,
@@ -597,6 +868,7 @@ def run_portfolio_backtest(
                 family=family,
                 strategy_params=params,
                 risk_controls=risk_controls,
+                include_buy_and_hold=False,
                 generate_plots=False,
             )
             stats = outcome["stats"]
@@ -632,6 +904,7 @@ def run_portfolio_backtest(
     result = _run_single_backtest(
         market_data,
         tickers=tickers,
+        allocation_weights=normalized_weights,
         timeframe=timeframe,
         initial_capital=initial_capital,
         tc_bps=tc_bps,
@@ -639,8 +912,11 @@ def run_portfolio_backtest(
         family=family,
         strategy_params=selected_params,
         risk_controls=risk_controls,
+        include_buy_and_hold=include_buy_and_hold,
         generate_plots=generate_plots,
     )
     result["strategy_params"] = {key: _clean_numeric(value) for key, value in selected_params.items()}
+    result["allocation_weights"] = normalized_weights
+    result["cash_reserve_pct"] = cash_reserve_pct
     result["tuning_summary"] = tuning_summary
     return result

@@ -130,6 +130,9 @@ BacktestStrategyFamily = Literal[
     "oversold_reversal",
     "moving_average_pullback",
     "volume_breakout",
+    "golden_cross",
+    "macd_trend",
+    "rsi_trend_filter",
 ]
 
 
@@ -176,6 +179,7 @@ class BacktestRunRequest(BaseModel):
     start_date: str
     end_date: str
     tickers: List[str] = Field(default_factory=list)
+    allocation_weights: Dict[str, float] = Field(default_factory=dict)
     timeframe: Literal["1d", "1wk", "1mo"] = "1d"
     initial_capital: float = Field(default=10000.0, gt=0.0)
     tc_bps: float = Field(default=5.0, ge=0.0, le=500.0)
@@ -183,12 +187,15 @@ class BacktestRunRequest(BaseModel):
     strategy: BacktestStrategyConfig
     risk_controls: Optional[BacktestRiskControls] = None
     tuning: Optional[BacktestTuningConfig] = None
+    include_buy_and_hold: bool = True
     generate_plots: bool = True
 
 
 class BacktestRunResponse(BaseModel):
     ticker: str
     tickers: List[str]
+    allocation_weights: Dict[str, float] = Field(default_factory=dict)
+    cash_reserve_pct: float = 0.0
     source: Literal["database", "yfinance", "mixed"]
     data_sources: Dict[str, str]
     cached: bool = False
@@ -201,6 +208,7 @@ class BacktestRunResponse(BaseModel):
     warnings: List[str] = Field(default_factory=list)
     stats: Dict[str, Any]
     equity_curve: List[Dict[str, Any]]
+    buy_and_hold: Optional[Dict[str, Any]] = None
     trade_log: List[Dict[str, Any]]
     tuning_summary: Optional[Dict[str, Any]] = None
     equity_curve_image: Optional[str] = None

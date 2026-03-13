@@ -111,7 +111,10 @@ export type BacktestStrategyFamily =
   | 'momentum_breakout'
   | 'oversold_reversal'
   | 'moving_average_pullback'
-  | 'volume_breakout';
+  | 'volume_breakout'
+  | 'golden_cross'
+  | 'macd_trend'
+  | 'rsi_trend_filter';
 
 export interface BacktestStrategyConfig {
   family: BacktestStrategyFamily;
@@ -154,6 +157,7 @@ export interface BacktestRunRequest {
   start_date: string;
   end_date: string;
   tickers: string[];
+  allocation_weights: Record<string, number>;
   timeframe: '1d' | '1wk' | '1mo';
   initial_capital: number;
   tc_bps: number;
@@ -161,12 +165,15 @@ export interface BacktestRunRequest {
   strategy: BacktestStrategyConfig;
   risk_controls?: BacktestRiskControls;
   tuning?: BacktestTuningConfig;
+  include_buy_and_hold: boolean;
   generate_plots: boolean;
 }
 
 export interface BacktestRunResponse {
   ticker: string;
   tickers: string[];
+  allocation_weights: Record<string, number>;
+  cash_reserve_pct: number;
   source: 'database' | 'yfinance' | 'mixed';
   data_sources: Record<string, 'database' | 'yfinance'>;
   cached: boolean;
@@ -179,6 +186,11 @@ export interface BacktestRunResponse {
   warnings: string[];
   stats: Record<string, number>;
   equity_curve: Array<Record<string, string | number | null>>;
+  buy_and_hold?: {
+    stats: Record<string, number>;
+    equity_curve: Array<Record<string, string | number | null>>;
+    equity_curve_image?: string | null;
+  } | null;
   trade_log: Array<Record<string, string | number | null>>;
   tuning_summary?: {
     enabled: boolean;

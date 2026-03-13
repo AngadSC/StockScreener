@@ -68,6 +68,24 @@ def _normalize_backtest_tickers(primary_ticker: str, extra_tickers: list[str]) -
     return ordered
 
 
+def _normalize_backtest_weights(tickers: list[str], allocation_weights: dict[str, float]) -> dict[str, float]:
+    if not allocation_weights:
+        return {}
+
+    normalized: dict[str, float] = {}
+    ticker_set = set(tickers)
+    for raw_ticker, raw_weight in allocation_weights.items():
+        ticker = str(raw_ticker).strip().upper()
+        if ticker not in ticker_set:
+            raise HTTPException(status_code=400, detail=f"Allocation weight provided for unknown ticker '{ticker}'.")
+        try:
+            weight = float(raw_weight)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail=f"Allocation weight for '{ticker}' must be numeric.")
+        normalized[ticker] = weight
+    return normalized
+
+
 @router.get("/{ticker}", response_model=StockDetail)
 def get_stock_detail(ticker: str, db: Session = Depends(get_db)):
     """Get detailed stock information including fundamentals."""
@@ -195,10 +213,12 @@ def run_backtest(
     """Run a portfolio backtest across one or more tickers."""
     ticker = ticker.upper()
     tickers = _normalize_backtest_tickers(ticker, request.tickers)
+    allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights)
 
     start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
     request_dump = request.model_dump(mode="json")
     request_dump["tickers"] = tickers
+    request_dump["allocation_weights"] = allocation_weights
     cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
     cache_key = f"backtest_run:{ticker}:{cache_suffix}"
 
@@ -222,6 +242,7 @@ def run_backtest(
         result = run_portfolio_backtest(
             market_data,
             tickers=tickers,
+            allocation_weights=allocation_weights,
             timeframe=request.timeframe,
             initial_capital=request.initial_capital,
             tc_bps=request.tc_bps,
@@ -230,12 +251,15 @@ def run_backtest(
             strategy_params=request.strategy.params,
             risk_controls=request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else None,
             tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
+            include_buy_and_hold=request.include_buy_and_hold,
             generate_plots=request.generate_plots,
         )
         overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"
         response = {
             "ticker": ticker,
             "tickers": tickers,
+            "allocation_weights": result["allocation_weights"],
+            "cash_reserve_pct": result["cash_reserve_pct"],
             "source": overall_source,
             "data_sources": data_sources,
             "cached": False,
@@ -248,6 +272,7 @@ def run_backtest(
             "warnings": warnings,
             "stats": result["stats"],
             "equity_curve": result["equity_curve"],
+            "buy_and_hold": result["buy_and_hold"],
             "trade_log": result["trade_log"],
             "tuning_summary": result["tuning_summary"],
             "equity_curve_image": result["equity_curve_image"],

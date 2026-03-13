@@ -220,7 +220,7 @@ def run_backtest(
     request_dump["tickers"] = tickers
     request_dump["allocation_weights"] = allocation_weights
     cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
-    cache_key = f"backtest_run:{ticker}:{cache_suffix}"
+    cache_key = f"backtest_run:v2:{ticker}:{cache_suffix}"
 
     cached = cache_service.get(cache_key)
     if cached:

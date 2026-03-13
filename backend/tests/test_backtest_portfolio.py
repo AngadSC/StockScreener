@@ -62,6 +62,8 @@ def test_allocation_weights_fill_missing_and_add_benchmark_curve():
     assert result["buy_and_hold"] is not None
     assert result["equity_curve"]
     assert "BuyHoldEquity" in result["equity_curve"][0]
+    benchmark_values = [float(row["BuyHoldEquity"]) for row in result["equity_curve"] if row["BuyHoldEquity"] is not None]
+    assert benchmark_values[0] != benchmark_values[-1]
 
 
 def test_new_strategy_families_execute():

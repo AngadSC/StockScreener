@@ -399,78 +399,38 @@ def _build_buy_and_hold_benchmark(
     generate_plots: bool,
 ) -> Dict[str, Any]:
     fee_rate = tc_bps / 10_000.0
-    active_positions: Dict[str, Position] = {}
-    last_prices: Dict[str, float] = {}
-    cash = float(initial_capital)
-    equity_rows: List[Dict[str, Any]] = []
+    benchmark_index = pd.DatetimeIndex(pd.to_datetime(all_dates), name="Date")
+    benchmark_df = pd.DataFrame(index=benchmark_index)
+    benchmark_df["Cash"] = float(initial_capital)
+    benchmark_df["MarketValue"] = 0.0
+    benchmark_df["ActivePositions"] = 0
 
     for ticker in tickers:
         frame = prepared_frames.get(ticker)
         if frame is None or frame.empty:
             continue
 
-        entry_date = pd.to_datetime(frame.index[0])
-        entry_row = frame.iloc[0]
-        price = float(entry_row["Close"])
+        close_series = frame["Close"].astype(float).sort_index()
+        if close_series.empty:
+            continue
+
         weight_pct = allocation_weights.get(ticker, 0.0)
         allocation = initial_capital * (weight_pct / 100.0)
-        if price <= 0 or allocation <= 0:
+        entry_date = pd.to_datetime(close_series.index[0])
+        entry_price = float(close_series.iloc[0])
+        if entry_price <= 0 or allocation <= 0:
             continue
 
-        raw_shares = allocation / (price * (1.0 + fee_rate))
-        shares = raw_shares if allow_fractional_shares else math.floor(raw_shares)
-        if shares <= 0:
-            continue
+        deployed_capital = allocation / (1.0 + fee_rate)
+        position_values = (close_series / entry_price) * deployed_capital
+        aligned_values = position_values.reindex(benchmark_df.index).ffill().fillna(0.0)
+        aligned_values.loc[benchmark_df.index < entry_date] = 0.0
 
-        gross_cost = shares * price
-        entry_fee = gross_cost * fee_rate
-        total_cost = gross_cost + entry_fee
-        if total_cost > cash:
-            if allow_fractional_shares:
-                shares = cash / (price * (1.0 + fee_rate))
-                gross_cost = shares * price
-                entry_fee = gross_cost * fee_rate
-                total_cost = gross_cost + entry_fee
-            else:
-                max_shares = math.floor(cash / (price * (1.0 + fee_rate)))
-                if max_shares <= 0:
-                    continue
-                shares = max_shares
-                gross_cost = shares * price
-                entry_fee = gross_cost * fee_rate
-                total_cost = gross_cost + entry_fee
+        benchmark_df["MarketValue"] += aligned_values
+        benchmark_df.loc[benchmark_df.index >= entry_date, "Cash"] -= allocation
+        benchmark_df.loc[benchmark_df.index >= entry_date, "ActivePositions"] += 1
 
-        if total_cost <= 0 or total_cost > cash:
-            continue
-
-        cash -= total_cost
-        active_positions[ticker] = Position(
-            ticker=ticker,
-            shares=shares,
-            entry_date=entry_date,
-            entry_price=price,
-            entry_fee=entry_fee,
-            entry_bar=0,
-            highest_price=float(entry_row["High"]),
-        )
-
-    for current_date in all_dates:
-        for ticker, frame in prepared_frames.items():
-            if current_date in frame.index:
-                last_prices[ticker] = float(frame.loc[current_date, "Close"])
-
-        market_value = _mark_to_market(active_positions, last_prices)
-        equity_rows.append(
-            {
-                "Date": pd.to_datetime(current_date),
-                "Cash": cash,
-                "MarketValue": market_value,
-                "Equity": cash + market_value,
-                "ActivePositions": len(active_positions),
-            }
-        )
-
-    benchmark_df = pd.DataFrame(equity_rows).set_index("Date")
+    benchmark_df["Equity"] = benchmark_df["Cash"] + benchmark_df["MarketValue"]
     benchmark_df["DailyReturn"] = benchmark_df["Equity"].pct_change().fillna(0.0)
     benchmark_df["RollingMax"] = benchmark_df["Equity"].cummax()
     benchmark_df["DrawdownPct"] = (

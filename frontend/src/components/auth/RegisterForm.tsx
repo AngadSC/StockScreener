@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Loader2, UserPlus } from 'lucide-react';
+
+import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { authAPI } from '@/lib/api';
-import { UserPlus, Loader2 } from 'lucide-react';
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -21,14 +22,13 @@ export default function RegisterForm() {
     e.preventDefault();
     setError('');
 
-    // Validation
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('Passwords do not match.');
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+      setError('Password must be at least 8 characters.');
       return;
     }
 
@@ -36,7 +36,6 @@ export default function RegisterForm() {
 
     try {
       await authAPI.register({ email, password });
-      // Auto-login after registration
       await authAPI.login({ email, password });
       router.push('/screener');
     } catch (err: any) {
@@ -49,16 +48,17 @@ export default function RegisterForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5" />
+        <div className="deco-kicker">Membership</div>
+        <CardTitle className="mt-2 flex items-center gap-3">
+          <UserPlus className="h-5 w-5 text-primary" />
           Create Account
         </CardTitle>
         <CardDescription>
-          Sign up to start screening stocks
+          Join QuantorSignal to save workspaces and track the names that matter.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -77,15 +77,12 @@ export default function RegisterForm() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="At least 8 characters"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading}
             />
-            <p className="text-xs text-muted-foreground">
-              Minimum 8 characters
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -93,7 +90,7 @@ export default function RegisterForm() {
             <Input
               id="confirmPassword"
               type="password"
-              placeholder="••••••••"
+              placeholder="Repeat password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
@@ -101,22 +98,22 @@ export default function RegisterForm() {
             />
           </div>
 
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+          {error ? (
+            <div className="border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
-          )}
+          ) : null}
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating account...
+                Creating
               </>
             ) : (
               <>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Sign Up
+                Join
               </>
             )}
           </Button>

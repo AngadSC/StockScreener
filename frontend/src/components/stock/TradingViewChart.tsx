@@ -82,24 +82,22 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
   }, [ticker]);
 
   return (
-    <div className="terminal-border bg-card">
-      {/* Header */}
-      <div className="border-b border-border px-4 py-2 bg-muted/20">
+    <div className="deco-panel bg-card">
+      <div className="border-b border-primary/12 px-4 py-3 bg-muted/20">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold">ADVANCED_CHART [{ticker}]</span>
-          <div className="text-xs text-muted-foreground">
-            POWERED_BY: TRADINGVIEW
+          <span className="text-xs font-bold uppercase tracking-[0.22em]">Live Chart {ticker}</span>
+          <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            Powered by TradingView
           </div>
         </div>
       </div>
 
-      {/* TradingView Chart Container */}
       <div className="relative">
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#131722]" style={{ height: `${height}px` }}>
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-              <p className="text-xs text-muted-foreground">INITIALIZING_CHART...</p>
+              <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Initializing chart...</p>
             </div>
           </div>
         )}
@@ -111,9 +109,8 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
         />
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border px-4 py-2 bg-muted/20 text-xs text-muted-foreground">
-        FEATURES: INDICATORS | DRAWING_TOOLS | MULTI_TIMEFRAME | VOLUME_ANALYSIS
+      <div className="border-t border-primary/12 px-4 py-3 bg-muted/20 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+        Indicators | Drawing tools | Multi timeframe | Volume analysis
       </div>
     </div>
   );

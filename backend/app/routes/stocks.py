@@ -24,6 +24,7 @@ from app.utils.data_fetcher import add_technical_indicators
 
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
+backtests_router = APIRouter(prefix="/backtests", tags=["backtests"])
 
 
 def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int) -> tuple:
@@ -49,10 +50,10 @@ def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int
     return start, end
 
 
-def _normalize_backtest_tickers(primary_ticker: str, extra_tickers: list[str]) -> list[str]:
+def _normalize_backtest_tickers(primary_ticker: str | None, extra_tickers: list[str]) -> list[str]:
     ordered: list[str] = []
     seen: set[str] = set()
-    for raw in [primary_ticker, *(extra_tickers or [])]:
+    for raw in ([primary_ticker] if primary_ticker else []) + list(extra_tickers or []):
         ticker = str(raw).strip().upper()
         if not ticker or ticker in seen:
             continue
@@ -84,6 +85,89 @@ def _normalize_backtest_weights(tickers: list[str], allocation_weights: dict[str
             raise HTTPException(status_code=400, detail=f"Allocation weight for '{ticker}' must be numeric.")
         normalized[ticker] = weight
     return normalized
+
+
+def _run_backtest_request(
+    primary_ticker: str | None,
+    request: BacktestRunRequest,
+    db: Session,
+):
+    tickers = _normalize_backtest_tickers(primary_ticker, request.tickers)
+    anchor_ticker = (primary_ticker or tickers[0]).upper()
+    allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights)
+
+    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
+    request_dump = request.model_dump(mode="json")
+    request_dump["tickers"] = tickers
+    request_dump["allocation_weights"] = allocation_weights
+    cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
+    cache_key = f"backtest_run:v3:{anchor_ticker}:{cache_suffix}"
+
+    cached = cache_service.get(cache_key)
+    if cached:
+        return {
+            **cached,
+            "cached": True,
+        }
+
+    try:
+        market_data: dict[str, pd.DataFrame] = {}
+        data_sources: dict[str, str] = {}
+        warnings: list[str] = []
+        for symbol in tickers:
+            symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
+            market_data[symbol] = symbol_data
+            data_sources[symbol] = source
+            warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
+
+        result = run_portfolio_backtest(
+            market_data,
+            tickers=tickers,
+            allocation_weights=allocation_weights,
+            timeframe=request.timeframe,
+            initial_capital=request.initial_capital,
+            tc_bps=request.tc_bps,
+            allow_fractional_shares=request.allow_fractional_shares,
+            family=request.strategy.family,
+            strategy_params=request.strategy.params,
+            risk_controls=request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else None,
+            tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
+            include_buy_and_hold=request.include_buy_and_hold,
+            generate_plots=request.generate_plots,
+        )
+        overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"
+        response = {
+            "ticker": anchor_ticker,
+            "tickers": tickers,
+            "allocation_weights": result["allocation_weights"],
+            "cash_reserve_pct": result["cash_reserve_pct"],
+            "source": overall_source,
+            "data_sources": data_sources,
+            "cached": False,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "timeframe": request.timeframe,
+            "strategy_family": request.strategy.family,
+            "strategy_params": result["strategy_params"],
+            "risk_controls": request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else {},
+            "warnings": warnings,
+            "stats": result["stats"],
+            "equity_curve": result["equity_curve"],
+            "buy_and_hold": result["buy_and_hold"],
+            "trade_log": result["trade_log"],
+            "tuning_summary": result["tuning_summary"],
+            "equity_curve_image": result["equity_curve_image"],
+        }
+        cache_service.set(cache_key, response, ttl=3600)
+        return response
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        anchor = anchor_ticker if primary_ticker else ",".join(tickers)
+        print(f"Backtest run error for {anchor}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to run backtest")
 
 
 @router.get("/{ticker}", response_model=StockDetail)
@@ -211,81 +295,16 @@ def run_backtest(
     db: Session = Depends(get_db),
 ):
     """Run a portfolio backtest across one or more tickers."""
-    ticker = ticker.upper()
-    tickers = _normalize_backtest_tickers(ticker, request.tickers)
-    allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights)
+    return _run_backtest_request(ticker.upper(), request, db)
 
-    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
-    request_dump = request.model_dump(mode="json")
-    request_dump["tickers"] = tickers
-    request_dump["allocation_weights"] = allocation_weights
-    cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
-    cache_key = f"backtest_run:v2:{ticker}:{cache_suffix}"
 
-    cached = cache_service.get(cache_key)
-    if cached:
-        return {
-            **cached,
-            "cached": True,
-        }
-
-    try:
-        market_data: dict[str, pd.DataFrame] = {}
-        data_sources: dict[str, str] = {}
-        warnings: list[str] = []
-        for symbol in tickers:
-            symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
-            market_data[symbol] = symbol_data
-            data_sources[symbol] = source
-            warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
-
-        result = run_portfolio_backtest(
-            market_data,
-            tickers=tickers,
-            allocation_weights=allocation_weights,
-            timeframe=request.timeframe,
-            initial_capital=request.initial_capital,
-            tc_bps=request.tc_bps,
-            allow_fractional_shares=request.allow_fractional_shares,
-            family=request.strategy.family,
-            strategy_params=request.strategy.params,
-            risk_controls=request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else None,
-            tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
-            include_buy_and_hold=request.include_buy_and_hold,
-            generate_plots=request.generate_plots,
-        )
-        overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"
-        response = {
-            "ticker": ticker,
-            "tickers": tickers,
-            "allocation_weights": result["allocation_weights"],
-            "cash_reserve_pct": result["cash_reserve_pct"],
-            "source": overall_source,
-            "data_sources": data_sources,
-            "cached": False,
-            "start_date": request.start_date,
-            "end_date": request.end_date,
-            "timeframe": request.timeframe,
-            "strategy_family": request.strategy.family,
-            "strategy_params": result["strategy_params"],
-            "risk_controls": request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else {},
-            "warnings": warnings,
-            "stats": result["stats"],
-            "equity_curve": result["equity_curve"],
-            "buy_and_hold": result["buy_and_hold"],
-            "trade_log": result["trade_log"],
-            "tuning_summary": result["tuning_summary"],
-            "equity_curve_image": result["equity_curve_image"],
-        }
-        cache_service.set(cache_key, response, ttl=3600)
-        return response
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except HTTPException:
-        raise
-    except Exception as exc:
-        print(f"Backtest run error for {ticker}: {exc}")
-        raise HTTPException(status_code=500, detail="Failed to run backtest")
+@backtests_router.post("/run", response_model=BacktestRunResponse)
+def run_global_backtest(
+    request: BacktestRunRequest,
+    db: Session = Depends(get_db),
+):
+    """Run a ticker-agnostic portfolio backtest."""
+    return _run_backtest_request(None, request, db)
 
 
 @router.post("/{ticker}/ml-features")

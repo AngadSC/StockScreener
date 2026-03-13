@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Loader2, LogIn } from 'lucide-react';
+
+import { authAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { authAPI } from '@/lib/api';
-import { LogIn, Loader2 } from 'lucide-react';
-
 
 export default function LoginForm() {
   const router = useRouter();
@@ -24,7 +24,7 @@ export default function LoginForm() {
 
     try {
       await authAPI.login({ email, password });
-      router.push('/screener'); // Redirect to screener after login
+      router.push('/screener');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
@@ -35,16 +35,17 @@ export default function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <LogIn className="h-5 w-5" />
+        <div className="deco-kicker">Member Access</div>
+        <CardTitle className="mt-2 flex items-center gap-3">
+          <LogIn className="h-5 w-5 text-primary" />
           Login
         </CardTitle>
         <CardDescription>
-          Enter your email and password to access your account
+          Enter your credentials to reopen your market workspace.
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -63,7 +64,7 @@ export default function LoginForm() {
             <Input
               id="password"
               type="password"
-              placeholder="••••••••"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -71,22 +72,22 @@ export default function LoginForm() {
             />
           </div>
 
-          {error && (
-            <div className="text-sm text-red-600 bg-red-50 p-3 rounded">
+          {error ? (
+            <div className="border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
               {error}
             </div>
-          )}
+          ) : null}
 
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Logging in...
+                Entering
               </>
             ) : (
               <>
                 <LogIn className="mr-2 h-4 w-4" />
-                Login
+                Enter
               </>
             )}
           </Button>

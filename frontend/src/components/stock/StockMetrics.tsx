@@ -108,20 +108,18 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {visibleMetrics.map((section) => (
-        <div key={section.category} className="terminal-border bg-card">
-          {/* Category Header */}
-          <div className="border-b border-border px-3 py-2 bg-muted/20">
-            <span className="text-xs font-bold">{section.category.toUpperCase().replace(' ', '_')}</span>
+        <div key={section.category} className="deco-panel bg-card">
+          <div className="border-b border-primary/12 px-4 py-3 bg-muted/20">
+            <span className="text-xs font-bold uppercase tracking-[0.22em]">{section.category}</span>
           </div>
 
-          {/* Metrics List */}
-          <div className="p-3 space-y-2 text-xs">
+          <div className="p-4 space-y-2 text-sm">
             {section.items.map((item) => (
-              <div key={item.label} className="flex justify-between items-center py-1 border-b border-border/30 last:border-0">
-                <span className="text-muted-foreground font-mono">
-                  {item.label.toUpperCase().replace(/\s/g, '_').replace(/\//g, '_')}
+              <div key={item.label} className="flex items-center justify-between gap-4 border-b border-primary/10 py-2 last:border-0">
+                <span className="text-muted-foreground">
+                  {item.label}
                 </span>
-                <span className="font-mono font-bold text-primary">
+                <span className="font-semibold text-primary">
                   {item.value}
                 </span>
               </div>

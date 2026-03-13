@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { Activity, ArrowRight, Search, Sparkles, Star, TrendingDown, TrendingUp } from 'lucide-react';
+
 import { screenerAPI } from '@/lib/api';
-import { formatPercent, normalizePercentValue } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Activity, Search, Star } from 'lucide-react';
+import { cn, formatMarketCap, formatPercent, formatVolume, normalizePercentValue } from '@/lib/utils';
 import type { Stock } from '@/types/stock';
 
 function getChangePercent(stock: Stock): number | null {
@@ -18,262 +19,277 @@ function getChangePercent(stock: Stock): number | null {
   return null;
 }
 
+function MarketList({
+  title,
+  subtitle,
+  stocks,
+  tone,
+}: {
+  title: string;
+  subtitle: string;
+  stocks: Stock[];
+  tone: 'up' | 'down' | 'neutral';
+}) {
+  return (
+    <section className="deco-panel p-6">
+      <div className="deco-kicker">{subtitle}</div>
+      <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
+      <div className="deco-divider" />
+      <div className="space-y-3">
+        {stocks.map((stock) => {
+          const changePercent = getChangePercent(stock);
+          const isPositive = (changePercent ?? 0) >= 0;
+          const toneClass =
+            tone === 'neutral'
+              ? 'text-muted-foreground'
+              : isPositive
+                ? 'text-success'
+                : 'text-destructive';
+
+          return (
+            <Link
+              key={stock.ticker}
+              href={`/stocks/${stock.ticker}`}
+              className="block border border-primary/12 bg-muted/10 px-4 py-4 transition-all duration-300 hover:border-primary/35 hover:bg-primary/5"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="font-display text-xl uppercase tracking-[0.16em] text-foreground">
+                    {stock.ticker}
+                  </div>
+                  <div className="truncate text-sm text-muted-foreground">
+                    {stock.name || stock.company_name || 'Company profile'}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-semibold text-foreground">
+                    {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
+                  </div>
+                  <div className={`text-sm ${toneClass}`}>
+                    {tone === 'neutral'
+                      ? stock.volume
+                        ? `${formatVolume(stock.volume)} volume`
+                        : 'N/A'
+                      : formatPercent(changePercent, { mode: 'percent', withSign: true })}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
-  // Fetch market movers
-  const { data: gainers, isLoading: gainersLoading } = useQuery({
+  const { data: gainers } = useQuery({
     queryKey: ['gainers'],
-    queryFn: () => screenerAPI.screenStocks({
-      limit: 25,
-      sort_by: 'day_change_percent',
-      sort_order: 'desc',
-      min_price: 5,
-      min_market_cap: 1000000000
-    }),
+    queryFn: () =>
+      screenerAPI.screenStocks({
+        limit: 25,
+        sort_by: 'day_change_percent',
+        sort_order: 'desc',
+        min_price: 5,
+        min_market_cap: 1000000000,
+      }),
   });
 
-  const { data: losers, isLoading: losersLoading } = useQuery({
+  const { data: losers } = useQuery({
     queryKey: ['losers'],
-    queryFn: () => screenerAPI.screenStocks({
-      limit: 25,
-      sort_by: 'day_change_percent',
-      sort_order: 'asc',
-      min_price: 5,
-      min_market_cap: 1000000000
-    }),
+    queryFn: () =>
+      screenerAPI.screenStocks({
+        limit: 25,
+        sort_by: 'day_change_percent',
+        sort_order: 'asc',
+        min_price: 5,
+        min_market_cap: 1000000000,
+      }),
   });
 
-  const { data: active, isLoading: activeLoading } = useQuery({
+  const { data: active } = useQuery({
     queryKey: ['active'],
-    queryFn: () => screenerAPI.screenStocks({
-      limit: 10,
-      sort_by: 'volume',
-      sort_order: 'desc',
-      min_market_cap: 1000000000
-    }),
+    queryFn: () =>
+      screenerAPI.screenStocks({
+        limit: 10,
+        sort_by: 'volume',
+        sort_order: 'desc',
+        min_market_cap: 1000000000,
+      }),
   });
 
   const topGainers = useMemo(() => {
     const stocks = gainers?.results ?? [];
-    const sorted = [...stocks]
-      .filter((stock) => getChangePercent(stock) !== null)
-      .sort((a, b) => (getChangePercent(b) ?? -Infinity) - (getChangePercent(a) ?? -Infinity));
-
-    const positiveOnly = sorted.filter((stock) => (getChangePercent(stock) ?? 0) > 0);
-    return (positiveOnly.length > 0 ? positiveOnly : sorted).slice(0, 5);
+    return [...stocks]
+      .filter((stock) => (getChangePercent(stock) ?? 0) > 0)
+      .sort((a, b) => (getChangePercent(b) ?? -Infinity) - (getChangePercent(a) ?? -Infinity))
+      .slice(0, 5);
   }, [gainers]);
 
   const topLosers = useMemo(() => {
     const stocks = losers?.results ?? [];
-    const sorted = [...stocks]
-      .filter((stock) => getChangePercent(stock) !== null)
-      .sort((a, b) => (getChangePercent(a) ?? Infinity) - (getChangePercent(b) ?? Infinity));
-
-    const negativeOnly = sorted.filter((stock) => (getChangePercent(stock) ?? 0) < 0);
-    return (negativeOnly.length > 0 ? negativeOnly : sorted).slice(0, 5);
+    return [...stocks]
+      .filter((stock) => (getChangePercent(stock) ?? 0) < 0)
+      .sort((a, b) => (getChangePercent(a) ?? Infinity) - (getChangePercent(b) ?? Infinity))
+      .slice(0, 5);
   }, [losers]);
 
+  const mostActive = (active?.results ?? []).slice(0, 5);
+  const spotlight = topGainers[0] ?? mostActive[0];
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container-custom py-8 space-y-8">
-        {/* Hero Section */}
-        <div className="space-y-3 pb-2">
-          <h1 className="text-5xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            Market Overview
-          </h1>
-          <p className="text-muted-foreground text-xl font-light">
-            Track top movers, analyze trends, and discover opportunities
-          </p>
-        </div>
+    <div className="min-h-screen">
+      <div className="container-custom py-8">
+        <section className="deco-panel bg-grid-luxe p-8 md:p-10">
+          <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            <div>
+              <div className="deco-kicker">Market Atelier</div>
+              <h1 className="mt-3 max-w-4xl text-5xl font-semibold leading-none text-glow md:text-7xl">
+                QuantorSignal
+              </h1>
+              <p className="mt-5 max-w-3xl text-lg leading-relaxed text-muted-foreground">
+                Screen the market, interrogate individual names, and test portfolio behavior inside a
+                single Art Deco trading workspace built for deliberate analysis.
+              </p>
+              <div className="mt-8 flex flex-wrap gap-3">
+                <Link href="/screener">
+                  <div className="inline-flex h-12 items-center gap-2 border border-primary bg-primary px-5 text-sm uppercase tracking-[0.22em] text-primary-foreground">
+                    <Search className="h-4 w-4" />
+                    Open Screener
+                  </div>
+                </Link>
+                <Link href="/backtester">
+                  <div className="inline-flex h-12 items-center gap-2 border border-primary/40 px-5 text-sm uppercase tracking-[0.22em] text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+                    <Sparkles className="h-4 w-4" />
+                    Launch Backtester
+                  </div>
+                </Link>
+              </div>
+            </div>
 
-        {/* Market Movers Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Top Gainers */}
-          <div className="card-elevated">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-success/10">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Link href="/screener" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1">
+                <div className="deco-kicker">I</div>
+                <div className="mt-2 text-2xl font-semibold">Screener</div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  Filter by valuation, quality, sector, industry, liquidity, and growth without losing table density.
+                </p>
+                <div className="mt-5 inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em] text-primary">
+                  Enter Hall <ArrowRight className="h-4 w-4" />
+                </div>
+              </Link>
+              <Link href="/backtester" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1">
+                <div className="deco-kicker">II</div>
+                <div className="mt-2 text-2xl font-semibold">Backtester</div>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  Compare weighted baskets, tune strategies, and review trade logs in a compact study workspace.
+                </p>
+                <div className="mt-5 inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em] text-primary">
+                  Start Study <ArrowRight className="h-4 w-4" />
+                </div>
+              </Link>
+              <Link href="/watchlist" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1 sm:col-span-2">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="deco-kicker">III</div>
+                    <div className="mt-2 text-2xl font-semibold">Watchlist</div>
+                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                      Keep a compact ledger of the names you are actively monitoring.
+                    </p>
+                  </div>
+                  <Star className="h-8 w-8 text-primary" />
+                </div>
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        {spotlight ? (
+          <section className="mt-8 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+            <div className="deco-panel p-6">
+              <div className="deco-kicker">Featured Instrument</div>
+              <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <div className="text-4xl font-semibold">{spotlight.ticker}</div>
+                  <p className="mt-2 text-base text-muted-foreground">
+                    {spotlight.name || spotlight.company_name || 'Selected from today’s leaders'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-3xl font-semibold">
+                    {spotlight.current_price != null ? `$${spotlight.current_price.toFixed(2)}` : 'N/A'}
+                  </div>
+                  <div className={cn('mt-2 text-sm', (getChangePercent(spotlight) ?? 0) >= 0 ? 'text-success' : 'text-destructive')}>
+                    {formatPercent(getChangePercent(spotlight), { mode: 'percent', withSign: true })}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                <div className="border border-primary/14 bg-muted/10 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Market Cap</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">{formatMarketCap(spotlight.market_cap)}</div>
+                </div>
+                <div className="border border-primary/14 bg-muted/10 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Volume</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">{formatVolume(spotlight.volume)}</div>
+                </div>
+                <div className="border border-primary/14 bg-muted/10 p-4">
+                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Sector</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">{spotlight.sector || 'N/A'}</div>
+                </div>
+              </div>
+              <div className="mt-6">
+                <Link href={`/stocks/${spotlight.ticker}`} className="deco-link inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em]">
+                  Open detail page <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="grid gap-4">
+              <div className="deco-panel p-5">
+                <div className="deco-kicker">Pulse</div>
+                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
                   <TrendingUp className="h-5 w-5 text-success" />
+                  Leaders
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Top Gainers</h3>
-                  <p className="text-sm text-muted-foreground">Biggest movers up today</p>
+                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  {topGainers.length > 0
+                    ? `${topGainers[0].ticker} leads the board at ${formatPercent(getChangePercent(topGainers[0]), { mode: 'percent', withSign: true })}.`
+                    : 'Market leaders will populate once quotes load.'}
                 </div>
               </div>
-            </div>
-            <div className="p-6">
-              {gainersLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted/30 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {topGainers.map((stock) => {
-                    const changePercent = getChangePercent(stock);
-                    const isPositive = (changePercent ?? 0) >= 0;
-                    return (
-                      <Link
-                        key={stock.ticker}
-                        href={`/stocks/${stock.ticker}`}
-                        className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-foreground">{stock.ticker}</div>
-                            <div className="text-sm text-muted-foreground truncate">
-                              {stock.name || stock.company_name || 'N/A'}
-                            </div>
-                          </div>
-                          <div className="text-right ml-4">
-                            <div className="font-semibold">
-                              ${stock.current_price?.toFixed(2)}
-                            </div>
-                            <div className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                              {formatPercent(changePercent, { mode: 'percent', withSign: true })}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Top Losers */}
-          <div className="card-elevated">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-destructive/10">
+              <div className="deco-panel p-5">
+                <div className="deco-kicker">Pressure</div>
+                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
                   <TrendingDown className="h-5 w-5 text-destructive" />
+                  Retreat
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Top Losers</h3>
-                  <p className="text-sm text-muted-foreground">Biggest declines today</p>
+                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  {topLosers.length > 0
+                    ? `${topLosers[0].ticker} is the weakest large-cap name in the current snapshot.`
+                    : 'Decliners will populate once quotes load.'}
                 </div>
               </div>
-            </div>
-            <div className="p-6">
-              {losersLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted/30 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {topLosers.map((stock) => {
-                    const changePercent = getChangePercent(stock);
-                    const isPositive = (changePercent ?? 0) >= 0;
-                    return (
-                      <Link
-                        key={stock.ticker}
-                        href={`/stocks/${stock.ticker}`}
-                        className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-foreground">{stock.ticker}</div>
-                            <div className="text-sm text-muted-foreground truncate">
-                              {stock.name || stock.company_name || 'N/A'}
-                            </div>
-                          </div>
-                          <div className="text-right ml-4">
-                            <div className="font-semibold">
-                              ${stock.current_price?.toFixed(2)}
-                            </div>
-                            <div className={`text-sm font-medium ${isPositive ? 'text-success' : 'text-destructive'}`}>
-                              {formatPercent(changePercent, { mode: 'percent', withSign: true })}
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Most Active */}
-          <div className="card-elevated">
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
+              <div className="deco-panel p-5">
+                <div className="deco-kicker">Liquidity</div>
+                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
                   <Activity className="h-5 w-5 text-primary" />
+                  Flow
                 </div>
-                <div>
-                  <h3 className="font-semibold text-lg">Most Active</h3>
-                  <p className="text-sm text-muted-foreground">Highest volume today</p>
+                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  {mostActive.length > 0
+                    ? `${mostActive[0].ticker} is carrying the heaviest tape with ${formatVolume(mostActive[0].volume)} traded.`
+                    : 'Most-active names will populate once quotes load.'}
                 </div>
               </div>
             </div>
-            <div className="p-6">
-              {activeLoading ? (
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="h-16 bg-muted/30 rounded animate-pulse" />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {active?.results.slice(0, 5).map((stock) => (
-                    <Link
-                      key={stock.ticker}
-                      href={`/stocks/${stock.ticker}`}
-                      className="block p-3 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-foreground">{stock.ticker}</div>
-                          <div className="text-sm text-muted-foreground truncate">
-                            {stock.name || stock.company_name || 'N/A'}
-                          </div>
-                        </div>
-                        <div className="text-right ml-4">
-                          <div className="font-semibold">
-                            ${stock.current_price?.toFixed(2)}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {stock.volume ? `${(stock.volume / 1000000).toFixed(1)}M vol` : 'N/A'}
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+          </section>
+        ) : null}
 
-        {/* Quick Access Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-          <Link href="/screener" className="card-elevated card-hover p-8 group">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-semibold mb-2">Stock Screener</h3>
-                <p className="text-muted-foreground">
-                  Filter and analyze 8,000+ stocks with advanced screening tools
-                </p>
-              </div>
-              <Search className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-            </div>
-          </Link>
-
-          <Link href="/watchlist" className="card-elevated card-hover p-8 group">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-2xl font-semibold mb-2">Watchlist</h3>
-                <p className="text-muted-foreground">
-                  Track and monitor your favorite stocks in one place
-                </p>
-              </div>
-              <Star className="h-8 w-8 text-primary group-hover:scale-110 transition-transform" />
-            </div>
-          </Link>
+        <div className="mt-8 grid gap-6 xl:grid-cols-3">
+          <MarketList title="Top Gainers" subtitle="Momentum Up" stocks={topGainers} tone="up" />
+          <MarketList title="Top Losers" subtitle="Pressure Down" stocks={topLosers} tone="down" />
+          <MarketList title="Most Active" subtitle="Liquidity Flow" stocks={mostActive} tone="neutral" />
         </div>
       </div>
     </div>

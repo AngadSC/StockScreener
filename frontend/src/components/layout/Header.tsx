@@ -3,8 +3,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { TrendingUp, Search, Star, LogIn, LogOut } from 'lucide-react';
+import { BarChart3, LogIn, LogOut, Search, Star, TrendingUp } from 'lucide-react';
+
+import BrandMark from '@/components/layout/BrandMark';
+import { Button } from '@/components/ui/button';
 import { authAPI, screenerAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import type { StockSuggestion } from '@/types/stock';
 
 export default function Header() {
@@ -19,21 +23,20 @@ export default function Header() {
   const latestQueryRef = useRef(0);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
     const loadSession = async () => {
       try {
         await authAPI.getCurrentUser();
-        if (isMounted) setIsLoggedIn(true);
+        if (mounted) setIsLoggedIn(true);
       } catch {
-        if (isMounted) setIsLoggedIn(false);
+        if (mounted) setIsLoggedIn(false);
       }
     };
 
     loadSession();
-
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [pathname]);
 
@@ -55,7 +58,7 @@ export default function Header() {
     const timer = setTimeout(async () => {
       setIsSuggestLoading(true);
       try {
-        const result = await screenerAPI.suggestStocks(trimmed, 8);
+        const result = await screenerAPI.suggestStocks(trimmed, 6);
         if (requestId !== latestQueryRef.current) return;
         setSuggestions(result.results);
         setSuggestOpen(true);
@@ -68,10 +71,30 @@ export default function Header() {
           setIsSuggestLoading(false);
         }
       }
-    }, 250);
+    }, 220);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  const navItems = [
+    { href: '/', label: 'Market', icon: TrendingUp },
+    { href: '/screener', label: 'Screener', icon: Search },
+    { href: '/backtester', label: 'Backtester', icon: BarChart3 },
+    { href: '/watchlist', label: 'Watchlist', icon: Star },
+  ];
+
+  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = searchQuery.trim();
+    setSuggestOpen(false);
+    router.push(trimmed ? `/screener?search=${encodeURIComponent(trimmed)}` : '/screener');
+  };
+
+  const handleSuggestionSelect = (ticker: string) => {
+    setSearchQuery(ticker);
+    setSuggestOpen(false);
+    router.push(`/stocks/${ticker}`);
+  };
 
   const handleLogout = async () => {
     try {
@@ -82,147 +105,163 @@ export default function Header() {
     }
   };
 
-  const handleSearchSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const trimmed = searchQuery.trim();
-    if (trimmed) {
-      setSuggestOpen(false);
-      router.push(`/screener?search=${encodeURIComponent(trimmed)}`);
-    } else {
-      setSuggestOpen(false);
-      router.push('/screener');
-    }
-  };
-
-  const handleSuggestionSelect = (ticker: string) => {
-    setSearchQuery(ticker);
-    setSuggestOpen(false);
-    router.push(`/screener?search=${encodeURIComponent(ticker)}`);
-  };
-
-  const navItems = [
-    { href: '/', label: 'Market', icon: TrendingUp },
-    { href: '/screener', label: 'Screener', icon: Search },
-    { href: '/watchlist', label: 'Watchlist', icon: Star },
-  ];
-
   return (
-    <header className="border-b border-border bg-card sticky top-0 z-50 backdrop-blur-sm bg-card/95">
+    <header className="sticky top-0 z-50 border-b border-primary/20 bg-background/90 backdrop-blur-xl">
       <div className="container-custom">
-        <div className="flex h-16 items-center justify-between gap-4">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-            <TrendingUp className="h-6 w-6 text-primary" />
-            <span className="text-xl font-semibold">QuantorSignal</span>
+        <div className="flex min-h-20 items-center justify-between gap-6 py-4">
+          <Link href="/" className="group flex items-center gap-4">
+            <BrandMark className="transition-transform duration-500 group-hover:rotate-[50deg]" />
+            <div>
+              <div className="font-display text-xl uppercase tracking-[0.26em] text-foreground">QuantorSignal</div>
+              <div className="text-[11px] uppercase tracking-[0.32em] text-primary/75">
+                Precision Market Atelier
+              </div>
+            </div>
           </Link>
 
-          <div className="flex flex-1 items-center justify-center gap-4">
-            {/* Navigation */}
-            <nav className="flex items-center gap-1">
+          <div className="hidden min-w-0 flex-1 items-center justify-center gap-6 xl:flex">
+            <nav className="flex items-center gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
-                const isActive = pathname === item.href;
+                const isActive =
+                  pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
 
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md transition-colors ${
+                    className={cn(
+                      'relative inline-flex items-center gap-2 border px-4 py-3 text-[11px] uppercase tracking-[0.24em] transition-all duration-300',
                       isActive
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
+                        ? 'border-primary/50 bg-primary/10 text-primary shadow-[0_0_18px_rgba(212,175,55,0.12)]'
+                        : 'border-transparent text-muted-foreground hover:border-primary/20 hover:bg-primary/5 hover:text-foreground'
+                    )}
                   >
                     <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
+                    {item.label}
                   </Link>
                 );
               })}
             </nav>
 
-            {/* Global Search */}
             <form
               onSubmit={handleSearchSubmit}
-              className="hidden sm:flex items-center gap-2 border border-border rounded-md bg-muted/20 px-3 py-1.5 relative"
+              className="relative w-full max-w-md border border-primary/20 bg-card/80 px-4 py-3 shadow-[0_0_18px_rgba(212,175,55,0.06)]"
             >
-              <Search className="h-4 w-4 text-muted-foreground" />
-              <input
-                type="text"
-                placeholder="Search ticker or name..."
-                className="bg-transparent outline-none text-sm w-40 md:w-56 placeholder:text-muted-foreground"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                onFocus={() => {
-                  if (suggestions.length > 0) {
-                    setSuggestOpen(true);
-                  }
-                }}
-                onBlur={() => {
-                  setTimeout(() => setSuggestOpen(false), 150);
-                }}
-                aria-label="Search stocks"
-              />
+              <div className="flex items-center gap-3">
+                <Search className="h-4 w-4 text-primary" />
+                <input
+                  type="text"
+                  placeholder="Search ticker or company"
+                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onFocus={() => {
+                    if (suggestions.length > 0) setSuggestOpen(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setSuggestOpen(false), 150);
+                  }}
+                  aria-label="Search stocks"
+                />
+              </div>
 
-              {suggestOpen && (
-                <div className="absolute left-0 right-0 top-full mt-2 terminal-border bg-card z-50">
-                  <div className="px-3 py-2 text-[10px] text-muted-foreground border-b border-border">
-                    {isSuggestLoading ? 'SEARCHING...' : 'SUGGESTED_STOCKS'}
+              {suggestOpen ? (
+                <div className="deco-panel absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 p-2">
+                  <div className="border-b border-primary/15 px-3 py-2 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
+                    {isSuggestLoading ? 'Searching the tape' : 'Quick matches'}
                   </div>
-                  <div className="max-h-64 overflow-auto">
-                    {!isSuggestLoading && suggestions.length === 0 && (
-                      <div className="px-3 py-2 text-xs text-muted-foreground">
-                        NO_MATCHES_FOUND
+                  <div className="deco-scroll max-h-64 overflow-auto py-1">
+                    {!isSuggestLoading && suggestions.length === 0 ? (
+                      <div className="px-3 py-3 text-sm text-muted-foreground">
+                        No matches found.
                       </div>
-                    )}
+                    ) : null}
                     {suggestions.map((item) => (
                       <div
                         key={item.ticker}
-                        className="px-3 py-2 text-xs hover:bg-primary/10 cursor-pointer flex items-center justify-between"
+                        className="flex cursor-pointer items-center justify-between px-3 py-3 transition-colors hover:bg-primary/10"
                         onMouseDown={(event) => {
                           event.preventDefault();
                           handleSuggestionSelect(item.ticker);
                         }}
                       >
-                        <span className="font-mono text-primary">{item.ticker}</span>
-                        <span className="text-muted-foreground truncate ml-3">
-                          {item.name || 'N/A'}
-                        </span>
+                        <div>
+                          <div className="font-display text-base uppercase tracking-[0.16em] text-primary">
+                            {item.ticker}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{item.name || 'Company profile'}</div>
+                        </div>
+                        <div className="text-[10px] uppercase tracking-[0.28em] text-primary/70">
+                          Open
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
             </form>
           </div>
 
-          {/* Auth */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             {isLoggedIn ? (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
+              <Button variant="ghost" onClick={handleLogout}>
                 <LogOut className="h-4 w-4" />
-                Logout
-              </button>
+                Sign Out
+              </Button>
             ) : (
               <>
-                <Link
-                  href="/auth/login"
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  <LogIn className="h-4 w-4" />
-                  Login
+                <Link href="/auth/login" className="hidden md:block">
+                  <Button variant="ghost">
+                    <LogIn className="h-4 w-4" />
+                    Login
+                  </Button>
                 </Link>
-                <Link
-                  href="/auth/register"
-                  className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
-                >
-                  Sign Up
+                <Link href="/auth/register">
+                  <Button>Membership</Button>
                 </Link>
               </>
             )}
           </div>
+        </div>
+
+        <div className="grid gap-3 border-t border-primary/10 py-3 xl:hidden">
+          <form
+            onSubmit={handleSearchSubmit}
+            className="flex items-center gap-3 border border-primary/20 bg-card/80 px-4 py-3"
+          >
+            <Search className="h-4 w-4 text-primary" />
+            <input
+              type="text"
+              placeholder="Search ticker or company"
+              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+            />
+          </form>
+          <nav className="flex flex-wrap gap-2">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive =
+                pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    'inline-flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-[0.22em]',
+                    isActive
+                      ? 'border-primary/45 bg-primary/10 text-primary'
+                      : 'border-primary/10 text-muted-foreground'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
         </div>
       </div>
     </header>

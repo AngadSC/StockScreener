@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, StarOff } from 'lucide-react';
+
 import { watchlistAPI } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 export default function WatchlistPage() {
   const queryClient = useQueryClient();
@@ -21,87 +23,74 @@ export default function WatchlistPage() {
   });
 
   return (
-    <div className="container py-6">
-      <div className="border-b border-border pb-6 mb-8">
-        <h1 className="text-3xl font-bold text-glow mb-2">WATCHLIST.DASHBOARD</h1>
-        <p className="text-sm text-muted-foreground font-mono">
-          Track and manage your saved tickers
+    <div className="container-custom space-y-6 py-8">
+      <section className="deco-panel bg-grid-luxe p-8">
+        <div className="deco-kicker">Curated Ledger</div>
+        <h1 className="mt-3 text-5xl font-semibold text-glow">Watchlist</h1>
+        <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
+          Keep a compact ledger of the symbols you revisit most often.
         </p>
-      </div>
+      </section>
 
-      {isLoading && (
-        <div className="terminal-border bg-card p-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-xs text-muted-foreground">LOADING_WATCHLIST...</p>
+      {isLoading ? (
+        <div className="deco-panel p-12 text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading watchlist...</p>
         </div>
-      )}
+      ) : null}
 
-      {isError && (
-        <div className="terminal-border bg-card p-6">
-          <p className="text-sm text-muted-foreground mb-3">
-            Could not load watchlist. Log in and try again.
+      {isError ? (
+        <div className="deco-panel p-8">
+          <p className="mb-3 text-sm text-muted-foreground">
+            Could not load your watchlist. Sign in and try again.
           </p>
-          <Link href="/auth/login" className="text-primary hover:underline text-sm">
+          <Link href="/auth/login" className="deco-link text-sm uppercase tracking-[0.18em]">
             Go to login
           </Link>
         </div>
-      )}
+      ) : null}
 
-      {!isLoading && !isError && data && (
+      {!isLoading && !isError && data ? (
         <>
-          <div className="terminal-border bg-card px-4 py-3 mb-4 text-xs text-muted-foreground font-mono">
-            TOTAL_ITEMS: {data.total}
+          <div className="deco-panel px-4 py-4 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+            Total items: {data.total}
           </div>
 
           {data.items.length === 0 ? (
-            <div className="terminal-border bg-card p-8 text-center">
-              <p className="text-sm text-muted-foreground mb-2">No stocks in watchlist yet.</p>
-              <Link href="/screener" className="text-primary hover:underline text-sm">
+            <div className="deco-panel p-10 text-center">
+              <p className="mb-2 text-sm text-muted-foreground">No stocks in your watchlist yet.</p>
+              <Link href="/screener" className="deco-link text-sm uppercase tracking-[0.18em]">
                 Open screener
               </Link>
             </div>
           ) : (
-            <div className="terminal-border bg-card overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/30 border-b border-border">
+            <div className="deco-panel overflow-hidden bg-card">
+              <table className="deco-table">
+                <thead className="bg-muted/20">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-mono text-muted-foreground">
-                      TICKER
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-mono text-muted-foreground">
-                      NAME
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-mono text-muted-foreground">
-                      ADDED
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-mono text-muted-foreground">
-                      ACTION
-                    </th>
+                    <th>Ticker</th>
+                    <th>Name</th>
+                    <th>Added</th>
+                    <th className="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.items.map((item) => (
-                    <tr key={item.id} className="border-b border-border/60 last:border-b-0">
-                      <td className="px-4 py-3">
-                        <Link href={`/stocks/${item.ticker}`} className="text-primary hover:underline">
-                          {item.ticker}
-                        </Link>
+                    <tr key={item.id} className="border-b border-primary/10 last:border-b-0">
+                      <td className="font-display text-lg uppercase tracking-[0.12em] text-primary">
+                        <Link href={`/stocks/${item.ticker}`}>{item.ticker}</Link>
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {item.stock?.name || 'N/A'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {new Date(item.added_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
+                      <td className="text-muted-foreground">{item.stock?.name || 'N/A'}</td>
+                      <td className="text-muted-foreground">{new Date(item.added_at).toLocaleDateString()}</td>
+                      <td className="text-right">
+                        <Button
+                          variant="ghost"
                           onClick={() => removeMutation.mutate(item.ticker)}
                           disabled={removeMutation.isPending}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 border border-border hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          <StarOff className="h-3.5 w-3.5" />
+                          <StarOff className="h-4 w-4" />
                           Remove
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -110,7 +99,7 @@ export default function WatchlistPage() {
             </div>
           )}
         </>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -25,11 +25,13 @@ const config = {
   			'2xl': '1600px', // Wider for better space usage
   		}
   	},
-  	extend: {
-  		fontFamily: {
-  			mono: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
-  			terminal: ['JetBrains Mono', 'Fira Code', 'Courier New', 'monospace'],
-  		},
+  		extend: {
+  			fontFamily: {
+  				display: ['var(--font-display)', 'serif'],
+  				body: ['var(--font-body)', 'sans-serif'],
+  				mono: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+  				terminal: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+  			},
   		colors: {
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',

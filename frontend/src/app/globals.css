@@ -4,97 +4,246 @@
 
 @layer base {
   :root {
-    /* TradingView-inspired Dark Theme */
-    --background: 217 33% 10%;      /* Deep blue-gray #131722 */
-    --foreground: 0 0% 98%;          /* Near white #fafafa */
-    --card: 217 33% 12%;             /* Slightly elevated #161b28 */
-    --card-foreground: 0 0% 98%;
-    --popover: 217 33% 12%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 210 100% 56%;         /* TradingView blue #2962FF */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 20% 20%;        /* Muted blue-gray */
-    --secondary-foreground: 0 0% 90%;
-    --muted: 217 20% 18%;
-    --muted-foreground: 215 15% 65%; /* Light gray for secondary text */
-    --accent: 210 100% 56%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 85% 60%;        /* Red #ef4444 */
+    --background: 0 0% 4%;
+    --foreground: 45 35% 92%;
+    --card: 0 0% 8%;
+    --card-foreground: 45 35% 92%;
+    --popover: 0 0% 8%;
+    --popover-foreground: 45 35% 92%;
+    --primary: 44 64% 52%;
+    --primary-foreground: 0 0% 6%;
+    --secondary: 211 50% 23%;
+    --secondary-foreground: 45 35% 92%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 40 8% 64%;
+    --accent: 44 64% 52%;
+    --accent-foreground: 0 0% 6%;
+    --destructive: 0 72% 58%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 76% 45%;          /* Green #22c55e */
+    --success: 146 42% 47%;
     --success-foreground: 0 0% 100%;
-    --border: 217 20% 20%;           /* Subtle border */
-    --input: 217 20% 18%;
-    --ring: 210 100% 56%;
-    --radius: 0.5rem;
+    --border: 44 64% 52%;
+    --input: 44 24% 24%;
+    --ring: 44 78% 68%;
+    --radius: 2px;
+    --chart-1: 44 64% 52%;
+    --chart-2: 146 42% 47%;
+    --chart-3: 211 50% 36%;
+    --chart-4: 27 74% 62%;
+    --chart-5: 0 72% 58%;
+    --terminal-glow: 44 64% 52%;
   }
 
-  .dark {
-    --background: 217 33% 10%;
-    --foreground: 0 0% 98%;
-    --card: 217 33% 12%;
-    --card-foreground: 0 0% 98%;
-    --popover: 217 33% 12%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 210 100% 56%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 217 20% 20%;
-    --secondary-foreground: 0 0% 90%;
-    --muted: 217 20% 18%;
-    --muted-foreground: 215 15% 65%;
-    --accent: 210 100% 56%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 85% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --success: 142 76% 45%;
-    --success-foreground: 0 0% 100%;
-    --border: 217 20% 20%;
-    --input: 217 20% 18%;
-    --ring: 210 100% 56%;
-  }
-}
-
-@layer base {
   * {
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
-    line-height: 1.5;
+  html {
+    scroll-behavior: smooth;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-weight: 600;
-    line-height: 1.2;
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top center, rgba(212, 175, 55, 0.18), transparent 32%),
+      radial-gradient(circle at 20% 20%, rgba(30, 61, 89, 0.22), transparent 24%),
+      repeating-linear-gradient(
+        45deg,
+        rgba(212, 175, 55, 0.045) 0,
+        rgba(212, 175, 55, 0.045) 1px,
+        transparent 1px,
+        transparent 24px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        rgba(212, 175, 55, 0.035) 0,
+        rgba(212, 175, 55, 0.035) 1px,
+        transparent 1px,
+        transparent 24px
+      ),
+      linear-gradient(180deg, #0f0f0f 0%, #090909 100%);
+    font-family: var(--font-body), sans-serif;
+    line-height: 1.6;
+  }
+
+  body::before {
+    content: "";
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.015), transparent 18%),
+      radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.14), transparent 28%);
+    mix-blend-mode: screen;
+    opacity: 0.5;
+    z-index: -1;
+  }
+
+  ::selection {
+    background: rgba(212, 175, 55, 0.25);
+    color: hsl(var(--foreground));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display), serif;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
   }
 }
 
 @layer components {
+  .container-custom {
+    max-width: 88rem;
+    margin: 0 auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .deco-panel,
+  .terminal-border,
   .card-elevated {
-    @apply rounded-lg border border-border bg-card shadow-lg;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 22%),
+      linear-gradient(180deg, rgba(20, 20, 20, 0.94), rgba(10, 10, 10, 0.96));
+    box-shadow:
+      0 0 0 1px rgba(212, 175, 55, 0.08),
+      0 0 28px rgba(212, 175, 55, 0.08);
+  }
+
+  .deco-panel::before,
+  .terminal-border::before,
+  .card-elevated::before {
+    content: "";
+    position: absolute;
+    inset: 10px;
+    border: 1px solid rgba(212, 175, 55, 0.12);
+    pointer-events: none;
+  }
+
+  .deco-panel::after,
+  .terminal-border::after,
+  .card-elevated::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(90deg, transparent 0, rgba(212, 175, 55, 0.06) 50%, transparent 100%);
+    opacity: 0.24;
   }
 
   .card-hover {
-    @apply transition-all duration-200 hover:border-primary/50 hover:shadow-xl;
+    @apply transition-all duration-500 ease-out;
   }
 
-  .terminal-border {
-    border: 1px solid hsl(var(--border));
-    border-radius: var(--radius);
-    box-shadow: 0 0 0 1px hsl(var(--border)), 0 0 24px hsl(var(--primary) / 0.1);
+  .card-hover:hover {
+    transform: translateY(-6px);
+    border-color: rgba(212, 175, 55, 0.65);
+    box-shadow:
+      0 0 0 1px rgba(212, 175, 55, 0.12),
+      0 0 38px rgba(212, 175, 55, 0.14);
+  }
+
+  .deco-kicker {
+    @apply text-[11px] uppercase tracking-[0.42em] text-primary/80;
+  }
+
+  .deco-title {
+    @apply font-semibold uppercase tracking-[0.22em] text-foreground;
+  }
+
+  .deco-subtitle {
+    @apply text-sm leading-relaxed text-muted-foreground;
+  }
+
+  .deco-divider {
+    @apply relative my-4 h-px bg-primary/25;
+  }
+
+  .deco-divider::before,
+  .deco-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    background: #0a0a0a;
+    transform: translateY(-50%) rotate(45deg);
+  }
+
+  .deco-divider::before {
+    left: 0;
+  }
+
+  .deco-divider::after {
+    right: 0;
+  }
+
+  .deco-chip {
+    @apply inline-flex items-center gap-2 border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-primary;
+  }
+
+  .deco-table {
+    @apply w-full border-collapse;
+  }
+
+  .deco-table th {
+    @apply border-b border-primary/20 px-4 py-3 text-left text-[11px] uppercase tracking-[0.24em] text-muted-foreground;
+  }
+
+  .deco-table td {
+    @apply px-4 py-3 align-middle;
+  }
+
+  .deco-link {
+    @apply text-primary transition-colors duration-300 hover:text-primary/75;
+  }
+
+  .deco-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(212, 175, 55, 0.4) transparent;
   }
 
   .text-glow {
-    text-shadow: 0 0 18px hsl(var(--primary) / 0.4);
+    text-shadow: 0 0 18px rgba(212, 175, 55, 0.25);
   }
 }
 
 @layer utilities {
-  .container-custom {
-    max-width: 1400px;
-    margin: 0 auto;
-    padding: 0 2rem;
+  .font-display {
+    font-family: var(--font-display), serif;
+  }
+
+  .font-body {
+    font-family: var(--font-body), sans-serif;
+  }
+
+  .bg-grid-luxe {
+    background-image:
+      repeating-linear-gradient(
+        90deg,
+        rgba(212, 175, 55, 0.05) 0,
+        rgba(212, 175, 55, 0.05) 1px,
+        transparent 1px,
+        transparent 36px
+      ),
+      linear-gradient(180deg, rgba(212, 175, 55, 0.06), transparent 25%);
   }
 }

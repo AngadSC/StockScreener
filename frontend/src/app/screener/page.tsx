@@ -2,12 +2,13 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
+
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
 import { screenerAPI } from '@/lib/api';
-import { ScreenerFilters } from '@/types/stock';
-import { Loader2 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
+import type { ScreenerFilters } from '@/types/stock';
 
 function ScreenerPageContent() {
   const searchParams = useSearchParams();
@@ -28,7 +29,7 @@ function ScreenerPageContent() {
     }));
   }, [searchQuery]);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['screener', filters],
     queryFn: () => screenerAPI.screenStocks(filters),
   });
@@ -55,84 +56,51 @@ function ScreenerPageContent() {
   };
 
   return (
-    <div className="container py-6">
-      {/* Terminal Header */}
-      <div className="border-b border-border pb-6 mb-8">
-        <div className="flex items-center justify-between">
+    <div className="container-custom space-y-6 py-8">
+      <section className="deco-panel bg-grid-luxe p-8">
+        <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <h1 className="text-3xl font-bold text-glow mb-2">STOCK_SCREENER.EXE</h1>
-            <p className="text-sm text-muted-foreground font-mono">
-              DATABASE: {data?.total.toLocaleString() || '8,247'} records indexed
+            <div className="deco-kicker">Market Hall</div>
+            <h1 className="mt-3 text-5xl font-semibold text-glow">Screener</h1>
+            <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
+              Search for names, shape the universe with collapsible filters, and keep the results table front
+              and center.
             </p>
           </div>
-          {data && (
-            <div className="text-right text-sm terminal-border bg-card px-4 py-3">
-              <p className="text-muted-foreground font-mono">
-                RESULTS: <span className="text-primary font-bold">{data.results.length}</span> / {data.total.toLocaleString()}
-              </p>
-              {data.cached && (
-                <p className="text-muted-foreground mt-1.5 font-mono">
-                  SOURCE: <span className="text-primary font-bold">CACHE</span>
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-4">
-        {/* Filters Sidebar */}
-        <div className="lg:col-span-1">
-          <FilterPanel
-            onFilterChange={handleFilterChange}
-            onReset={handleReset}
-            search={filters.search}
-          />
-        </div>
-
-        {/* Results */}
-        <div className="lg:col-span-3 space-y-4">
-          {/* Loading State */}
-          {isLoading && (
-            <div className="terminal-border bg-card p-12 text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-              <p className="text-xs text-muted-foreground">EXECUTING_QUERY...</p>
-            </div>
-          )}
-
-          {/* Stock Table */}
-          {!isLoading && data && (
-            <StockTable
-              stocks={data.results}
-              onSort={handleSort}
-            />
-          )}
-
-          {/* Pagination */}
-          {data && data.total_pages > 1 && (
-            <div className="terminal-border bg-card px-4 py-3 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">
-                PAGE {data.page} OF {data.total_pages}
-              </span>
-              <div className="flex gap-2">
-                <button className="px-3 py-1 border border-border hover:border-primary hover:text-primary transition-colors">
-                  PREV
-                </button>
-                <button className="px-3 py-1 border border-border hover:border-primary hover:text-primary transition-colors">
-                  NEXT
-                </button>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="border border-primary/14 bg-background/60 px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Records</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">
+                {data?.total.toLocaleString() || '8,247'}
               </div>
             </div>
-          )}
+            <div className="border border-primary/14 bg-background/60 px-4 py-4">
+              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Visible</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground">
+                {data?.results.length ?? filters.limit ?? 50}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <FilterPanel onFilterChange={handleFilterChange} onReset={handleReset} search={filters.search} />
+
+      {isLoading ? (
+        <div className="deco-panel p-16 text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <div className="text-sm text-muted-foreground">Refreshing the market ledger...</div>
+        </div>
+      ) : (
+        <StockTable stocks={data?.results ?? []} onSort={handleSort} />
+      )}
     </div>
   );
 }
 
 export default function ScreenerPage() {
   return (
-    <Suspense fallback={<div className="container py-6" />}>
+    <Suspense fallback={<div className="container-custom py-8" />}>
       <ScreenerPageContent />
     </Suspense>
   );

@@ -1,10 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Play, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { ChevronDown, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
+
+import HelpPopover from '@/components/ui/help-popover';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { ScreenerFilters } from '@/types/stock';
+import { screenerAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
+import type { ScreenerFilters } from '@/types/stock';
 
 interface FilterPanelProps {
   onFilterChange: (filters: ScreenerFilters) => void;
@@ -41,12 +46,70 @@ const fromPercentInput = (rawValue: string): number | undefined => {
   return parsed / 100;
 };
 
+function Group({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <div className="border border-primary/14 bg-muted/10">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between px-4 py-4 text-left"
+      >
+        <div className="text-[11px] uppercase tracking-[0.24em] text-foreground">{title}</div>
+        <ChevronDown className={cn('h-4 w-4 text-primary transition-transform', open && 'rotate-180')} />
+      </button>
+      {open ? <div className="border-t border-primary/10 p-4">{children}</div> : null}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  help,
+  suggestion,
+  children,
+}: {
+  label: string;
+  help?: string;
+  suggestion?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+        {help ? <HelpPopover title={label} description={help} suggestion={suggestion} /> : null}
+      </div>
+      {children}
+    </label>
+  );
+}
+
 export default function FilterPanel({ onFilterChange, onReset, search }: FilterPanelProps) {
   const [filters, setFilters] = useState<ScreenerFilters>({
     limit: 50,
     sort_by: 'market_cap',
     sort_order: 'desc',
     search,
+  });
+
+  const { data: sectors } = useQuery({
+    queryKey: ['screener-sectors'],
+    queryFn: () => screenerAPI.getSectors(),
+  });
+
+  const { data: industries } = useQuery({
+    queryKey: ['screener-industries'],
+    queryFn: () => screenerAPI.getIndustries(),
   });
 
   useEffect(() => {
@@ -56,8 +119,24 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
     }));
   }, [search]);
 
-  const handleInputChange = (field: keyof ScreenerFilters, value: number | string | undefined) => {
+  const selectedSectorSet = useMemo(() => new Set(filters.sectors ?? []), [filters.sectors]);
+  const selectedIndustrySet = useMemo(() => new Set(filters.industries ?? []), [filters.industries]);
+
+  const handleInputChange = (field: keyof ScreenerFilters, value: number | string | string[] | undefined) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleArrayValue = (field: 'sectors' | 'industries', value: string) => {
+    setFilters((prev) => {
+      const current = new Set(prev[field] ?? []);
+      if (current.has(value)) current.delete(value);
+      else current.add(value);
+      const next = Array.from(current);
+      return {
+        ...prev,
+        [field]: next.length > 0 ? next : undefined,
+      };
+    });
   };
 
   const handleApplyFilters = () => {
@@ -80,188 +159,189 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
   };
 
   return (
-    <div className="terminal-border bg-card h-fit sticky top-20">
-      <div className="border-b border-border px-4 py-3 flex items-center justify-between">
+    <div className="deco-panel p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold tracking-wide">SCREENER FILTERS</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Percent fields accept whole % values, e.g. 15 for 15%</p>
+          <div className="deco-kicker">Search and Filter</div>
+          <h2 className="mt-2 text-2xl font-semibold">Screener Controls</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Tune the market universe without sacrificing table density.
+          </p>
         </div>
-        <button
-          onClick={handleReset}
-          className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1.5"
-        >
-          <RotateCcw className="h-3.5 w-3.5" />
-          RESET
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={handleReset}
+            className="inline-flex items-center gap-2 border border-primary/16 px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={handleApplyFilters}
+            className="inline-flex items-center gap-2 border border-primary bg-primary px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-primary-foreground"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Apply Filters
+          </button>
+        </div>
       </div>
 
-      <div className="p-4 space-y-5 text-xs">
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-foreground/90">Valuation</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-1 text-muted-foreground">Min P/E</label>
-              <Input
-                type="number"
-                placeholder="0"
-                className="h-8 text-xs"
-                value={filters.min_pe ?? ''}
-                onChange={(e) => handleInputChange('min_pe', parseFloatInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground">Max P/E</label>
-              <Input
-                type="number"
-                placeholder="50"
-                className="h-8 text-xs"
-                value={filters.max_pe ?? ''}
-                onChange={(e) => handleInputChange('max_pe', parseFloatInput(e.target.value))}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Market Cap Min ($)</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="1,000,000,000"
-              className="h-8 text-xs"
-              value={formatIntegerForInput(filters.min_market_cap)}
-              onChange={(e) => handleInputChange('min_market_cap', parseIntegerInput(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Market Cap Max ($)</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="10,000,000,000"
-              className="h-8 text-xs"
-              value={formatIntegerForInput(filters.max_market_cap)}
-              onChange={(e) => handleInputChange('max_market_cap', parseIntegerInput(e.target.value))}
-            />
-          </div>
-        </div>
+      <div className="deco-divider" />
 
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-foreground/90">Price and Liquidity</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-1 text-muted-foreground">Min Price ($)</label>
-              <Input
-                type="number"
-                placeholder="0"
-                className="h-8 text-xs"
-                value={filters.min_price ?? ''}
-                onChange={(e) => handleInputChange('min_price', parseFloatInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground">Max Price ($)</label>
-              <Input
-                type="number"
-                placeholder="500"
-                className="h-8 text-xs"
-                value={filters.max_price ?? ''}
-                onChange={(e) => handleInputChange('max_price', parseFloatInput(e.target.value))}
-              />
-            </div>
+      <div className="grid gap-4">
+        <Group title="Search" defaultOpen>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field
+              label="Ticker or Company"
+              help="Use a ticker, company fragment, or both. This is the fastest way to narrow the table."
+              suggestion="AAPL, NVIDIA, or bank"
+            >
+              <div className="flex items-center gap-3 border border-primary/16 bg-background/60 px-4 py-3">
+                <Search className="h-4 w-4 text-primary" />
+                <input
+                  type="text"
+                  value={filters.search ?? ''}
+                  onChange={(event) => handleInputChange('search', event.target.value || undefined)}
+                  placeholder="Search ticker or company"
+                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                />
+              </div>
+            </Field>
+            <Field
+              label="Result Limit"
+              help="Raise the limit when you want a broader table. Keep it moderate for faster comparison."
+              suggestion="50 to 100"
+            >
+              <div className="space-y-3 pt-2">
+                <div className="text-sm text-foreground">{filters.limit ?? 50} rows</div>
+                <Slider
+                  value={[filters.limit ?? 50]}
+                  onValueChange={(value) => handleInputChange('limit', value[0])}
+                  min={10}
+                  max={150}
+                  step={10}
+                />
+              </div>
+            </Field>
           </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Min Volume</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="500,000"
-              className="h-8 text-xs"
-              value={formatIntegerForInput(filters.min_volume)}
-              onChange={(e) => handleInputChange('min_volume', parseIntegerInput(e.target.value))}
-            />
-          </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Min Avg Volume</label>
-            <Input
-              type="text"
-              inputMode="numeric"
-              placeholder="1,000,000"
-              className="h-8 text-xs"
-              value={formatIntegerForInput(filters.min_avg_volume)}
-              onChange={(e) => handleInputChange('min_avg_volume', parseIntegerInput(e.target.value))}
-            />
-          </div>
-        </div>
+        </Group>
 
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-foreground/90">Quality and Risk</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-1 text-muted-foreground">Min ROE (%)</label>
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="15"
-                className="h-8 text-xs"
-                value={toPercentInputValue(filters.min_roe)}
-                onChange={(e) => handleInputChange('min_roe', fromPercentInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground">Min Revenue Growth (%)</label>
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="10"
-                className="h-8 text-xs"
-                value={toPercentInputValue(filters.min_revenue_growth)}
-                onChange={(e) => handleInputChange('min_revenue_growth', fromPercentInput(e.target.value))}
-              />
-            </div>
+        <Group title="Valuation and Price" defaultOpen>
+          <div className="grid gap-4 lg:grid-cols-4">
+            <Field label="Min P/E" help="Useful for excluding loss-making or extreme valuation names." suggestion="5 to 10">
+              <Input type="number" value={filters.min_pe ?? ''} onChange={(e) => handleInputChange('min_pe', parseFloatInput(e.target.value))} />
+            </Field>
+            <Field label="Max P/E" help="Cap the valuation range to avoid overpriced names." suggestion="25 to 40">
+              <Input type="number" value={filters.max_pe ?? ''} onChange={(e) => handleInputChange('max_pe', parseFloatInput(e.target.value))} />
+            </Field>
+            <Field label="Min Price" help="Removes penny stocks and illiquid low-price names." suggestion="5">
+              <Input type="number" value={filters.min_price ?? ''} onChange={(e) => handleInputChange('min_price', parseFloatInput(e.target.value))} />
+            </Field>
+            <Field label="Max Price" help="Useful if you want a tighter price band." suggestion="500">
+              <Input type="number" value={filters.max_price ?? ''} onChange={(e) => handleInputChange('max_price', parseFloatInput(e.target.value))} />
+            </Field>
+            <Field label="Market Cap Min" help="Large-cap studies often start at $10B or $50B." suggestion="10,000,000,000">
+              <Input type="text" inputMode="numeric" value={formatIntegerForInput(filters.min_market_cap)} onChange={(e) => handleInputChange('min_market_cap', parseIntegerInput(e.target.value))} />
+            </Field>
+            <Field label="Market Cap Max" help="Leave blank for no ceiling or cap for mid-cap focus." suggestion="250,000,000,000">
+              <Input type="text" inputMode="numeric" value={formatIntegerForInput(filters.max_market_cap)} onChange={(e) => handleInputChange('max_market_cap', parseIntegerInput(e.target.value))} />
+            </Field>
+            <Field label="Min Volume" help="Reduces low-liquidity names that are harder to trade." suggestion="500,000">
+              <Input type="text" inputMode="numeric" value={formatIntegerForInput(filters.min_volume)} onChange={(e) => handleInputChange('min_volume', parseIntegerInput(e.target.value))} />
+            </Field>
+            <Field label="Min Avg Volume" help="Average volume gives a cleaner liquidity filter than a single day." suggestion="1,000,000">
+              <Input type="text" inputMode="numeric" value={formatIntegerForInput(filters.min_avg_volume)} onChange={(e) => handleInputChange('min_avg_volume', parseIntegerInput(e.target.value))} />
+            </Field>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block mb-1 text-muted-foreground">Min Dividend Yield (%)</label>
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="1.5"
-                className="h-8 text-xs"
-                value={toPercentInputValue(filters.min_dividend_yield)}
-                onChange={(e) => handleInputChange('min_dividend_yield', fromPercentInput(e.target.value))}
-              />
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground">Max Debt to Equity</label>
-              <Input
-                type="number"
-                step="0.1"
-                placeholder="2.0"
-                className="h-8 text-xs"
-                value={filters.max_debt_to_equity ?? ''}
-                onChange={(e) => handleInputChange('max_debt_to_equity', parseFloatInput(e.target.value))}
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Max Beta</label>
-            <Input
-              type="number"
-              step="0.1"
-              placeholder="1.5"
-              className="h-8 text-xs"
-              value={filters.max_beta ?? ''}
-              onChange={(e) => handleInputChange('max_beta', parseFloatInput(e.target.value))}
-            />
-          </div>
-        </div>
+        </Group>
 
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold text-foreground/90">Sorting and Output</p>
-          <div className="grid grid-cols-2 gap-2">
+        <Group title="Quality and Risk">
+          <div className="grid gap-4 lg:grid-cols-4">
+            <Field label="Min ROE (%)" help="Higher ROE filters for stronger profitability." suggestion="15">
+              <Input type="number" step="0.1" value={toPercentInputValue(filters.min_roe)} onChange={(e) => handleInputChange('min_roe', fromPercentInput(e.target.value))} />
+            </Field>
+            <Field label="Min Revenue Growth (%)" help="Filters for expanding businesses." suggestion="10">
+              <Input type="number" step="0.1" value={toPercentInputValue(filters.min_revenue_growth)} onChange={(e) => handleInputChange('min_revenue_growth', fromPercentInput(e.target.value))} />
+            </Field>
+            <Field label="Min Dividend Yield (%)" help="Useful for income-oriented screens." suggestion="1.5">
+              <Input type="number" step="0.1" value={toPercentInputValue(filters.min_dividend_yield)} onChange={(e) => handleInputChange('min_dividend_yield', fromPercentInput(e.target.value))} />
+            </Field>
+            <Field label="Max Debt to Equity" help="Keeps leverage within a defined band." suggestion="2.0">
+              <Input type="number" step="0.1" value={filters.max_debt_to_equity ?? ''} onChange={(e) => handleInputChange('max_debt_to_equity', parseFloatInput(e.target.value))} />
+            </Field>
+            <Field label="Max Beta" help="Useful when you want calmer names with lower volatility." suggestion="1.5">
+              <Input type="number" step="0.1" value={filters.max_beta ?? ''} onChange={(e) => handleInputChange('max_beta', parseFloatInput(e.target.value))} />
+            </Field>
+          </div>
+        </Group>
+
+        <Group title="Sector and Industry">
+          <div className="grid gap-5">
             <div>
-              <label className="block mb-1 text-muted-foreground">Sort By</label>
+              <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                Sector Focus
+                <HelpPopover
+                  title="Sector Focus"
+                  description="Sectors let you isolate broad themes before drilling into specific industries."
+                  suggestion="Technology, Financial Services, Healthcare"
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {(sectors?.sectors ?? []).map((sector) => (
+                  <button
+                    key={sector}
+                    type="button"
+                    onClick={() => toggleArrayValue('sectors', sector)}
+                    className={cn(
+                      'border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors',
+                      selectedSectorSet.has(sector)
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-primary/12 text-muted-foreground hover:border-primary/25 hover:text-foreground'
+                    )}
+                  >
+                    {sector}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                Industry Focus
+                <HelpPopover
+                  title="Industry Focus"
+                  description="Industries apply a tighter thematic cut after selecting sectors."
+                  suggestion="Semiconductors, Banks, Software"
+                />
+              </div>
+              <div className="flex max-h-44 flex-wrap gap-2 overflow-auto pr-1">
+                {(industries?.industries ?? []).slice(0, 48).map((industry) => (
+                  <button
+                    key={industry}
+                    type="button"
+                    onClick={() => toggleArrayValue('industries', industry)}
+                    className={cn(
+                      'border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors',
+                      selectedIndustrySet.has(industry)
+                        ? 'border-primary/40 bg-primary/10 text-primary'
+                        : 'border-primary/12 text-muted-foreground hover:border-primary/25 hover:text-foreground'
+                    )}
+                  >
+                    {industry}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Group>
+
+        <Group title="Sorting">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Field label="Sort By" help="Choose the ranking dimension for the table." suggestion="Market Cap or Daily Change %">
               <select
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs"
+                className="h-12 w-full border-0 border-b-2 border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
                 value={filters.sort_by ?? 'market_cap'}
                 onChange={(e) => handleInputChange('sort_by', e.target.value)}
               >
@@ -276,43 +356,19 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
                 <option value="dividend_yield">Dividend Yield</option>
                 <option value="beta">Beta</option>
               </select>
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground">Order</label>
+            </Field>
+            <Field label="Order" help="Descending is usually best for leaders and largest names." suggestion="Descending">
               <select
-                className="h-8 w-full rounded-md border border-input bg-transparent px-2 text-xs"
+                className="h-12 w-full border-0 border-b-2 border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
                 value={filters.sort_order ?? 'desc'}
                 onChange={(e) => handleInputChange('sort_order', e.target.value as 'asc' | 'desc')}
               >
                 <option value="desc">Descending</option>
                 <option value="asc">Ascending</option>
               </select>
-            </div>
+            </Field>
           </div>
-          <div>
-            <label className="block mb-1 text-muted-foreground">Result Limit: {filters.limit ?? 50}</label>
-            <Slider
-              value={[filters.limit ?? 50]}
-              onValueChange={(value) => handleInputChange('limit', value[0])}
-              min={10}
-              max={150}
-              step={10}
-              className="mt-2"
-            />
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-              <span>10</span>
-              <span>150</span>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={handleApplyFilters}
-          className="w-full border border-primary bg-primary/10 hover:bg-primary/20 text-primary py-2 transition-colors flex items-center justify-center gap-2 font-bold"
-        >
-          <Play className="h-3.5 w-3.5" />
-          APPLY FILTERS
-        </button>
+        </Group>
       </div>
     </div>
   );

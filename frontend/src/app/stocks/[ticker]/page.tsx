@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
-import TradingViewChart from '@/components/stock/TradingViewChart';
+import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+
 import StockMetrics from '@/components/stock/StockMetrics';
+import TradingViewChart from '@/components/stock/TradingViewChart';
+import { Button } from '@/components/ui/button';
 import { stocksAPI } from '@/lib/api';
-import { formatMarketCap, formatPercent, normalizePercentValue } from '@/lib/utils';
+import { formatMarketCap, formatPercent, formatVolume, normalizePercentValue } from '@/lib/utils';
 
 interface PageProps {
   params: { ticker: string };
@@ -22,10 +24,10 @@ export default function StockDetailPage({ params }: PageProps) {
 
   if (stockLoading) {
     return (
-      <div className="container py-8">
-        <div className="terminal-border bg-card p-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-xs text-muted-foreground">LOADING_STOCK_DATA...</p>
+      <div className="container-custom py-8">
+        <div className="deco-panel p-12 text-center">
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading security profile...</p>
         </div>
       </div>
     );
@@ -33,16 +35,14 @@ export default function StockDetailPage({ params }: PageProps) {
 
   if (!stock) {
     return (
-      <div className="container py-8">
-        <div className="terminal-border bg-card p-12 text-center">
-          <p className="text-destructive font-bold mb-2">ERROR: STOCK_NOT_FOUND</p>
-          <p className="text-xs text-muted-foreground mb-6">
-            Ticker [{ticker}] not indexed in database
+      <div className="container-custom py-8">
+        <div className="deco-panel p-12 text-center">
+          <p className="mb-2 text-lg text-destructive">Stock not found.</p>
+          <p className="mb-6 text-sm text-muted-foreground">
+            Ticker {ticker} is not available in the current database snapshot.
           </p>
           <Link href="/screener">
-            <button className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 transition-colors">
-              &lt; RETURN_TO_SCREENER
-            </button>
+            <Button variant="outline">Return to Screener</Button>
           </Link>
         </div>
       </div>
@@ -54,110 +54,89 @@ export default function StockDetailPage({ params }: PageProps) {
   const isPositive = changePercent !== null && changePercent >= 0;
 
   return (
-    <div className="container py-6 space-y-6">
-      <Link href="/screener">
-        <button className="text-xs text-muted-foreground hover:text-primary transition-colors">
-          &lt; BACK_TO_SCREENER
-        </button>
+    <div className="container-custom space-y-6 py-8">
+      <Link href="/screener" className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary">
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to Screener
       </Link>
 
-      <div className="terminal-border bg-card p-8">
-        <div className="flex items-start justify-between gap-8">
-          <div className="flex-1">
-            <div className="flex items-baseline gap-4 mb-3">
-              <h1 className="text-5xl font-bold text-glow">{stock.ticker}</h1>
-              <span className="text-xs text-muted-foreground tracking-wider">EQUITY_DATA</span>
+      <section className="deco-panel bg-grid-luxe p-8">
+        <div className="grid gap-8 xl:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <div className="deco-kicker">Security Profile</div>
+            <div className="mt-3 flex flex-wrap items-end gap-4">
+              <h1 className="text-5xl font-semibold text-glow">{stock.ticker}</h1>
+              <div className="text-xs uppercase tracking-[0.3em] text-primary/80">
+                {stock.sector || 'Equity'}
+              </div>
             </div>
-            <p className="text-xl text-foreground/90 mb-6 font-light">
-              {stock.name}
-            </p>
-            <div className="flex gap-3 text-xs">
-              {stock.sector && (
-                <div className="px-3 py-1.5 border border-primary/50 bg-primary/5 text-primary rounded-sm">
-                  SECTOR: {stock.sector}
-                </div>
-              )}
-              {stock.industry && (
-                <div className="px-3 py-1.5 border border-border bg-muted/20 text-muted-foreground rounded-sm">
-                  INDUSTRY: {stock.industry}
-                </div>
-              )}
+            <p className="mt-3 text-xl text-foreground/90">{stock.name}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {stock.sector ? <span className="deco-chip">{stock.sector}</span> : null}
+              {stock.industry ? <span className="deco-chip">{stock.industry}</span> : null}
+            </div>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link href={`/backtester?tickers=${ticker}`}>
+                <Button>
+                  Open Backtester
+                </Button>
+              </Link>
+              <Link href={`/backtester?tickers=${ticker}`}>
+                <Button variant="outline">
+                  Compare This Name
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
             </div>
           </div>
 
-          <div className="text-right border-l border-border pl-8 min-w-[240px]">
-            <div className="text-xs text-muted-foreground mb-3 tracking-wider">CURRENT_PRICE</div>
-            <p className="text-5xl font-bold font-mono mb-2">
-              {stock.current_price !== null && stock.current_price !== undefined
-                ? `$${stock.current_price.toFixed(2)}`
-                : 'N/A'}
-            </p>
-            {changePercent !== null && (
-              <div
-                className={`flex items-center justify-end gap-2 mt-4 mb-6 font-mono ${
-                  isPositive ? 'text-success' : 'text-destructive'
-                }`}
-              >
-                {isPositive ? 'UP' : 'DOWN'}
-                <span className="text-xl font-bold">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+            <div className="deco-panel p-6">
+              <div className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Current Price</div>
+              <div className="mt-3 text-5xl font-semibold text-foreground">
+                {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
+              </div>
+              {changePercent !== null ? (
+                <div className={isPositive ? 'mt-3 text-sm text-success' : 'mt-3 text-sm text-destructive'}>
                   {formatPercent(changePercent, { mode: 'percent', withSign: true })}
-                </span>
+                </div>
+              ) : null}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-3 xl:grid-cols-3">
+              <div className="border border-primary/14 bg-muted/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Market Cap</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">{formatMarketCap(stock.market_cap)}</div>
               </div>
-            )}
-            <div className="text-xs text-muted-foreground space-y-2 border-t border-border pt-4">
-              <div className="flex justify-between gap-4">
-                <span>MKT_CAP:</span>
-                <span className="font-mono text-foreground/80">{formatMarketCap(stock.market_cap)}</span>
+              <div className="border border-primary/14 bg-muted/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Volume</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">{formatVolume(stock.volume)}</div>
               </div>
-              <div className="flex justify-between gap-4">
-                <span>VOLUME:</span>
-                <span className="font-mono text-foreground/80">
-                  {stock.volume ? (stock.volume / 1000000).toFixed(2) + 'M' : 'N/A'}
-                </span>
+              <div className="border border-primary/14 bg-muted/10 p-4">
+                <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Beta</div>
+                <div className="mt-2 text-lg font-semibold text-foreground">
+                  {stock.beta != null ? stock.beta.toFixed(2) : 'N/A'}
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <TradingViewChart ticker={ticker} />
 
-      <div>
-        <div className="flex items-center gap-3 mb-4">
-          <h2 className="text-lg font-bold text-glow">FUNDAMENTAL_METRICS</h2>
-          <div className="flex-1 border-b border-border"></div>
-        </div>
-        <StockMetrics stock={stock} />
-      </div>
-
-      <div className="terminal-border bg-card">
-        <div className="border-b border-border px-4 py-2 bg-muted/20">
-          <span className="text-xs font-bold">ADVANCED_ANALYSIS</span>
-          <span className="ml-3 text-xs text-primary">[LIVE]</span>
-        </div>
-        <div className="p-6 space-y-4">
-          <p className="text-xs text-muted-foreground">
-            $ ./backtest --ticker={ticker} --mode=indicator-lab
-          </p>
-          <p className="text-xs text-muted-foreground">
-            DB_FIRST=true YFINANCE_FALLBACK=true PLOTS=enabled
-          </p>
-          <div className="flex gap-3 mt-6">
-            <Link
-              href={`/stocks/${ticker}/backtest`}
-              className="px-4 py-2 border border-primary text-primary hover:bg-primary/10 transition-colors"
-            >
-              RUN_BACKTEST
-            </Link>
-            <button
-              disabled
-              className="px-4 py-2 border border-border text-muted-foreground cursor-not-allowed opacity-50"
-            >
-              EXPORT_ML_DATA
-            </button>
+      <section className="deco-panel p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="deco-kicker">Fundamentals</div>
+            <h2 className="mt-2 text-2xl font-semibold">Core Metrics</h2>
           </div>
+          <Link href={`/backtester?tickers=${ticker}`} className="deco-link text-sm uppercase tracking-[0.18em]">
+            Test this name
+          </Link>
         </div>
-      </div>
+        <div className="deco-divider" />
+        <StockMetrics stock={stock} />
+      </section>
     </div>
   );
 }

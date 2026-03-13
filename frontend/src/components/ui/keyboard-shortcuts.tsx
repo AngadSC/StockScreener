@@ -8,41 +8,30 @@ export default function KeyboardShortcuts() {
 
   const shortcuts = [
     {
-      category: 'NAVIGATION',
+      category: 'Navigation',
       items: [
-        { keys: ['⌘', 'K'], description: 'Open command palette' },
-        { keys: ['Ctrl', 'K'], description: 'Open command palette (Windows/Linux)' },
-        { keys: ['ESC'], description: 'Close modals/dialogs' },
-        { keys: ['[D]'], description: 'Go to Dashboard (from header)' },
-        { keys: ['[S]'], description: 'Go to Screener (from header)' },
-        { keys: ['[W]'], description: 'Go to Watchlist (from header)' },
+        { keys: ['Ctrl', 'K'], description: 'Open command palette' },
+        { keys: ['Cmd', 'K'], description: 'Open command palette on macOS' },
+        { keys: ['Esc'], description: 'Close modals or drawers' },
       ],
     },
     {
-      category: 'SCREENER',
+      category: 'Workspace',
       items: [
-        { keys: ['↑', '↓'], description: 'Navigate results (in command palette)' },
-        { keys: ['Enter'], description: 'Select item' },
-      ],
-    },
-    {
-      category: 'SYSTEM',
-      items: [
-        { keys: ['?'], description: 'Show this help menu' },
-        { keys: ['Ctrl', '/'], description: 'Quick search' },
+        { keys: ['?'], description: 'Open this shortcut guide' },
+        { keys: ['Arrow'], description: 'Move inside the command palette' },
+        { keys: ['Enter'], description: 'Launch selected command' },
       ],
     },
   ];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Open shortcuts with '?' key
       if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         setIsOpen(true);
       }
 
-      // Close with Escape
       if (e.key === 'Escape' && isOpen) {
         setIsOpen(false);
       }
@@ -56,48 +45,29 @@ export default function KeyboardShortcuts() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0"
-        onClick={() => setIsOpen(false)}
-      />
-
-      {/* Modal */}
-      <div className="relative w-full max-w-3xl terminal-border bg-card max-h-[80vh] overflow-y-auto">
-        {/* Header */}
-        <div className="border-b border-border px-4 py-3 flex items-center justify-between sticky top-0 bg-card">
+      <div className="absolute inset-0" onClick={() => setIsOpen(false)} />
+      <div className="relative w-full max-w-3xl deco-panel bg-card max-h-[80vh] overflow-y-auto">
+        <div className="border-b border-primary/12 px-4 py-4 flex items-center justify-between sticky top-0 bg-card">
           <div>
-            <h2 className="text-lg font-bold text-glow">KEYBOARD_SHORTCUTS</h2>
-            <p className="text-xs text-muted-foreground mt-1">Quick reference guide</p>
+            <div className="deco-kicker">Reference</div>
+            <h2 className="mt-2 text-2xl font-semibold">Keyboard Shortcuts</h2>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="text-muted-foreground hover:text-primary transition-colors"
-          >
+          <button onClick={() => setIsOpen(false)} className="text-muted-foreground hover:text-primary transition-colors">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Shortcuts List */}
         <div className="p-6 space-y-6">
           {shortcuts.map((section) => (
             <div key={section.category}>
-              <h3 className="text-xs font-bold text-primary mb-3 border-b border-border pb-2">
-                ──[ {section.category} ]──
-              </h3>
+              <h3 className="text-xs uppercase tracking-[0.22em] text-primary mb-3">{section.category}</h3>
               <div className="space-y-3">
                 {section.items.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between py-2 text-sm hover:bg-primary/5 transition-colors px-2"
-                  >
-                    <span className="text-muted-foreground">{item.description}</span>
+                  <div key={idx} className="flex items-center justify-between gap-4 border border-primary/10 px-4 py-3">
+                    <span className="text-sm text-muted-foreground">{item.description}</span>
                     <div className="flex gap-1">
                       {item.keys.map((key, keyIdx) => (
-                        <kbd
-                          key={keyIdx}
-                          className="px-2 py-1 text-xs border border-border bg-muted/20 font-mono min-w-[2rem] text-center"
-                        >
+                        <kbd key={keyIdx} className="border border-primary/14 px-2 py-1 text-xs uppercase tracking-[0.12em]">
                           {key}
                         </kbd>
                       ))}
@@ -107,11 +77,6 @@ export default function KeyboardShortcuts() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Footer */}
-        <div className="border-t border-border px-4 py-3 bg-muted/20 text-xs text-muted-foreground text-center">
-          Press <kbd className="px-2 py-1 border border-border mx-1">?</kbd> anytime to open this help menu
         </div>
       </div>
     </div>

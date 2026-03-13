@@ -126,6 +126,16 @@ export const stocksAPI = {
     return response.data;
   },
 
+  runGlobalBacktest: async (
+    config: BacktestRunRequest
+  ): Promise<BacktestRunResponse> => {
+    const response = await api.post<BacktestRunResponse>(
+      '/backtests/run',
+      config
+    );
+    return response.data;
+  },
+
   getMLFeatures: async (
     ticker: string,
     startDate: string,

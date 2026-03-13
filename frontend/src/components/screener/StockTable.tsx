@@ -14,9 +14,9 @@ interface StockTableProps {
 export default function StockTable({ stocks, isLoading, onSort }: StockTableProps) {
   if (isLoading) {
     return (
-      <div className="terminal-border bg-card">
-        <div className="border-b border-border px-4 py-2">
-          <span className="text-xs text-muted-foreground">LOADING_DATA...</span>
+      <div className="deco-panel bg-card">
+        <div className="border-b border-primary/12 px-4 py-3">
+          <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Loading data...</span>
         </div>
         <div className="p-4 space-y-2">
           {[...Array(10)].map((_, i) => (
@@ -29,29 +29,27 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
 
   if (stocks.length === 0) {
     return (
-      <div className="terminal-border bg-card p-8 text-center">
-        <p className="text-muted-foreground mb-2">ERROR: NO_RESULTS_FOUND</p>
-        <p className="text-xs text-muted-foreground">
-          Adjust filter parameters and retry query
+      <div className="deco-panel bg-card p-8 text-center">
+        <p className="mb-2 text-muted-foreground">No results found.</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+          Adjust filters and run again
         </p>
       </div>
     );
   }
 
   return (
-    <div className="terminal-border bg-card overflow-hidden">
-      {/* Header */}
-      <div className="border-b border-border px-4 py-2 flex items-center justify-between bg-muted/20">
-        <span className="text-xs font-bold">QUERY_RESULTS</span>
-        <span className="text-xs text-muted-foreground">{stocks.length} RECORDS</span>
+    <div className="deco-panel overflow-hidden bg-card">
+      <div className="border-b border-primary/12 bg-muted/20 px-4 py-3 flex items-center justify-between">
+        <span className="text-xs font-bold uppercase tracking-[0.22em]">Results</span>
+        <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{stocks.length} records</span>
       </div>
 
-      {/* Column Headers */}
-      <div className="border-b border-border bg-background">
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 text-xs font-bold">
+      <div className="border-b border-primary/10 bg-background/80">
+        <div className="grid grid-cols-12 gap-2 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.18em]">
           <div className="col-span-1 text-muted-foreground">#</div>
-          <div className="col-span-1">TICK</div>
-          <div className="col-span-3">COMPANY_NAME</div>
+          <div className="col-span-1">Ticker</div>
+          <div className="col-span-3">Company</div>
           <div className="col-span-2 text-right">
             <button
               onClick={() => onSort?.('current_price')}
@@ -66,7 +64,7 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
               onClick={() => onSort?.('market_cap')}
               className="hover:text-primary transition-colors"
             >
-              MKT_CAP <ArrowUp className="inline h-3 w-3" />
+              Mkt Cap <ArrowUp className="inline h-3 w-3" />
             </button>
           </div>
           <div className="col-span-1 text-right">P/E</div>
@@ -74,8 +72,7 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
         </div>
       </div>
 
-      {/* Data Rows */}
-      <div className="divide-y divide-border/50">
+      <div className="divide-y divide-primary/10">
         {stocks.map((stock, idx) => {
           const changePercent = stock.day_change_percent ?? stock.change_percent;
           const isPositive = changePercent !== null && changePercent !== undefined && changePercent >= 0;
@@ -83,15 +80,13 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
           return (
             <div
               key={stock.ticker}
-              className="grid grid-cols-12 gap-2 px-4 py-3 text-sm hover:bg-primary/5 transition-colors"
+              className="grid grid-cols-12 gap-2 px-4 py-4 text-sm transition-colors hover:bg-primary/5"
             >
-              {/* Line Number */}
-              <div className="col-span-1 text-muted-foreground text-xs font-mono">
+              <div className="col-span-1 text-xs text-muted-foreground">
                 {String(idx + 1).padStart(3, '0')}
               </div>
 
-              {/* Ticker */}
-              <div className="col-span-1 font-bold text-primary">
+              <div className="col-span-1 font-display text-lg uppercase tracking-[0.14em] text-primary">
                 <Link
                   href={`/stocks/${stock.ticker}`}
                   className="hover:underline underline-offset-4"
@@ -100,20 +95,17 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
                 </Link>
               </div>
 
-              {/* Company Name */}
               <div className="col-span-3 truncate">
                 {stock.name || stock.company_name || 'N/A'}
               </div>
 
-              {/* Price */}
-              <div className="col-span-2 text-right font-mono">
+              <div className="col-span-2 text-right font-semibold">
                 {stock.current_price !== null && stock.current_price !== undefined
                   ? `$${stock.current_price.toFixed(2)}`
                   : 'N/A'
                 }
               </div>
 
-              {/* Change % */}
               <div className={`col-span-1 text-right font-mono ${
                 changePercent !== null && changePercent !== undefined
                   ? isPositive ? 'text-primary' : 'text-destructive'
@@ -122,17 +114,14 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
                 {formatPercent(changePercent, { mode: 'auto', withSign: true })}
               </div>
 
-              {/* Market Cap */}
-              <div className="col-span-2 text-right font-mono text-xs">
+              <div className="col-span-2 text-right text-xs">
                 {formatMarketCap(stock.market_cap)}
               </div>
 
-              {/* P/E Ratio */}
-              <div className="col-span-1 text-right font-mono text-xs">
+              <div className="col-span-1 text-right text-xs">
                 {stock.pe_ratio ? stock.pe_ratio.toFixed(1) : '--'}
               </div>
 
-              {/* View Link */}
               <div className="col-span-1 text-right">
                 <Link
                   href={`/stocks/${stock.ticker}`}
@@ -146,9 +135,8 @@ export default function StockTable({ stocks, isLoading, onSort }: StockTableProp
         })}
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border px-4 py-2 bg-muted/20 text-xs text-muted-foreground">
-        END_OF_RECORDS [{stocks.length}]
+      <div className="border-t border-primary/12 bg-muted/20 px-4 py-3 text-xs uppercase tracking-[0.22em] text-muted-foreground">
+        End of records [{stocks.length}]
       </div>
     </div>
   );

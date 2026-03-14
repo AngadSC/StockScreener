@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/react-query";
 import Header from "@/components/layout/Header";
+import Footer from "@/components/layout/Footer";
 import CommandPalette from "@/components/ui/command-palette";
 import KeyboardShortcuts from "@/components/ui/keyboard-shortcuts";
 import PageTransition from "@/components/layout/PageTransition";
@@ -19,14 +20,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body>
+      <body className="min-h-screen">
         <ReactQueryProvider>
-          <Suspense fallback={<div className="h-20 border-b border-border bg-card" />}>
-            <Header />
-          </Suspense>
-          <PageTransition>
-            <main className="min-h-screen">{children}</main>
-          </PageTransition>
+          <div className="flex min-h-screen flex-col">
+            <Suspense fallback={<div className="h-20 border-b border-border bg-card" />}>
+              <Header />
+            </Suspense>
+            <div className="flex-1">
+              <PageTransition>
+                <main className="min-h-full">{children}</main>
+              </PageTransition>
+            </div>
+            <Footer />
+          </div>
           <CommandPalette />
           <KeyboardShortcuts />
         </ReactQueryProvider>

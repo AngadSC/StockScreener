@@ -218,8 +218,13 @@ export function EquityCurveChart({
       ? ((hoverPoint.strategy - hoverPoint.benchmark) / hoverPoint.benchmark) * 100
       : null;
   const tooltipWidth = width < 480 ? 176 : 220;
+  const tooltipGap = 14;
   const tooltipLeft =
-    hoverX == null ? 12 : clamp(hoverX + 14, 12, Math.max(width - tooltipWidth - 12, 12));
+    hoverX == null
+      ? 12
+      : hoverX + tooltipGap + tooltipWidth <= width - 12
+        ? hoverX + tooltipGap
+        : clamp(hoverX - tooltipWidth - tooltipGap, 12, Math.max(width - tooltipWidth - 12, 12));
 
   const handlePointerMove = (event: ReactMouseEvent<SVGRectElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();

@@ -14,6 +14,7 @@ class StockDetail(StockBase):
     sector: Optional[str] = None
     industry: Optional[str] = None
     market_cap: Optional[int] = None
+    description: Optional[str] = None
     
     # Valuation
     pe_ratio: Optional[float] = None

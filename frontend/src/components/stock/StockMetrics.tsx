@@ -1,6 +1,7 @@
 'use client';
 
 import { Stock } from '@/types/stock';
+import { cn } from '@/lib/utils';
 import { formatCurrency, formatNumber } from '@/lib/utils';
 
 interface StockMetricsProps {
@@ -16,29 +17,53 @@ const formatPercent = (value: number | null | undefined): string => {
   return `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
 };
 
-const numberItem = (label: string, value: number | null | undefined) => ({
+type MetricTone = 'positive' | 'negative' | 'neutral';
+
+type MetricItem = {
+  label: string;
+  value: string;
+  hasValue: boolean;
+  tone?: MetricTone;
+  showAccent?: boolean;
+};
+
+const numberItem = (label: string, value: number | null | undefined): MetricItem => ({
   label,
   value: hasNumber(value) ? formatNumber(value) : 'N/A',
   hasValue: hasNumber(value),
 });
 
-const currencyItem = (label: string, value: number | null | undefined) => ({
+const currencyItem = (label: string, value: number | null | undefined): MetricItem => ({
   label,
   value: hasNumber(value) ? formatCurrency(value) : 'N/A',
   hasValue: hasNumber(value),
 });
 
-const percentItem = (label: string, value: number | null | undefined) => ({
+const percentItem = (label: string, value: number | null | undefined): MetricItem => ({
   label,
   value: formatPercent(value),
   hasValue: hasNumber(value),
+  tone: hasNumber(value) ? (value > 0 ? 'positive' : value < 0 ? 'negative' : 'neutral') : undefined,
+  showAccent: hasNumber(value) && value !== 0,
 });
 
-const integerItem = (label: string, value: number | null | undefined) => ({
+const integerItem = (label: string, value: number | null | undefined): MetricItem => ({
   label,
   value: hasNumber(value) ? Math.trunc(value).toLocaleString() : 'N/A',
   hasValue: hasNumber(value),
 });
+
+function getValueToneClass(item: MetricItem): string {
+  if (item.tone === 'positive') return 'text-[var(--positive)]';
+  if (item.tone === 'negative') return 'text-[var(--negative)]';
+  return 'text-[var(--text-primary)]';
+}
+
+function getAccentClass(item: MetricItem): string {
+  if (item.tone === 'positive') return 'bg-[var(--positive-bg)] text-[var(--positive)]';
+  if (item.tone === 'negative') return 'bg-[var(--negative-bg)] text-[var(--negative)]';
+  return 'bg-[rgba(152,152,176,0.08)] text-[var(--neutral)]';
+}
 
 export default function StockMetrics({ stock }: StockMetricsProps) {
   const metrics = [
@@ -108,19 +133,49 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {visibleMetrics.map((section) => (
-        <div key={section.category} className="deco-panel bg-card">
-          <div className="border-b border-border/70 bg-muted/20 px-4 py-3">
-            <span className="text-sm font-semibold">{section.category}</span>
+        <div
+          key={section.category}
+          className="deco-panel rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] hover:-translate-y-px hover:border-[var(--border-strong)]"
+          style={{ transition: 'border-color 200ms ease, transform 200ms ease' }}
+        >
+          <div
+            className="border-b border-[var(--border-subtle)] px-5 py-4"
+            style={{ font: 'var(--heading-sm)', color: 'var(--text-primary)' }}
+          >
+            {section.category}
           </div>
 
-          <div className="space-y-2 p-4 text-sm">
+          <div className="px-5 py-2">
             {section.items.map((item) => (
               <div
                 key={item.label}
-                className="flex items-center justify-between gap-4 border-b border-border/70 py-2 last:border-0"
+                className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] py-[10px] last:border-b-0"
               >
-                <span className="text-muted-foreground">{item.label}</span>
-                <span className="tabular-nums font-semibold text-primary">{item.value}</span>
+                <span
+                  className="text-[var(--text-secondary)]"
+                  style={{ font: 'var(--label)' }}
+                >
+                  {item.label}
+                </span>
+                <span className="inline-flex items-center gap-2 tabular-nums">
+                  {item.showAccent ? (
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'inline-flex min-w-[20px] items-center justify-center rounded-[var(--radius-pill)] px-1.5 py-[2px] text-[10px] font-medium',
+                        getAccentClass(item)
+                      )}
+                    >
+                      {item.tone === 'negative' ? '-' : '+'}
+                    </span>
+                  ) : null}
+                  <span
+                    className={cn('font-semibold', getValueToneClass(item))}
+                    style={{ font: 'var(--body)' }}
+                  >
+                    {item.value}
+                  </span>
+                </span>
               </div>
             ))}
           </div>

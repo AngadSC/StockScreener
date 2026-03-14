@@ -12,6 +12,7 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
   const container = useRef<HTMLDivElement>(null);
   const scriptLoadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(true);
+  const featureChips = ['Indicators', 'Drawing Tools', 'Multi Timeframe', 'Volume Analysis'];
 
   useEffect(() => {
     const loadTradingViewScript = () => {
@@ -71,10 +72,12 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
 
   return (
     <div className="deco-panel bg-card">
-      <div className="border-b border-border/70 bg-muted/20 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold">Live Chart {ticker}</span>
-          <div className="text-xs text-muted-foreground">Powered by TradingView</div>
+      <div className="border-b border-[var(--border-subtle)] px-5 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <span className="heading-sm text-[var(--text-secondary)]">Live Chart — {ticker}</span>
+          <div className="text-[var(--text-tertiary)]" style={{ font: 'var(--caption)' }}>
+            Powered by TradingView
+          </div>
         </div>
       </div>
 
@@ -90,11 +93,27 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
             </div>
           </div>
         )}
-        <div ref={container} id="tradingview_chart" style={{ height: `${height}px` }} className="bg-surface-1" />
+        <div
+          ref={container}
+          id="tradingview_chart"
+          style={{ height: `${height}px` }}
+          className="bg-[var(--bg-surface-1)]"
+        />
       </div>
 
-      <div className="border-t border-border/70 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-        Indicators | Drawing tools | Multi-timeframe | Volume analysis
+      <div className="border-t border-[var(--border-subtle)] px-5 py-3">
+        <div className="flex flex-wrap gap-2">
+          {featureChips.map((feature) => (
+            <button
+              key={feature}
+              type="button"
+              className="rounded-[var(--radius-pill)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              style={{ transition: 'border-color 180ms ease, color 180ms ease' }}
+            >
+              {feature}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

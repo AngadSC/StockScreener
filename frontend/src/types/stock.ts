@@ -9,6 +9,7 @@ export interface Stock {
   sector: string | null;
   industry: string | null;
   market_cap: number | null;
+  description?: string | null;
   
   // Valuation
   pe_ratio: number | null;

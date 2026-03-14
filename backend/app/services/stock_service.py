@@ -41,6 +41,28 @@ def _resolve_company_name(ticker_obj: Ticker, fundamentals: StockFundamental) ->
     return None
 
 
+def _resolve_company_description(fundamentals: StockFundamental) -> Optional[str]:
+    additional = fundamentals.additional_data if isinstance(fundamentals.additional_data, dict) else {}
+    if not isinstance(additional, dict):
+        return None
+
+    for key in ("longBusinessSummary", "description", "businessSummary"):
+        value = additional.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for section_key in ("assetProfile", "summaryProfile", "summary", "price"):
+        section = additional.get(section_key)
+        if not isinstance(section, dict):
+            continue
+        for key in ("longBusinessSummary", "description", "businessSummary"):
+            value = section.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+    return None
+
+
 def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True) -> Optional[Dict[str, Any]]:
     """
     Get stock data with fundamentals
@@ -128,6 +150,7 @@ def get_stock_with_fundamentals(db: Session, ticker: str, use_cache: bool = True
         # Classification
         'sector': fundamentals.sector,
         'industry': fundamentals.industry,
+        'description': _resolve_company_description(fundamentals),
         
         # Metadata
         'last_updated': fundamentals.last_updated.isoformat() if fundamentals.last_updated else None,

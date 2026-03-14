@@ -1,26 +1,31 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Suspense, useDeferredValue, useEffect, useState } from 'react';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { BarChart3 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
 import { screenerAPI } from '@/lib/api';
 import type { ScreenerFilters } from '@/types/stock';
 
+function getDefaultFilters(search?: string): ScreenerFilters {
+  return {
+    limit: 50,
+    sort_by: 'market_cap',
+    sort_order: 'desc',
+    search,
+    skip: 0,
+  };
+}
+
 function ScreenerPageContent() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get('search')?.trim() || undefined;
 
-  const [filters, setFilters] = useState<ScreenerFilters>(() => ({
-    limit: 50,
-    sort_by: 'market_cap',
-    sort_order: 'desc',
-    search: searchQuery,
-    skip: 0,
-  }));
+  const [filters, setFilters] = useState<ScreenerFilters>(() => getDefaultFilters(searchQuery));
+  const deferredFilters = useDeferredValue(filters);
 
   useEffect(() => {
     setFilters((prev) => ({
@@ -30,23 +35,20 @@ function ScreenerPageContent() {
     }));
   }, [searchQuery]);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['screener', filters],
-    queryFn: () => screenerAPI.screenStocks(filters),
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['screener', deferredFilters],
+    queryFn: () => screenerAPI.screenStocks(deferredFilters),
+    placeholderData: keepPreviousData,
   });
 
-  const handleFilterChange = (newFilters: ScreenerFilters) => {
-    setFilters(newFilters);
+  const currentPage = Math.floor((filters.skip ?? 0) / (filters.limit ?? 50)) + 1;
+
+  const handleFilterChange = (nextFilters: ScreenerFilters) => {
+    setFilters(nextFilters);
   };
 
   const handleReset = () => {
-    setFilters({
-      limit: 50,
-      sort_by: 'market_cap',
-      sort_order: 'desc',
-      search: searchQuery,
-      skip: 0,
-    });
+    setFilters(getDefaultFilters(searchQuery));
   };
 
   const handleSort = (field: string) => {
@@ -58,12 +60,6 @@ function ScreenerPageContent() {
     }));
   };
 
-  const currentPage = useMemo(() => {
-    const perPage = filters.limit ?? 50;
-    const skip = filters.skip ?? 0;
-    return Math.floor(skip / perPage) + 1;
-  }, [filters.limit, filters.skip]);
-
   const handlePageChange = (page: number) => {
     const perPage = filters.limit ?? 50;
     setFilters((prev) => ({
@@ -73,52 +69,62 @@ function ScreenerPageContent() {
   };
 
   return (
-    <div className="container-custom space-y-6 py-8">
-      <section className="deco-panel p-8">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div>
+    <div className="container-custom py-8">
+      <section className="deco-panel mb-6 p-6 sm:p-8">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-3xl">
             <div className="deco-kicker">Workspace</div>
             <h1 className="mt-3">Screener</h1>
-            <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
-              Search for names, shape the universe with filters, and keep the results table front
-              and center.
+            <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
+              Filter the market from the left rail and review the live table without leaving the
+              page context.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
-              <div className="text-xs font-medium text-muted-foreground">Records</div>
-              <div className="mt-2 text-2xl font-semibold text-foreground tabular-nums">
-                {data?.total.toLocaleString() || '8,247'}
-              </div>
+
+          <div className="flex min-w-[220px] items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] px-4 py-4">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
+              <BarChart3 className="h-5 w-5" />
             </div>
-            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
-              <div className="text-xs font-medium text-muted-foreground">Visible</div>
-              <div className="mt-2 text-2xl font-semibold text-foreground tabular-nums">
-                {data?.results.length ?? filters.limit ?? 50}
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                Matches
+              </div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
+                {data?.total.toLocaleString() ?? '0'}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <FilterPanel onFilterChange={handleFilterChange} onReset={handleReset} search={filters.search} />
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <aside className="lg:w-[280px] lg:flex-none">
+          <div className="deco-scroll flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] lg:sticky lg:top-24 lg:h-[calc(100vh-8.5rem)] lg:overflow-hidden">
+            <FilterPanel
+              filters={filters}
+              isFetching={isFetching}
+              onChange={handleFilterChange}
+              onReset={handleReset}
+            />
+          </div>
+        </aside>
 
-      {isLoading ? (
-        <div className="deco-panel p-16 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
-          <div className="text-sm text-muted-foreground">Refreshing the market ledger...</div>
+        <div className="min-w-0 flex-1">
+          <StockTable
+            stocks={data?.results ?? []}
+            isLoading={isLoading || isFetching}
+            sortBy={filters.sort_by}
+            sortOrder={filters.sort_order}
+            onSort={handleSort}
+            page={data?.page ?? currentPage}
+            totalPages={data?.total_pages ?? 1}
+            total={data?.total ?? 0}
+            perPage={data?.per_page ?? filters.limit ?? 50}
+            onPageChange={handlePageChange}
+            onResetFilters={handleReset}
+          />
         </div>
-      ) : (
-        <StockTable
-          stocks={data?.results ?? []}
-          onSort={handleSort}
-          page={data?.page ?? currentPage}
-          totalPages={data?.total_pages ?? 1}
-          total={data?.total ?? 0}
-          perPage={data?.per_page ?? filters.limit ?? 50}
-          onPageChange={handlePageChange}
-        />
-      )}
+      </div>
     </div>
   );
 }

@@ -1,196 +1,349 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, SearchX } from 'lucide-react';
 
-import type { Stock } from '@/types/stock';
-import { formatMarketCap, formatPercent } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { formatMarketCap, formatPercent } from '@/lib/utils';
+import type { Stock } from '@/types/stock';
 
 interface StockTableProps {
   stocks: Stock[];
   isLoading?: boolean;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   onSort?: (field: string) => void;
   page?: number;
   totalPages?: number;
   total?: number;
   perPage?: number;
   onPageChange?: (page: number) => void;
+  onResetFilters?: () => void;
+}
+
+interface SortableColumnProps {
+  field: string;
+  label: string;
+  align?: 'left' | 'right';
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  onSort?: (field: string) => void;
 }
 
 function buildPages(currentPage: number, totalPages: number) {
-  const pages = new Set<number>([1, totalPages, currentPage - 1, currentPage, currentPage + 1]);
-  return Array.from(pages).filter((page) => page >= 1 && page <= totalPages).sort((a, b) => a - b);
+  if (totalPages <= 1) return [1];
+
+  const pages = new Set<number>([1, totalPages]);
+  for (let value = currentPage - 1; value <= currentPage + 1; value += 1) {
+    if (value >= 1 && value <= totalPages) pages.add(value);
+  }
+
+  return Array.from(pages).sort((a, b) => a - b);
+}
+
+function SortableColumn({
+  field,
+  label,
+  align = 'left',
+  sortBy,
+  sortOrder,
+  onSort,
+}: SortableColumnProps) {
+  const isActive = sortBy === field;
+  const justifyClass = align === 'right' ? 'justify-end text-right' : 'justify-start text-left';
+
+  return (
+    <th className={align === 'right' ? 'text-right' : 'text-left'}>
+      <button
+        type="button"
+        onClick={() => onSort?.(field)}
+        className={`inline-flex w-full items-center gap-2 ${justifyClass} transition-colors hover:text-[var(--text-primary)]`}
+      >
+        <span>{label}</span>
+        <span className="flex flex-col leading-none">
+          <ChevronUp
+            className={`h-3 w-3 ${isActive && sortOrder === 'asc' ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}`}
+          />
+          <ChevronDown
+            className={`-mt-1 h-3 w-3 ${isActive && sortOrder === 'desc' ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'}`}
+          />
+        </span>
+      </button>
+    </th>
+  );
+}
+
+function SkeletonRows() {
+  return (
+    <tbody>
+      {Array.from({ length: 8 }).map((_, index) => (
+        <tr key={index} className="border-b border-[var(--border-subtle)] last:border-b-0">
+          <td className="px-4 py-3">
+            <div className="screener-skeleton h-4 w-14 rounded-full" />
+          </td>
+          <td className="px-4 py-3">
+            <div className="screener-skeleton h-4 w-40 rounded-full" />
+          </td>
+          <td className="px-4 py-3 text-right">
+            <div className="screener-skeleton ml-auto h-4 w-20 rounded-full" />
+          </td>
+          <td className="px-4 py-3 text-right">
+            <div className="screener-skeleton ml-auto h-6 w-16 rounded-full" />
+          </td>
+          <td className="px-4 py-3 text-right">
+            <div className="screener-skeleton ml-auto h-4 w-24 rounded-full" />
+          </td>
+          <td className="px-4 py-3 text-right">
+            <div className="screener-skeleton ml-auto h-4 w-12 rounded-full" />
+          </td>
+          <td className="px-4 py-3 text-right">
+            <div className="screener-skeleton ml-auto h-10 w-10 rounded-full" />
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+}
+
+function Pagination({
+  page,
+  totalPages,
+  onPageChange,
+}: {
+  page: number;
+  totalPages: number;
+  onPageChange?: (page: number) => void;
+}) {
+  const pages = buildPages(page, totalPages);
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2 px-4 py-4 text-sm">
+      <button
+        type="button"
+        onClick={() => onPageChange?.(page - 1)}
+        disabled={page <= 1}
+        className="inline-flex items-center gap-1 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:text-[var(--text-tertiary)]"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Previous
+      </button>
+
+      {pages.map((pageNumber, index) => {
+        const previous = pages[index - 1];
+        const showEllipsis = previous !== undefined && pageNumber - previous > 1;
+
+        return (
+          <div key={pageNumber} className="flex items-center gap-2">
+            {showEllipsis ? <span className="text-[var(--text-tertiary)]">...</span> : null}
+            <button
+              type="button"
+              onClick={() => onPageChange?.(pageNumber)}
+              className={`min-w-[2rem] text-center transition-colors ${
+                pageNumber === page
+                  ? 'font-semibold text-[var(--accent)]'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              [{pageNumber}]
+            </button>
+          </div>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={() => onPageChange?.(page + 1)}
+        disabled={page >= totalPages}
+        className="inline-flex items-center gap-1 text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:text-[var(--text-tertiary)]"
+      >
+        Next
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  );
 }
 
 export default function StockTable({
   stocks,
   isLoading,
+  sortBy,
+  sortOrder,
   onSort,
   page = 1,
   totalPages = 1,
   total = stocks.length,
   perPage = stocks.length,
   onPageChange,
+  onResetFilters,
 }: StockTableProps) {
-  if (isLoading) {
-    return (
-      <div className="deco-panel bg-card">
-        <div className="border-b border-border/70 px-4 py-3">
-          <span className="text-xs font-medium text-muted-foreground">Loading data...</span>
-        </div>
-        <div className="space-y-2 p-4">
-          {[...Array(10)].map((_, i) => (
-            <div key={i} className="h-8 animate-pulse rounded-md bg-muted/30" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  if (stocks.length === 0) {
-    return (
-      <div className="deco-panel bg-card p-8 text-center">
-        <p className="mb-2 text-muted-foreground">No results found.</p>
-        <p className="text-xs text-muted-foreground">Adjust your filters and try again.</p>
-      </div>
-    );
-  }
+  const router = useRouter();
 
   const startIndex = total === 0 ? 0 : (page - 1) * perPage + 1;
   const endIndex = Math.min(page * perPage, total);
-  const pages = buildPages(page, totalPages);
+
+  if (!isLoading && stocks.length === 0) {
+    return (
+      <div className="deco-panel flex min-h-[520px] items-center justify-center bg-[var(--bg-surface-1)] p-8">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--text-secondary)]">
+            <SearchX className="h-7 w-7" />
+          </div>
+          <h2 className="mt-5 text-2xl font-semibold text-[var(--text-primary)]">No results found</h2>
+          <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            Try adjusting your filters or broadening your search.
+          </p>
+          <div className="mt-6">
+            <Button type="button" variant="secondary" onClick={onResetFilters}>
+              Reset filters
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="deco-panel overflow-hidden bg-card">
-      <div className="flex items-center justify-between border-b border-border/70 bg-muted/20 px-4 py-3">
-        <span className="text-sm font-semibold">Results</span>
-        <span className="text-xs text-muted-foreground">
-          Showing {startIndex}-{endIndex} of {total.toLocaleString()}
-        </span>
-      </div>
-
-      <div className="border-b border-border/70 bg-background/80">
-        <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs font-medium text-muted-foreground">
-          <div className="col-span-1">#</div>
-          <div className="col-span-1">Ticker</div>
-          <div className="col-span-3">Company</div>
-          <div className="col-span-2 text-right">
-            <button onClick={() => onSort?.('current_price')} className="inline-flex items-center gap-1 hover:text-primary">
-              Price <ArrowUp className="h-3 w-3" />
-            </button>
-          </div>
-          <div className="col-span-1 text-right">Chg%</div>
-          <div className="col-span-2 text-right">
-            <button onClick={() => onSort?.('market_cap')} className="inline-flex items-center gap-1 hover:text-primary">
-              Market Cap <ArrowUp className="h-3 w-3" />
-            </button>
-          </div>
-          <div className="col-span-1 text-right">P/E</div>
-          <div className="col-span-1" />
+    <div className="deco-panel overflow-hidden bg-[var(--bg-surface-1)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--bg-surface-1)] px-4 py-4">
+        <div>
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Results</h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {total > 0 ? `Showing ${startIndex}-${endIndex} of ${total.toLocaleString()}` : 'Scanning the market'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          {isLoading ? (
+            <>
+              <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)]" />
+              Updating
+            </>
+          ) : (
+            <>
+              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[var(--positive)]" />
+              Live
+            </>
+          )}
         </div>
       </div>
 
-      <div className="divide-y divide-border/70">
-        {stocks.map((stock, idx) => {
-          const changePercent = stock.day_change_percent ?? stock.change_percent;
-          const isPositive =
-            changePercent !== null && changePercent !== undefined && changePercent >= 0;
+      <div className="overflow-x-auto">
+        <table>
+          <thead className="bg-[var(--bg-surface-2)]">
+            <tr className="border-b border-[var(--border-default)] text-xs font-medium text-[var(--text-secondary)]">
+              <th className="px-4 py-3 text-left">Ticker</th>
+              <th className="px-4 py-3 text-left">Company</th>
+              <SortableColumn
+                field="current_price"
+                label="Price"
+                align="right"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={onSort}
+              />
+              <SortableColumn
+                field="day_change_percent"
+                label="Chg%"
+                align="right"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={onSort}
+              />
+              <SortableColumn
+                field="market_cap"
+                label="Market Cap"
+                align="right"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={onSort}
+              />
+              <SortableColumn
+                field="pe_ratio"
+                label="P/E"
+                align="right"
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                onSort={onSort}
+              />
+              <th className="w-16 px-4 py-3 text-right" />
+            </tr>
+          </thead>
 
-          return (
-            <div
-              key={stock.ticker}
-              className="grid grid-cols-12 gap-2 px-4 py-4 text-sm transition-[background,border-color,box-shadow,color,transform] duration-[180ms] hover:bg-[var(--accent-subtle)]"
-            >
-              <div className="col-span-1 text-xs text-muted-foreground tabular-nums">
-                {String(startIndex + idx).padStart(3, '0')}
-              </div>
+          {isLoading ? (
+            <SkeletonRows />
+          ) : (
+            <tbody>
+              {stocks.map((stock) => {
+                const changePercent = stock.day_change_percent ?? stock.change_percent;
+                const isPositive =
+                  changePercent !== null && changePercent !== undefined && changePercent >= 0;
+                const companyName = stock.name || stock.company_name || 'N/A';
 
-              <div className="col-span-1 text-lg font-semibold text-primary">
-                <Link href={`/stocks/${stock.ticker}`} className="hover:underline underline-offset-4">
-                  {stock.ticker}
-                </Link>
-              </div>
-
-              <div className="col-span-3 truncate">{stock.name || stock.company_name || 'N/A'}</div>
-
-              <div className="col-span-2 text-right font-semibold tabular-nums">
-                {stock.current_price !== null && stock.current_price !== undefined
-                  ? `$${stock.current_price.toFixed(2)}`
-                  : 'N/A'}
-              </div>
-
-              <div
-                className={`col-span-1 text-right tabular-nums ${
-                  changePercent !== null && changePercent !== undefined
-                    ? isPositive
-                      ? 'text-positive'
-                      : 'text-negative'
-                    : 'text-muted-foreground'
-                }`}
-              >
-                {formatPercent(changePercent, { mode: 'auto', withSign: true })}
-              </div>
-
-              <div className="col-span-2 text-right text-xs tabular-nums">
-                {formatMarketCap(stock.market_cap)}
-              </div>
-
-              <div className="col-span-1 text-right text-xs tabular-nums">
-                {stock.pe_ratio ? stock.pe_ratio.toFixed(1) : '--'}
-              </div>
-
-              <div className="col-span-1 text-right">
-                <Link
-                  href={`/stocks/${stock.ticker}`}
-                  className="inline-flex items-center text-primary transition-colors hover:text-primary/80"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </div>
-          );
-        })}
+                return (
+                  <tr
+                    key={stock.ticker}
+                    tabIndex={0}
+                    onClick={() => router.push(`/stocks/${stock.ticker}`)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        router.push(`/stocks/${stock.ticker}`);
+                      }
+                    }}
+                    className="group cursor-pointer border-b border-[var(--border-subtle)] text-sm transition-colors duration-[120ms] hover:bg-[var(--bg-surface-2)] focus-visible:bg-[var(--bg-surface-2)] focus-visible:outline-none"
+                  >
+                    <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
+                      {stock.ticker}
+                    </td>
+                    <td
+                      title={companyName}
+                      className="max-w-[320px] truncate px-4 py-3 text-[var(--text-secondary)]"
+                    >
+                      {companyName}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium tabular-nums text-[var(--text-primary)]">
+                      {stock.current_price !== null && stock.current_price !== undefined
+                        ? `$${stock.current_price.toFixed(2)}`
+                        : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      {changePercent !== null && changePercent !== undefined ? (
+                        <span
+                          className={`inline-flex rounded-[var(--radius-sm)] px-2 py-0.5 font-medium tabular-nums ${
+                            isPositive
+                              ? 'bg-[var(--positive-bg)] text-[var(--positive)]'
+                              : 'bg-[var(--negative-bg)] text-[var(--negative)]'
+                          }`}
+                        >
+                          {formatPercent(changePercent, { mode: 'auto', withSign: true })}
+                        </span>
+                      ) : (
+                        <span className="tabular-nums text-[var(--text-secondary)]">N/A</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
+                      {formatMarketCap(stock.market_cap)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-[var(--text-secondary)]">
+                      {stock.pe_ratio !== null && stock.pe_ratio !== undefined
+                        ? stock.pe_ratio.toFixed(1)
+                        : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-transparent bg-[var(--bg-surface-2)] text-[var(--text-secondary)] transition-transform duration-150 group-hover:translate-x-1 group-hover:text-[var(--accent)]">
+                        <ChevronRight className="h-5 w-5" />
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          )}
+        </table>
       </div>
 
-      {totalPages > 1 ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/70 bg-muted/20 px-4 py-3">
-          <div className="text-xs text-muted-foreground">
-            Page {page} of {totalPages}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onPageChange?.(page - 1)}
-              disabled={page <= 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Previous
-            </Button>
-            {pages.map((pageNumber) => (
-              <Button
-                key={pageNumber}
-                type="button"
-                variant={pageNumber === page ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => onPageChange?.(pageNumber)}
-              >
-                {pageNumber}
-              </Button>
-            ))}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onPageChange?.(page + 1)}
-              disabled={page >= totalPages}
-            >
-              Next
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+      {totalPages > 1 && !isLoading ? (
+        <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
+          <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} />
         </div>
       ) : null}
     </div>

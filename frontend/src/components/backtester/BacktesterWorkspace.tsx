@@ -421,8 +421,8 @@ function StatCard({ statKey, value }: { statKey: string; value: number }) {
   if (statKey.endsWith('_pct')) formatted = formatPercent(value, { mode: 'percent', withSign: statKey !== 'max_drawdown_pct' });
   return (
     <div className="rounded border border-border bg-muted/10 p-4">
-      <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</div>
-      <div className="mt-2 text-xl font-semibold text-foreground">{formatted}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="mt-2 text-xl font-semibold text-foreground tabular-nums">{formatted}</div>
     </div>
   );
 }
@@ -623,7 +623,7 @@ export default function BacktesterWorkspace({
       </div>
 
       <section className="deco-panel bg-grid-luxe p-8">
-        <div className="text-xs uppercase tracking-[0.3em] text-primary/80">Portfolio Backtester</div>
+        <div className="deco-kicker">Portfolio backtester</div>
         <h1 className="mt-3 text-4xl font-bold text-glow">{primaryTicker}</h1>
         <p className="mt-2 max-w-4xl text-muted-foreground">
           {stock?.name ?? 'Test one stock or a full basket with weighted allocations, strategy rules, risk controls, tuning, and buy-and-hold comparison.'}
@@ -652,7 +652,7 @@ export default function BacktesterWorkspace({
                 <p className="text-sm text-muted-foreground">Choose the basket, date range, capital, timeframe, and whether to compare against buy-and-hold.</p>
               </div>
               <Button type="submit" disabled={mutation.isPending || allocationOverweight}>
-                {mutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />RUNNING</> : 'RUN BACKTEST'}
+                {mutation.isPending ? <><Loader2 className="h-4 w-4 animate-spin" />Running</> : 'Run Backtest'}
               </Button>
             </div>
 
@@ -715,7 +715,7 @@ export default function BacktesterWorkspace({
                 <p className="text-sm text-muted-foreground">Set the target percentage for each ticker. If the total is below 100%, the unused amount stays in cash.</p>
               </div>
               <Button type="button" variant="outline" onClick={() => setRequest((prev) => ({ ...prev, allocation_weights: buildEqualWeights(resolvedTickers) }))}>
-                EQUAL_WEIGHT
+                Equal Weight
               </Button>
             </div>
 
@@ -891,7 +891,7 @@ export default function BacktesterWorkspace({
           <section className="deco-panel min-h-[220px] bg-card p-6">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-bold">Results</h2>
-              {result ? <div className="text-xs text-muted-foreground">{result.source.toUpperCase()}{result.cached ? ' | Cached' : ''}</div> : null}
+              {result ? <div className="text-xs text-muted-foreground">{result.source}{result.cached ? ' | Cached' : ''}</div> : null}
             </div>
             <div className="mt-5 h-[320px] border border-primary/16 bg-background/70 p-3">
               {mutation.isPending ? (
@@ -901,16 +901,16 @@ export default function BacktesterWorkspace({
               ) : result ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={equityData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(212, 175, 55, 0.12)" />
-                    <XAxis dataKey="date" minTickGap={36} stroke="#a6a095" />
-                    <YAxis stroke="#a6a095" domain={['auto', 'auto']} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 61, 96, 0.28)" />
+                    <XAxis dataKey="date" minTickGap={36} stroke="#9898B0" />
+                    <YAxis stroke="#9898B0" domain={['auto', 'auto']} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#101010', border: '1px solid rgba(212, 175, 55, 0.25)', borderRadius: '2px' }}
+                      contentStyle={{ backgroundColor: '#0F0F1A', border: '1px solid #2A2A42', borderRadius: '8px' }}
                       formatter={(value: number | string | undefined, name?: string) => [formatCurrency(typeof value === 'number' ? value : Number(value ?? 0)), name === 'strategy' ? 'Strategy' : 'Buy & Hold']}
                     />
                     <Legend />
-                    <Line type="monotone" dataKey="strategy" name="Strategy" stroke="#d4af37" strokeWidth={2.3} dot={false} />
-                    {result.buy_and_hold ? <Line type="monotone" dataKey="benchmark" name="Buy & Hold" stroke="#6ca1d0" strokeWidth={2} dot={false} strokeDasharray="6 4" connectNulls /> : null}
+                    <Line type="monotone" dataKey="strategy" name="Strategy" stroke="#5B5BD6" strokeWidth={2.3} dot={false} />
+                    {result.buy_and_hold ? <Line type="monotone" dataKey="benchmark" name="Buy & Hold" stroke="#7070E8" strokeWidth={2} dot={false} strokeDasharray="6 4" connectNulls /> : null}
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
@@ -919,10 +919,10 @@ export default function BacktesterWorkspace({
             </div>
             {result ? (
               <div className="mt-5 space-y-5">
-                {result.warnings.length > 0 ? <div className="border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">{result.warnings.map((warning) => <div key={warning}>{warning}</div>)}</div> : null}
+                {result.warnings.length > 0 ? <div className="rounded-md border border-primary/30 bg-[var(--accent-subtle)] p-4 text-sm text-foreground">{result.warnings.map((warning) => <div key={warning}>{warning}</div>)}</div> : null}
                 <div className="flex flex-wrap gap-2">
                   {result.tickers.map((symbol) => <span key={symbol} className="deco-chip">{symbol} | {formatPercent(Number(result.allocation_weights?.[symbol] ?? 0), { mode: 'percent', withSign: false })}</span>)}
-                  {result.cash_reserve_pct > 0 ? <span className="border border-primary/16 px-3 py-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">Cash | {formatPercent(Number(result.cash_reserve_pct ?? 0), { mode: 'percent', withSign: false })}</span> : null}
+                  {result.cash_reserve_pct > 0 ? <span className="rounded-full border border-primary/16 px-3 py-1 text-xs text-muted-foreground">Cash | {formatPercent(Number(result.cash_reserve_pct ?? 0), { mode: 'percent', withSign: false })}</span> : null}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">{Object.entries(result.stats).filter(([key]) => STAT_LABELS[key]).map(([key, value]) => <StatCard key={key} statKey={key} value={Number(value)} />)}</div>
                 <div className="flex flex-wrap gap-3">
@@ -954,7 +954,7 @@ export default function BacktesterWorkspace({
             <section className="deco-panel bg-card p-4">
               <div className="mb-3 text-sm font-semibold">Generated Equity Plot</div>
               {result.equity_curve_image ? <img src={result.equity_curve_image} alt="Equity curve plot" className="w-full border border-primary/16" /> : <div className="border border-dashed border-primary/16 p-6 text-sm text-muted-foreground">Equity image generation disabled.</div>}
-              <div className="mt-3 text-xs uppercase tracking-[0.18em] text-muted-foreground">{formatDate(result.start_date)} - {formatDate(result.end_date)} | {result.timeframe.toUpperCase()}</div>
+              <div className="mt-3 text-xs text-muted-foreground">{formatDate(result.start_date)} - {formatDate(result.end_date)} | {result.timeframe}</div>
             </section>
           ) : null}
         </div>

@@ -27,60 +27,78 @@ const config = {
   	},
   		extend: {
   			fontFamily: {
-  				display: ['var(--font-display)', 'serif'],
-  				body: ['var(--font-body)', 'sans-serif'],
+				display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+				body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
   				mono: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
   				terminal: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
   			},
   		colors: {
-  			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
+			border: 'rgb(var(--border-default-rgb) / <alpha-value>)',
+			input: 'rgb(var(--border-default-rgb) / <alpha-value>)',
+			ring: 'rgb(var(--accent-rgb) / <alpha-value>)',
+			background: 'rgb(var(--bg-base-rgb) / <alpha-value>)',
+			foreground: 'rgb(var(--text-primary-rgb) / <alpha-value>)',
   			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
+				DEFAULT: 'rgb(var(--accent-rgb) / <alpha-value>)',
+				foreground: '#ffffff'
   			},
   			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
+				DEFAULT: 'rgb(var(--bg-surface-2-rgb) / <alpha-value>)',
+				foreground: 'rgb(var(--text-primary-rgb) / <alpha-value>)'
   			},
   			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
+				DEFAULT: 'rgb(var(--negative-rgb) / <alpha-value>)',
+				foreground: '#ffffff'
   			},
   			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
+				DEFAULT: 'rgb(var(--bg-surface-2-rgb) / <alpha-value>)',
+				foreground: 'rgb(var(--text-secondary-rgb) / <alpha-value>)'
   			},
   			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
+				DEFAULT: 'rgb(var(--accent-rgb) / <alpha-value>)',
+				foreground: '#ffffff'
   			},
   			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
+				DEFAULT: 'rgb(var(--bg-surface-1-rgb) / <alpha-value>)',
+				foreground: 'rgb(var(--text-primary-rgb) / <alpha-value>)'
   			},
   			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
+				DEFAULT: 'rgb(var(--bg-surface-1-rgb) / <alpha-value>)',
+				foreground: 'rgb(var(--text-primary-rgb) / <alpha-value>)'
   			},
+			positive: {
+				DEFAULT: 'rgb(var(--positive-rgb) / <alpha-value>)',
+				bg: 'var(--positive-bg)'
+			},
+			negative: {
+				DEFAULT: 'rgb(var(--negative-rgb) / <alpha-value>)',
+				bg: 'var(--negative-bg)'
+			},
+			neutral: 'rgb(var(--neutral-rgb) / <alpha-value>)',
+			text: {
+				primary: 'rgb(var(--text-primary-rgb) / <alpha-value>)',
+				secondary: 'rgb(var(--text-secondary-rgb) / <alpha-value>)',
+				tertiary: 'rgb(var(--text-tertiary-rgb) / <alpha-value>)',
+			},
+			surface: {
+				1: 'rgb(var(--bg-surface-1-rgb) / <alpha-value>)',
+				2: 'rgb(var(--bg-surface-2-rgb) / <alpha-value>)',
+				3: 'rgb(var(--bg-surface-3-rgb) / <alpha-value>)',
+			},
   			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			},
-  			terminal: {
-  				glow: 'hsl(var(--terminal-glow))',
+				'1': 'rgb(var(--accent-rgb) / <alpha-value>)',
+				'2': 'rgb(var(--positive-rgb) / <alpha-value>)',
+				'3': 'rgb(var(--border-strong-rgb) / <alpha-value>)',
+				'4': 'rgb(var(--accent-hover-rgb) / <alpha-value>)',
+				'5': 'rgb(var(--negative-rgb) / <alpha-value>)'
   			}
   		},
   		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
+			lg: 'var(--radius-lg)',
+			md: 'var(--radius-md)',
+			sm: 'var(--radius-sm)',
+			xl: 'var(--radius-xl)',
+			full: 'var(--radius-pill)'
   		},
   		keyframes: {
   			'accordion-down': {

@@ -106,17 +106,12 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 border-b border-primary/20 bg-background/90 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/90 backdrop-blur-xl">
       <div className="container-custom">
         <div className="flex min-h-20 items-center justify-between gap-6 py-4">
           <Link href="/" className="group flex items-center gap-4">
-            <BrandMark className="transition-transform duration-500 group-hover:rotate-[50deg]" />
-            <div>
-              <div className="font-display text-xl uppercase tracking-[0.26em] text-foreground">QuantorSignal</div>
-              <div className="text-[11px] uppercase tracking-[0.32em] text-primary/75">
-                Precision Market Atelier
-              </div>
-            </div>
+            <BrandMark className="transition-transform duration-300 group-hover:scale-[1.03]" />
+            <div className="text-xl font-semibold text-foreground">QuantorSignal</div>
           </Link>
 
           <div className="hidden min-w-0 flex-1 items-center justify-center gap-6 xl:flex">
@@ -131,10 +126,10 @@ export default function Header() {
                     key={item.href}
                     href={item.href}
                     className={cn(
-                      'relative inline-flex items-center gap-2 border px-4 py-3 text-[11px] uppercase tracking-[0.24em] transition-all duration-300',
+                      'inline-flex items-center gap-2 rounded-md border px-4 py-3 text-sm font-medium transition-[background,border-color,box-shadow,color,transform] duration-[180ms]',
                       isActive
-                        ? 'border-primary/50 bg-primary/10 text-primary shadow-[0_0_18px_rgba(212,175,55,0.12)]'
-                        : 'border-transparent text-muted-foreground hover:border-primary/20 hover:bg-primary/5 hover:text-foreground'
+                        ? 'border-primary/40 bg-[var(--accent-subtle)] text-primary shadow-[var(--glow-accent)]'
+                        : 'border-transparent text-muted-foreground hover:border-border hover:bg-muted/40 hover:text-foreground'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -146,14 +141,14 @@ export default function Header() {
 
             <form
               onSubmit={handleSearchSubmit}
-              className="relative w-full max-w-md border border-primary/20 bg-card/80 px-4 py-3 shadow-[0_0_18px_rgba(212,175,55,0.06)]"
+              className="relative w-full max-w-md rounded-lg border border-border/70 bg-card px-4 py-3 shadow-sm"
             >
               <div className="flex items-center gap-3">
                 <Search className="h-4 w-4 text-primary" />
                 <input
                   type="text"
                   placeholder="Search ticker or company"
-                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="w-full border-none bg-transparent p-0 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-none focus:shadow-none"
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   onFocus={() => {
@@ -168,33 +163,29 @@ export default function Header() {
 
               {suggestOpen ? (
                 <div className="deco-panel absolute left-0 right-0 top-[calc(100%+0.75rem)] z-50 p-2">
-                  <div className="border-b border-primary/15 px-3 py-2 text-[10px] uppercase tracking-[0.28em] text-muted-foreground">
-                    {isSuggestLoading ? 'Searching the tape' : 'Quick matches'}
+                  <div className="border-b border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                    {isSuggestLoading ? 'Searching' : 'Quick matches'}
                   </div>
                   <div className="deco-scroll max-h-64 overflow-auto py-1">
                     {!isSuggestLoading && suggestions.length === 0 ? (
-                      <div className="px-3 py-3 text-sm text-muted-foreground">
-                        No matches found.
-                      </div>
+                      <div className="px-3 py-3 text-sm text-muted-foreground">No matches found.</div>
                     ) : null}
                     {suggestions.map((item) => (
                       <div
                         key={item.ticker}
-                        className="flex cursor-pointer items-center justify-between px-3 py-3 transition-colors hover:bg-primary/10"
+                        className="flex cursor-pointer items-center justify-between rounded-md px-3 py-3 transition-[background,border-color,box-shadow,color,transform] duration-[180ms] hover:bg-[var(--accent-subtle)]"
                         onMouseDown={(event) => {
                           event.preventDefault();
                           handleSuggestionSelect(item.ticker);
                         }}
                       >
                         <div>
-                          <div className="font-display text-base uppercase tracking-[0.16em] text-primary">
-                            {item.ticker}
+                          <div className="text-base font-semibold text-primary">{item.ticker}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {item.name || 'Company profile'}
                           </div>
-                          <div className="text-sm text-muted-foreground">{item.name || 'Company profile'}</div>
                         </div>
-                        <div className="text-[10px] uppercase tracking-[0.28em] text-primary/70">
-                          Open
-                        </div>
+                        <div className="text-xs text-primary">Open</div>
                       </div>
                     ))}
                   </div>
@@ -214,27 +205,27 @@ export default function Header() {
                 <Link href="/auth/login" className="hidden md:block">
                   <Button variant="ghost">
                     <LogIn className="h-4 w-4" />
-                    Login
+                    Sign In
                   </Button>
                 </Link>
                 <Link href="/auth/register">
-                  <Button>Membership</Button>
+                  <Button>Create Account</Button>
                 </Link>
               </>
             )}
           </div>
         </div>
 
-        <div className="grid gap-3 border-t border-primary/10 py-3 xl:hidden">
+        <div className="grid gap-3 border-t border-border/70 py-3 xl:hidden">
           <form
             onSubmit={handleSearchSubmit}
-            className="flex items-center gap-3 border border-primary/20 bg-card/80 px-4 py-3"
+            className="flex items-center gap-3 rounded-lg border border-border/70 bg-card px-4 py-3"
           >
             <Search className="h-4 w-4 text-primary" />
             <input
               type="text"
               placeholder="Search ticker or company"
-              className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              className="w-full border-none bg-transparent p-0 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-none focus:shadow-none"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
             />
@@ -250,10 +241,10 @@ export default function Header() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    'inline-flex items-center gap-2 border px-3 py-2 text-[10px] uppercase tracking-[0.22em]',
+                    'inline-flex items-center gap-2 rounded-md border px-3 py-2 text-xs font-medium',
                     isActive
-                      ? 'border-primary/45 bg-primary/10 text-primary'
-                      : 'border-primary/10 text-muted-foreground'
+                      ? 'border-primary/40 bg-[var(--accent-subtle)] text-primary'
+                      : 'border-border/70 text-muted-foreground'
                   )}
                 >
                   <Icon className="h-3.5 w-3.5" />

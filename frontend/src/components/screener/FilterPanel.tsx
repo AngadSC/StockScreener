@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, RotateCcw, Search, SlidersHorizontal } from 'lucide-react';
 
 import HelpPopover from '@/components/ui/help-popover';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
 import { screenerAPI } from '@/lib/api';
@@ -58,16 +59,16 @@ function Group({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="border border-primary/14 bg-muted/10">
+    <div className="rounded-lg border border-border/70 bg-muted/20">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         className="flex w-full items-center justify-between px-4 py-4 text-left"
       >
-        <div className="text-[11px] uppercase tracking-[0.24em] text-foreground">{title}</div>
+        <div className="text-sm font-medium text-foreground">{title}</div>
         <ChevronDown className={cn('h-4 w-4 text-primary transition-transform', open && 'rotate-180')} />
       </button>
-      {open ? <div className="border-t border-primary/10 p-4">{children}</div> : null}
+      {open ? <div className="border-t border-border/70 p-4">{children}</div> : null}
     </div>
   );
 }
@@ -86,7 +87,7 @@ function Field({
   return (
     <label className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium text-muted-foreground">{label}</span>
         {help ? <HelpPopover title={label} description={help} suggestion={suggestion} /> : null}
       </div>
       {children}
@@ -100,6 +101,7 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
     sort_by: 'market_cap',
     sort_order: 'desc',
     search,
+    skip: 0,
   });
 
   const { data: sectors } = useQuery({
@@ -122,7 +124,10 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
   const selectedSectorSet = useMemo(() => new Set(filters.sectors ?? []), [filters.sectors]);
   const selectedIndustrySet = useMemo(() => new Set(filters.industries ?? []), [filters.industries]);
 
-  const handleInputChange = (field: keyof ScreenerFilters, value: number | string | string[] | undefined) => {
+  const handleInputChange = (
+    field: keyof ScreenerFilters,
+    value: number | string | string[] | undefined
+  ) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -162,29 +167,21 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
     <div className="deco-panel p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="deco-kicker">Search and Filter</div>
-          <h2 className="mt-2 text-2xl font-semibold">Screener Controls</h2>
+          <div className="deco-kicker">Controls</div>
+          <h2 className="mt-2">Screener Controls</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Tune the market universe without sacrificing table density.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="inline-flex items-center gap-2 border border-primary/16 px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-muted-foreground transition-colors hover:border-primary/30 hover:text-primary"
-          >
+          <Button type="button" variant="ghost" onClick={handleReset}>
             <RotateCcw className="h-4 w-4" />
             Reset
-          </button>
-          <button
-            type="button"
-            onClick={handleApplyFilters}
-            className="inline-flex items-center gap-2 border border-primary bg-primary px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-primary-foreground"
-          >
+          </Button>
+          <Button type="button" onClick={handleApplyFilters}>
             <SlidersHorizontal className="h-4 w-4" />
             Apply Filters
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -198,14 +195,14 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
               help="Use a ticker, company fragment, or both. This is the fastest way to narrow the table."
               suggestion="AAPL, NVIDIA, or bank"
             >
-              <div className="flex items-center gap-3 border border-primary/16 bg-background/60 px-4 py-3">
+              <div className="flex items-center gap-3 rounded-md border border-border/70 bg-muted/20 px-4 py-3">
                 <Search className="h-4 w-4 text-primary" />
                 <input
                   type="text"
                   value={filters.search ?? ''}
                   onChange={(event) => handleInputChange('search', event.target.value || undefined)}
                   placeholder="Search ticker or company"
-                  className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="w-full border-none bg-transparent p-0 text-sm text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-none focus:shadow-none"
                 />
               </div>
             </Field>
@@ -215,7 +212,7 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
               suggestion="50 to 100"
             >
               <div className="space-y-3 pt-2">
-                <div className="text-sm text-foreground">{filters.limit ?? 50} rows</div>
+                <div className="text-sm text-foreground tabular-nums">{filters.limit ?? 50} rows</div>
                 <Slider
                   value={[filters.limit ?? 50]}
                   onValueChange={(value) => handleInputChange('limit', value[0])}
@@ -280,7 +277,7 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
         <Group title="Sector and Industry">
           <div className="grid gap-5">
             <div>
-              <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 Sector Focus
                 <HelpPopover
                   title="Sector Focus"
@@ -295,10 +292,10 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
                     type="button"
                     onClick={() => toggleArrayValue('sectors', sector)}
                     className={cn(
-                      'border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors',
+                      'rounded-full border px-3 py-2 text-xs font-medium transition-[background,border-color,box-shadow,color,transform] duration-[180ms]',
                       selectedSectorSet.has(sector)
-                        ? 'border-primary/40 bg-primary/10 text-primary'
-                        : 'border-primary/12 text-muted-foreground hover:border-primary/25 hover:text-foreground'
+                        ? 'border-primary/40 bg-[var(--accent-subtle)] text-primary'
+                        : 'border-border/70 text-muted-foreground hover:border-primary/30 hover:text-foreground'
                     )}
                   >
                     {sector}
@@ -308,7 +305,7 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
             </div>
 
             <div>
-              <div className="mb-3 flex items-center gap-2 text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              <div className="mb-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 Industry Focus
                 <HelpPopover
                   title="Industry Focus"
@@ -323,10 +320,10 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
                     type="button"
                     onClick={() => toggleArrayValue('industries', industry)}
                     className={cn(
-                      'border px-3 py-2 text-[11px] uppercase tracking-[0.18em] transition-colors',
+                      'rounded-full border px-3 py-2 text-xs font-medium transition-[background,border-color,box-shadow,color,transform] duration-[180ms]',
                       selectedIndustrySet.has(industry)
-                        ? 'border-primary/40 bg-primary/10 text-primary'
-                        : 'border-primary/12 text-muted-foreground hover:border-primary/25 hover:text-foreground'
+                        ? 'border-primary/40 bg-[var(--accent-subtle)] text-primary'
+                        : 'border-border/70 text-muted-foreground hover:border-primary/30 hover:text-foreground'
                     )}
                   >
                     {industry}
@@ -340,11 +337,7 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
         <Group title="Sorting">
           <div className="grid gap-4 lg:grid-cols-2">
             <Field label="Sort By" help="Choose the ranking dimension for the table." suggestion="Market Cap or Daily Change %">
-              <select
-                className="h-12 w-full border-0 border-b-2 border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
-                value={filters.sort_by ?? 'market_cap'}
-                onChange={(e) => handleInputChange('sort_by', e.target.value)}
-              >
+              <select value={filters.sort_by ?? 'market_cap'} onChange={(e) => handleInputChange('sort_by', e.target.value)}>
                 <option value="market_cap">Market Cap</option>
                 <option value="current_price">Price</option>
                 <option value="day_change_percent">Daily Change %</option>
@@ -359,7 +352,6 @@ export default function FilterPanel({ onFilterChange, onReset, search }: FilterP
             </Field>
             <Field label="Order" help="Descending is usually best for leaders and largest names." suggestion="Descending">
               <select
-                className="h-12 w-full border-0 border-b-2 border-input bg-transparent px-0 text-sm outline-none focus:border-ring"
                 value={filters.sort_order ?? 'desc'}
                 onChange={(e) => handleInputChange('sort_order', e.target.value as 'asc' | 'desc')}
               >

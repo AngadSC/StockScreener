@@ -109,19 +109,18 @@ export default function StockMetrics({ stock }: StockMetricsProps) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {visibleMetrics.map((section) => (
         <div key={section.category} className="deco-panel bg-card">
-          <div className="border-b border-primary/12 px-4 py-3 bg-muted/20">
-            <span className="text-xs font-bold uppercase tracking-[0.22em]">{section.category}</span>
+          <div className="border-b border-border/70 bg-muted/20 px-4 py-3">
+            <span className="text-sm font-semibold">{section.category}</span>
           </div>
 
-          <div className="p-4 space-y-2 text-sm">
+          <div className="space-y-2 p-4 text-sm">
             {section.items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between gap-4 border-b border-primary/10 py-2 last:border-0">
-                <span className="text-muted-foreground">
-                  {item.label}
-                </span>
-                <span className="font-semibold text-primary">
-                  {item.value}
-                </span>
+              <div
+                key={item.label}
+                className="flex items-center justify-between gap-4 border-b border-border/70 py-2 last:border-0"
+              >
+                <span className="text-muted-foreground">{item.label}</span>
+                <span className="tabular-nums font-semibold text-primary">{item.value}</span>
               </div>
             ))}
           </div>

@@ -48,7 +48,7 @@ export default function RegisterForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <div className="deco-kicker">Membership</div>
+        <div className="deco-kicker">Account</div>
         <CardTitle className="mt-2 flex items-center gap-3">
           <UserPlus className="h-5 w-5 text-primary" />
           Create Account
@@ -99,7 +99,7 @@ export default function RegisterForm() {
           </div>
 
           {error ? (
-            <div className="border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="rounded-md border border-negative/30 bg-[var(--negative-bg)] p-3 text-sm text-negative">
               {error}
             </div>
           ) : null}
@@ -108,12 +108,12 @@ export default function RegisterForm() {
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating
+                Creating Account
               </>
             ) : (
               <>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Join
+                Create Account
               </>
             )}
           </Button>

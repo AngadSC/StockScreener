@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, ArrowRight, Search, Sparkles, Star, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowRight, Search, Sparkles, Star } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { screenerAPI } from '@/lib/api';
 import { cn, formatMarketCap, formatPercent, formatVolume, normalizePercentValue } from '@/lib/utils';
 import type { Stock } from '@/types/stock';
@@ -33,7 +34,7 @@ function MarketList({
   return (
     <section className="deco-panel p-6">
       <div className="deco-kicker">{subtitle}</div>
-      <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
+      <h2 className="mt-2">{title}</h2>
       <div className="deco-divider" />
       <div className="space-y-3">
         {stocks.map((stock) => {
@@ -43,25 +44,23 @@ function MarketList({
             tone === 'neutral'
               ? 'text-muted-foreground'
               : isPositive
-                ? 'text-success'
-                : 'text-destructive';
+                ? 'text-positive'
+                : 'text-negative';
 
           return (
             <Link
               key={stock.ticker}
               href={`/stocks/${stock.ticker}`}
-              className="block border border-primary/12 bg-muted/10 px-4 py-4 transition-all duration-300 hover:border-primary/35 hover:bg-primary/5"
+              className="interactive-card block rounded-lg border border-border/70 bg-muted/20 px-4 py-4"
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <div className="font-display text-xl uppercase tracking-[0.16em] text-foreground">
-                    {stock.ticker}
-                  </div>
+                  <div className="text-xl font-semibold text-foreground">{stock.ticker}</div>
                   <div className="truncate text-sm text-muted-foreground">
                     {stock.name || stock.company_name || 'Company profile'}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right tabular-nums">
                   <div className="text-lg font-semibold text-foreground">
                     {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
                   </div>
@@ -140,61 +139,60 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       <div className="container-custom py-8">
-        <section className="deco-panel bg-grid-luxe p-8 md:p-10">
+        <section className="deco-panel p-8 md:p-10">
           <div className="grid gap-8 xl:grid-cols-[1.1fr_0.9fr]">
             <div>
-              <div className="deco-kicker">Market Atelier</div>
-              <h1 className="mt-3 max-w-4xl text-5xl font-semibold leading-none text-glow md:text-7xl">
-                QuantorSignal
-              </h1>
+              <h1 className="max-w-4xl text-glow md:text-[64px]">QuantorSignal</h1>
               <p className="mt-5 max-w-3xl text-lg leading-relaxed text-muted-foreground">
-                Screen the market, interrogate individual names, and test portfolio behavior inside a
-                single Art Deco trading workspace built for deliberate analysis.
+                Screen the market, inspect individual names, and test portfolio behavior inside a
+                single workflow built for deliberate analysis.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link href="/screener">
-                  <div className="inline-flex h-12 items-center gap-2 border border-primary bg-primary px-5 text-sm uppercase tracking-[0.22em] text-primary-foreground">
+                <Button asChild>
+                  <Link href="/screener">
                     <Search className="h-4 w-4" />
                     Open Screener
-                  </div>
-                </Link>
-                <Link href="/backtester">
-                  <div className="inline-flex h-12 items-center gap-2 border border-primary/40 px-5 text-sm uppercase tracking-[0.22em] text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/backtester">
                     <Sparkles className="h-4 w-4" />
                     Launch Backtester
-                  </div>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Link href="/screener" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1">
-                <div className="deco-kicker">I</div>
+              <Link href="/screener" className="deco-panel interactive-card p-5">
+                <div className="deco-kicker">Discover</div>
                 <div className="mt-2 text-2xl font-semibold">Screener</div>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Filter by valuation, quality, sector, industry, liquidity, and growth without losing table density.
+                  Filter by valuation, quality, sector, industry, liquidity, and growth without
+                  losing table density.
                 </p>
-                <div className="mt-5 inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em] text-primary">
-                  Enter Hall <ArrowRight className="h-4 w-4" />
+                <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary">
+                  Open Screener <ArrowRight className="h-4 w-4" />
                 </div>
               </Link>
-              <Link href="/backtester" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1">
-                <div className="deco-kicker">II</div>
+              <Link href="/backtester" className="deco-panel interactive-card p-5">
+                <div className="deco-kicker">Test</div>
                 <div className="mt-2 text-2xl font-semibold">Backtester</div>
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                  Compare weighted baskets, tune strategies, and review trade logs in a compact study workspace.
+                  Compare weighted baskets, tune strategies, and review trade logs in a compact
+                  workspace.
                 </p>
-                <div className="mt-5 inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em] text-primary">
-                  Start Study <ArrowRight className="h-4 w-4" />
+                <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-primary">
+                  Launch Backtester <ArrowRight className="h-4 w-4" />
                 </div>
               </Link>
-              <Link href="/watchlist" className="deco-panel p-5 transition-transform duration-500 hover:-translate-y-1 sm:col-span-2">
+              <Link href="/watchlist" className="deco-panel interactive-card p-5 sm:col-span-2">
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <div className="deco-kicker">III</div>
+                    <div className="deco-kicker">Track</div>
                     <div className="mt-2 text-2xl font-semibold">Watchlist</div>
                     <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      Keep a compact ledger of the names you are actively monitoring.
+                      Keep a focused list of the names you are actively monitoring.
                     </p>
                   </div>
                   <Star className="h-8 w-8 text-primary" />
@@ -205,9 +203,9 @@ export default function HomePage() {
         </section>
 
         {spotlight ? (
-          <section className="mt-8 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+          <section className="mt-8">
             <div className="deco-panel p-6">
-              <div className="deco-kicker">Featured Instrument</div>
+              <div className="deco-kicker">Featured stock</div>
               <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <div className="text-4xl font-semibold">{spotlight.ticker}</div>
@@ -215,72 +213,50 @@ export default function HomePage() {
                     {spotlight.name || spotlight.company_name || 'Selected from today’s leaders'}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right tabular-nums">
                   <div className="text-3xl font-semibold">
                     {spotlight.current_price != null ? `$${spotlight.current_price.toFixed(2)}` : 'N/A'}
                   </div>
-                  <div className={cn('mt-2 text-sm', (getChangePercent(spotlight) ?? 0) >= 0 ? 'text-success' : 'text-destructive')}>
-                    {formatPercent(getChangePercent(spotlight), { mode: 'percent', withSign: true })}
+                  <div
+                    className={cn(
+                      'mt-2 text-sm',
+                      (getChangePercent(spotlight) ?? 0) >= 0 ? 'text-positive' : 'text-negative'
+                    )}
+                  >
+                    {formatPercent(getChangePercent(spotlight), {
+                      mode: 'percent',
+                      withSign: true,
+                    })}
                   </div>
                 </div>
               </div>
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                <div className="border border-primary/14 bg-muted/10 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Market Cap</div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">{formatMarketCap(spotlight.market_cap)}</div>
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="text-xs font-medium text-muted-foreground">Market Cap</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {formatMarketCap(spotlight.market_cap)}
+                  </div>
                 </div>
-                <div className="border border-primary/14 bg-muted/10 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Volume</div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">{formatVolume(spotlight.volume)}</div>
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="text-xs font-medium text-muted-foreground">Volume</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {formatVolume(spotlight.volume)}
+                  </div>
                 </div>
-                <div className="border border-primary/14 bg-muted/10 p-4">
-                  <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Sector</div>
-                  <div className="mt-2 text-xl font-semibold text-foreground">{spotlight.sector || 'N/A'}</div>
+                <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                  <div className="text-xs font-medium text-muted-foreground">Sector</div>
+                  <div className="mt-2 text-xl font-semibold text-foreground">
+                    {spotlight.sector || 'N/A'}
+                  </div>
                 </div>
               </div>
               <div className="mt-6">
-                <Link href={`/stocks/${spotlight.ticker}`} className="deco-link inline-flex items-center gap-2 text-sm uppercase tracking-[0.18em]">
+                <Link
+                  href={`/stocks/${spotlight.ticker}`}
+                  className="deco-link inline-flex items-center gap-2 text-sm font-medium"
+                >
                   Open detail page <ArrowRight className="h-4 w-4" />
                 </Link>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              <div className="deco-panel p-5">
-                <div className="deco-kicker">Pulse</div>
-                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
-                  <TrendingUp className="h-5 w-5 text-success" />
-                  Leaders
-                </div>
-                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  {topGainers.length > 0
-                    ? `${topGainers[0].ticker} leads the board at ${formatPercent(getChangePercent(topGainers[0]), { mode: 'percent', withSign: true })}.`
-                    : 'Market leaders will populate once quotes load.'}
-                </div>
-              </div>
-              <div className="deco-panel p-5">
-                <div className="deco-kicker">Pressure</div>
-                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
-                  <TrendingDown className="h-5 w-5 text-destructive" />
-                  Retreat
-                </div>
-                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  {topLosers.length > 0
-                    ? `${topLosers[0].ticker} is the weakest large-cap name in the current snapshot.`
-                    : 'Decliners will populate once quotes load.'}
-                </div>
-              </div>
-              <div className="deco-panel p-5">
-                <div className="deco-kicker">Liquidity</div>
-                <div className="mt-2 flex items-center gap-3 text-lg text-foreground">
-                  <Activity className="h-5 w-5 text-primary" />
-                  Flow
-                </div>
-                <div className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  {mostActive.length > 0
-                    ? `${mostActive[0].ticker} is carrying the heaviest tape with ${formatVolume(mostActive[0].volume)} traded.`
-                    : 'Most-active names will populate once quotes load.'}
-                </div>
               </div>
             </div>
           </section>

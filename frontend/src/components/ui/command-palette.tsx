@@ -133,22 +133,24 @@ export default function CommandPalette() {
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/80 pt-[16vh]">
       <div className="absolute inset-0" onClick={() => setIsOpen(false)} />
       <div className="relative w-full max-w-2xl deco-panel bg-card">
-        <div className="border-b border-primary/12 px-4 py-3 flex items-center gap-2">
-          <span className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Command Palette</span>
-          <span className="ml-auto text-xs uppercase tracking-[0.22em] text-muted-foreground">Esc to close</span>
+        <div className="flex items-center gap-2 border-b border-border/70 px-4 py-3">
+          <span className="text-xs text-muted-foreground">Command palette</span>
+          <span className="ml-auto text-xs text-muted-foreground">Esc to close</span>
         </div>
 
-        <div className="border-b border-primary/12 px-4 py-4 flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
           <Search className="h-4 w-4 text-primary" />
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command or route"
-            className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground"
+            className="flex-1 border-none bg-transparent p-0 text-foreground shadow-none outline-none placeholder:text-muted-foreground focus:border-none focus:shadow-none"
             autoFocus
           />
-          <kbd className="hidden sm:inline-block border border-primary/14 px-2 py-1 text-xs">Cmd/Ctrl+K</kbd>
+          <kbd className="hidden rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground sm:inline-block">
+            Cmd/Ctrl+K
+          </kbd>
         </div>
 
         <div className="max-h-[400px] overflow-y-auto">
@@ -168,10 +170,10 @@ export default function CommandPalette() {
                     key={cmd.id}
                     onClick={() => cmd.action()}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`w-full px-4 py-3 flex items-center gap-3 transition-colors ${
+                    className={`flex w-full items-center gap-3 px-4 py-3 transition-[background,border-color,box-shadow,color,transform] duration-[180ms] ${
                       isSelected
-                        ? 'bg-primary/20 border-l-2 border-l-primary'
-                        : 'border-l-2 border-l-transparent hover:bg-muted/50'
+                        ? 'border-l-2 border-l-primary bg-[var(--accent-subtle)]'
+                        : 'border-l-2 border-l-transparent hover:bg-muted/40'
                     }`}
                   >
                     <Icon className="h-5 w-5 text-primary" />
@@ -180,7 +182,9 @@ export default function CommandPalette() {
                       {cmd.description ? <p className="text-xs text-muted-foreground">{cmd.description}</p> : null}
                     </div>
                     {isSelected ? (
-                      <kbd className="border border-primary/14 px-2 py-1 text-xs">Enter</kbd>
+                      <kbd className="rounded-md border border-border/70 px-2 py-1 text-xs text-muted-foreground">
+                        Enter
+                      </kbd>
                     ) : null}
                   </button>
                 );
@@ -189,7 +193,7 @@ export default function CommandPalette() {
           )}
         </div>
 
-        <div className="border-t border-primary/12 px-4 py-3 flex items-center gap-4 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="flex items-center gap-4 border-t border-border/70 px-4 py-3 text-xs text-muted-foreground">
           <span>Arrow keys navigate</span>
           <span>Enter select</span>
           <span>Esc close</span>

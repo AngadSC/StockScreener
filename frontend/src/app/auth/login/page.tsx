@@ -9,7 +9,7 @@ export default function LoginPage() {
         <p className="text-center text-sm text-muted-foreground">
           Don't have an account?{' '}
           <Link href="/auth/register" className="deco-link">
-            Become a member
+            Create an account
           </Link>
         </p>
       </div>

@@ -1,9 +1,18 @@
 'use client';
 
 import { useMemo } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { StockPrice } from '@/types/stock';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+
+import type { StockPrice } from '@/types/stock';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 interface StockChartProps {
@@ -31,16 +40,18 @@ export default function StockChart({ data, ticker }: StockChartProps) {
 
   return (
     <div className="terminal-border bg-card">
-      {/* Header */}
-      <div className="border-b border-border px-4 py-2 bg-muted/20">
+      <div className="border-b border-border px-4 py-3 bg-muted/20">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold">PRICE_HISTORY [{ticker}]</span>
+          <span className="text-sm font-semibold">Price History {ticker}</span>
           {data.length > 0 && (
             <div className="text-xs text-muted-foreground">
-              {formatDate(data[0].date)} → {formatDate(data[data.length - 1].date)}
+              {formatDate(data[0].date)} to {formatDate(data[data.length - 1].date)}
               {priceChange && (
-                <span className={`ml-3 font-mono ${priceChange.change >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                  {priceChange.change >= 0 ? '▲' : '▼'}
+                <span
+                  className={`ml-3 tabular-nums ${
+                    priceChange.change >= 0 ? 'text-positive' : 'text-negative'
+                  }`}
+                >
                   {priceChange.change >= 0 ? '+' : ''}
                   {formatCurrency(priceChange.change)} ({priceChange.changePercent.toFixed(2)}%)
                 </span>
@@ -50,52 +61,44 @@ export default function StockChart({ data, ticker }: StockChartProps) {
         </div>
       </div>
 
-      {/* Chart */}
       <div className="p-4">
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(61, 61, 96, 0.28)" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 11, fill: '#9898B0' }}
               interval="preserveStartEnd"
-              stroke="hsl(var(--border))"
+              stroke="#2A2A42"
             />
             <YAxis
               domain={['auto', 'auto']}
-              tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+              tick={{ fontSize: 11, fill: '#9898B0' }}
               tickFormatter={(value) => `$${value.toFixed(0)}`}
-              stroke="hsl(var(--border))"
+              stroke="#2A2A42"
             />
             <Tooltip
               formatter={(value: number | undefined) => {
-                if (value === undefined) return ['N/A', 'PRICE'];
-                return [`$${value.toFixed(2)}`, 'CLOSE'];
+                if (value === undefined) return ['N/A', 'Price'];
+                return [`$${value.toFixed(2)}`, 'Close'];
               }}
               contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '0',
-                fontFamily: 'monospace',
-                fontSize: '11px',
+                backgroundColor: '#0F0F1A',
+                border: '1px solid #2A2A42',
+                borderRadius: '8px',
+                fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontSize: '12px',
               }}
-              labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+              labelStyle={{ color: '#9898B0' }}
             />
-            <Line
-              type="monotone"
-              dataKey="price"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2}
-              dot={false}
-              name="CLOSE_PRICE"
-            />
+            <Legend />
+            <Line type="monotone" dataKey="price" stroke="#5B5BD6" strokeWidth={2} dot={false} name="Close Price" />
           </LineChart>
         </ResponsiveContainer>
       </div>
 
-      {/* Footer */}
-      <div className="border-t border-border px-4 py-2 bg-muted/20 text-xs text-muted-foreground">
-        DATA_POINTS: {data.length} | INTERVAL: DAILY
+      <div className="border-t border-border px-4 py-3 bg-muted/20 text-xs text-muted-foreground">
+        Data points: {data.length} | Interval: Daily
       </div>
     </div>
   );

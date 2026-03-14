@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
@@ -19,6 +19,7 @@ function ScreenerPageContent() {
     sort_by: 'market_cap',
     sort_order: 'desc',
     search: searchQuery,
+    skip: 0,
   }));
 
   useEffect(() => {
@@ -44,6 +45,7 @@ function ScreenerPageContent() {
       sort_by: 'market_cap',
       sort_order: 'desc',
       search: searchQuery,
+      skip: 0,
     });
   };
 
@@ -52,31 +54,46 @@ function ScreenerPageContent() {
       ...prev,
       sort_by: field,
       sort_order: prev.sort_by === field && prev.sort_order === 'desc' ? 'asc' : 'desc',
+      skip: 0,
+    }));
+  };
+
+  const currentPage = useMemo(() => {
+    const perPage = filters.limit ?? 50;
+    const skip = filters.skip ?? 0;
+    return Math.floor(skip / perPage) + 1;
+  }, [filters.limit, filters.skip]);
+
+  const handlePageChange = (page: number) => {
+    const perPage = filters.limit ?? 50;
+    setFilters((prev) => ({
+      ...prev,
+      skip: Math.max(0, (page - 1) * perPage),
     }));
   };
 
   return (
     <div className="container-custom space-y-6 py-8">
-      <section className="deco-panel bg-grid-luxe p-8">
+      <section className="deco-panel p-8">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <div className="deco-kicker">Market Hall</div>
-            <h1 className="mt-3 text-5xl font-semibold text-glow">Screener</h1>
+            <div className="deco-kicker">Workspace</div>
+            <h1 className="mt-3">Screener</h1>
             <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
-              Search for names, shape the universe with collapsible filters, and keep the results table front
+              Search for names, shape the universe with filters, and keep the results table front
               and center.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="border border-primary/14 bg-background/60 px-4 py-4">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Records</div>
-              <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
+              <div className="text-xs font-medium text-muted-foreground">Records</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground tabular-nums">
                 {data?.total.toLocaleString() || '8,247'}
               </div>
             </div>
-            <div className="border border-primary/14 bg-background/60 px-4 py-4">
-              <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Visible</div>
-              <div className="mt-2 text-2xl font-semibold text-foreground">
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-4">
+              <div className="text-xs font-medium text-muted-foreground">Visible</div>
+              <div className="mt-2 text-2xl font-semibold text-foreground tabular-nums">
                 {data?.results.length ?? filters.limit ?? 50}
               </div>
             </div>
@@ -92,7 +109,15 @@ function ScreenerPageContent() {
           <div className="text-sm text-muted-foreground">Refreshing the market ledger...</div>
         </div>
       ) : (
-        <StockTable stocks={data?.results ?? []} onSort={handleSort} />
+        <StockTable
+          stocks={data?.results ?? []}
+          onSort={handleSort}
+          page={data?.page ?? currentPage}
+          totalPages={data?.total_pages ?? 1}
+          total={data?.total ?? 0}
+          perPage={data?.per_page ?? filters.limit ?? 50}
+          onPageChange={handlePageChange}
+        />
       )}
     </div>
   );

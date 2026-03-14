@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, memo, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 interface TradingViewChartProps {
@@ -14,7 +14,6 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Load TradingView widget script
     const loadTradingViewScript = () => {
       if (scriptLoadedRef.current) return;
 
@@ -30,7 +29,6 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
 
     const initializeWidget = () => {
       if (container.current && (window as any).TradingView) {
-        // Clear previous widget
         container.current.innerHTML = '';
 
         new (window as any).TradingView.widget({
@@ -39,33 +37,24 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
           interval: 'D',
           timezone: 'America/New_York',
           theme: 'dark',
-          style: '1', // 1 = Candles
+          style: '1',
           locale: 'en',
-          toolbar_bg: '#131722',
+          toolbar_bg: '#0f0f1a',
           enable_publishing: false,
           withdateranges: true,
           hide_side_toolbar: false,
           allow_symbol_change: false,
           save_image: true,
           container_id: 'tradingview_chart',
-          // Advanced features
-          studies: [
-            'Volume@tv-basicstudies',
-          ],
-          // Theme colors matching our design
-          backgroundColor: '#131722',
-          gridColor: 'rgba(42, 46, 57, 0.3)',
-          // Hide TradingView branding (only available with premium)
-          // hide_legend: false,
-          // hide_top_toolbar: false,
+          studies: ['Volume@tv-basicstudies'],
+          backgroundColor: '#0f0f1a',
+          gridColor: 'rgba(61, 61, 96, 0.22)',
         });
 
-        // Set loading to false after a brief delay to allow widget to render
         setTimeout(() => setIsLoading(false), 1500);
       }
     };
 
-    // Check if script is already loaded
     if ((window as any).TradingView) {
       scriptLoadedRef.current = true;
       initializeWidget();
@@ -73,7 +62,6 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
       loadTradingViewScript();
     }
 
-    // Cleanup on unmount
     return () => {
       if (container.current) {
         container.current.innerHTML = '';
@@ -83,34 +71,30 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
 
   return (
     <div className="deco-panel bg-card">
-      <div className="border-b border-primary/12 px-4 py-3 bg-muted/20">
+      <div className="border-b border-border/70 bg-muted/20 px-4 py-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold uppercase tracking-[0.22em]">Live Chart {ticker}</span>
-          <div className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
-            Powered by TradingView
-          </div>
+          <span className="text-sm font-semibold">Live Chart {ticker}</span>
+          <div className="text-xs text-muted-foreground">Powered by TradingView</div>
         </div>
       </div>
 
       <div className="relative">
         {isLoading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-[#131722]" style={{ height: `${height}px` }}>
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center bg-surface-1"
+            style={{ height: `${height}px` }}
+          >
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-              <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Initializing chart...</p>
+              <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Initializing chart...</p>
             </div>
           </div>
         )}
-        <div
-          ref={container}
-          id="tradingview_chart"
-          style={{ height: `${height}px` }}
-          className="bg-[#131722]"
-        />
+        <div ref={container} id="tradingview_chart" style={{ height: `${height}px` }} className="bg-surface-1" />
       </div>
 
-      <div className="border-t border-primary/12 px-4 py-3 bg-muted/20 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-        Indicators | Drawing tools | Multi timeframe | Volume analysis
+      <div className="border-t border-border/70 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+        Indicators | Drawing tools | Multi-timeframe | Volume analysis
       </div>
     </div>
   );

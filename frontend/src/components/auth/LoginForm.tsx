@@ -26,7 +26,7 @@ export default function LoginForm() {
       await authAPI.login({ email, password });
       router.push('/screener');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
+      setError(err.response?.data?.detail || 'Sign in failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -35,14 +35,12 @@ export default function LoginForm() {
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
-        <div className="deco-kicker">Member Access</div>
+        <div className="deco-kicker">Account</div>
         <CardTitle className="mt-2 flex items-center gap-3">
           <LogIn className="h-5 w-5 text-primary" />
-          Login
+          Sign In
         </CardTitle>
-        <CardDescription>
-          Enter your credentials to reopen your market workspace.
-        </CardDescription>
+        <CardDescription>Enter your credentials to reopen your workspace.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -73,7 +71,7 @@ export default function LoginForm() {
           </div>
 
           {error ? (
-            <div className="border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <div className="rounded-md border border-negative/30 bg-[var(--negative-bg)] p-3 text-sm text-negative">
               {error}
             </div>
           ) : null}
@@ -82,12 +80,12 @@ export default function LoginForm() {
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Entering
+                Signing In
               </>
             ) : (
               <>
                 <LogIn className="mr-2 h-4 w-4" />
-                Enter
+                Sign In
               </>
             )}
           </Button>

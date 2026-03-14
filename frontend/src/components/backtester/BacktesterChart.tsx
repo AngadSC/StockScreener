@@ -228,8 +228,8 @@ export function EquityCurveChart({
 
   const handlePointerMove = (event: ReactMouseEvent<SVGRectElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const pointerX = clamp(event.clientX - rect.left, padding.left, width - padding.right);
-    const ratio = (pointerX - padding.left) / plotWidth;
+    const pointerX = clamp(event.clientX - rect.left, 0, rect.width);
+    const ratio = rect.width <= 0 ? 0 : pointerX / rect.width;
     const nextIndex = clamp(Math.round(ratio * Math.max(points.length - 1, 0)), 0, points.length - 1);
     setHoveredIndex(nextIndex);
   };

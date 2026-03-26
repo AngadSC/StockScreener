@@ -39,7 +39,16 @@ export default function RegisterForm() {
       await authAPI.login({ email, password });
       router.push('/screener');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Registration failed. Please try again.');
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setError(detail.map((d: any) => d.msg).join(', '));
+      } else if (typeof detail === 'string') {
+        setError(detail);
+      } else if (!err.response) {
+        setError('Cannot reach the server. Please check your connection.');
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

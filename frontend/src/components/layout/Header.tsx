@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   BarChart3,
+  BookOpen,
   Lock,
   LogIn,
   LogOut,
@@ -34,6 +35,7 @@ const navItems: NavItem[] = [
   { href: '/screener', label: 'Screener', icon: Search },
   { href: '/backtester', label: 'Backtester', icon: BarChart3 },
   { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
+  { href: '/blog', label: 'Blog', icon: BookOpen },
 ];
 
 function isNavItemActive(pathname: string, href: string) {

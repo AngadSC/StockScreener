@@ -3,6 +3,7 @@ import Link from 'next/link';
 import BrandMark from '@/components/layout/BrandMark';
 
 const footerLinks = [
+  { href: '/blog', label: 'Blog' },
   { href: '/terms', label: 'Terms of Service' },
   { href: '/privacy', label: 'Privacy Policy' },
   { href: '/contact', label: 'Contact' },

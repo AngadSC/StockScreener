@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Angad/Desktop/StockScreener/StockScreener/backend/alembic -type f -name *.py)",
+      "Bash(xargs grep:*)"
+    ]
+  }
+}

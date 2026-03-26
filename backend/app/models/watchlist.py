@@ -1,19 +1,17 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from app.models.stock import StockDetail
 
-class WatchlistItemBase(BaseModel):
+class WatchlistItemCreate(BaseModel):
     ticker: str
 
-class WatchlistItemCreate(WatchlistItemBase):
-    pass
-
-class WatchlistItemResponse(WatchlistItemBase):
+class WatchlistItemResponse(BaseModel):
     id: int
+    ticker: str
     added_at: datetime
-    stock: StockDetail
-    
+    stock: Optional[StockDetail] = None
+
     class Config:
         from_attributes = True
 

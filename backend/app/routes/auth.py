@@ -34,7 +34,7 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(
             status_code=400,
-            detail="Unable to create account"
+            detail="An account with that email already exists."
         )
     
     # Create new user

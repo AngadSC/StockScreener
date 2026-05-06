@@ -3,7 +3,8 @@
     "allow": [
       "Bash(find /c/Users/Angad/Desktop/StockScreener/StockScreener/backend/alembic -type f -name *.py)",
       "Bash(xargs grep:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Angad\\\\Desktop\\\\StockScreener\\\\StockScreener\" -Force | Select-Object Name, @{Name='Type';Expression={if\\($_.PSIsContainer\\){'Directory'}else{'File'}}} | Format-Table -AutoSize)"
     ],
     "additionalDirectories": [
       "c:\\Users\\Angad\\Desktop\\StockScreener\\StockScreener\\frontend\\src\\app\\blog"

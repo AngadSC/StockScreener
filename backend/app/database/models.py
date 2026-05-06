@@ -19,6 +19,8 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     watchlists = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
+    ai_stock_reports = relationship("AIStockReport", back_populates="user", cascade="all, delete-orphan")
+    ai_usage_events = relationship("AIUsageEvent", back_populates="user", cascade="all, delete-orphan")
 
 
 # ============================================
@@ -213,3 +215,56 @@ class Watchlist(Base):
     __table_args__ = (
         Index('idx_user_ticker', 'user_id', 'ticker_id', unique=True),
     )
+
+
+# ============================================
+# AI STOCK REPORTS
+# ============================================
+
+class AIStockReport(Base):
+    __tablename__ = "ai_stock_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ticker = Column(String(10), nullable=False, index=True)
+    report_date = Column(Date, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    tier_used = Column(String(20))
+    report_type = Column(String(50), nullable=False, index=True)
+    swing_bias = Column(String(20))
+    setup_type = Column(String(50))
+    setup_quality_score = Column(REAL)
+    entry_timing_score = Column(REAL)
+    technical_score = Column(REAL)
+    fundamental_score = Column(REAL)
+    sentiment_score = Column(REAL)
+    valuation_score = Column(REAL)
+    risk_score = Column(REAL)
+    ai_report = Column(JSONB)
+    input_snapshot = Column(JSONB)
+    sources = Column(JSONB)
+
+    user = relationship("User", back_populates="ai_stock_reports")
+
+    __table_args__ = (
+        Index('idx_ai_stock_reports_user_ticker_date', 'user_id', 'ticker', 'report_date'),
+    )
+
+
+# ============================================
+# AI USAGE EVENTS
+# ============================================
+
+class AIUsageEvent(Base):
+    __tablename__ = "ai_usage_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    ticker = Column(String(10), index=True)
+    report_type = Column(String(50), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    model_used = Column(String(100))
+    tokens_input = Column(Integer)
+    tokens_output = Column(Integer)
+
+    user = relationship("User", back_populates="ai_usage_events")

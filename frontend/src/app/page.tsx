@@ -8,6 +8,7 @@ import {
   BarChart3,
   ChevronRight,
   Search,
+  Sparkles,
   Star,
   type LucideIcon,
 } from 'lucide-react';
@@ -409,6 +410,13 @@ export default function HomePage() {
                       <Link href="/screener">
                         <Search className="h-4 w-4" />
                         Open Screener
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/ai-analyzer">
+                        <Sparkles className="h-4 w-4" />
+                        Try AI Swing Analyzer
+                        <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
                     <Button asChild variant="ghost">

@@ -71,7 +71,23 @@ class Settings(BaseSettings):
 
     # ===== AI SETTINGS =====
     news_api_key: str = Field(default="", validation_alias=AliasChoices("NEWS_API_KEY", "news_api_key"))
+    ai_provider: str = Field(default="anthropic", validation_alias=AliasChoices("AI_PROVIDER", "ai_provider"))
     ai_model: str = Field(default="claude-sonnet-4-6", validation_alias=AliasChoices("AI_MODEL", "ai_model"))
+    ai_api_key: str = Field(default="", validation_alias=AliasChoices("AI_API_KEY", "ai_api_key"))
+    anthropic_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("ANTHROPIC_API_KEY", "anthropic_api_key"),
+    )
+    openai_api_key: str = Field(default="", validation_alias=AliasChoices("OPENAI_API_KEY", "openai_api_key"))
+    openai_base_url: str = Field(
+        default="https://api.openai.com/v1",
+        validation_alias=AliasChoices(
+            "OPENAI_BASE_URL",
+            "OPENAI_COMPATIBLE_BASE_URL",
+            "AI_BASE_URL",
+            "openai_base_url",
+        ),
+    )
     ai_monthly_report_limit_pro: int = Field(
         default=150,
         validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_PRO", "ai_monthly_report_limit_pro"),

@@ -11,6 +11,7 @@ import type {
 } from '@/types/stock';
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
+import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -38,6 +39,24 @@ api.interceptors.response.use(
     }
     return Promise.reject(error);
   }
+);
+
+const getApiOrigin = () => {
+  try {
+    return new URL(API_BASE_URL).origin;
+  } catch {
+    return API_BASE_URL.replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+  }
+};
+
+type FastAPIErrorResponse = {
+  detail?: string;
+};
+
+const getErrorDetail = (error: AxiosError<FastAPIErrorResponse>) => (
+  typeof error.response?.data?.detail === 'string'
+    ? error.response.data.detail
+    : undefined
 );
 
 // ====================================
@@ -218,6 +237,43 @@ export const watchlistAPI = {
     const response = await api.delete(`/watchlist/${ticker}`);
     return response.data;
   },
+};
+
+// ====================================
+// AI REPORTS API
+// ====================================
+
+export const generateAIReport = async (ticker: string): Promise<AIReportResponse> => {
+  try {
+    const response = await api.post<AIReportSuccessResponse>(
+      `${getApiOrigin()}/api/ai-reports/${encodeURIComponent(ticker.trim().toUpperCase())}`
+    );
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError<FastAPIErrorResponse>(error)) {
+      const detail = getErrorDetail(error);
+
+      if (error.response?.status === 403) {
+        return {
+          error: 'not_pro',
+          status: 403,
+          message: detail ?? 'AI reports require a Pro account.',
+          detail,
+        };
+      }
+
+      if (error.response?.status === 429) {
+        return {
+          error: 'limit_exceeded',
+          status: 429,
+          message: detail ?? 'AI report limit exceeded.',
+          detail,
+        };
+      }
+    }
+
+    throw error;
+  }
 };
 
 export default api;

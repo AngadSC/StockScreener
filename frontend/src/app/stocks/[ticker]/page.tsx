@@ -5,10 +5,12 @@ import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { ChevronRight, Loader2 } from 'lucide-react';
 
+import AIReportCard from '@/components/ai/AIReportCard';
 import StockMetrics from '@/components/stock/StockMetrics';
 import TradingViewChart from '@/components/stock/TradingViewChart';
 import { Button } from '@/components/ui/button';
 import { screenerAPI, stocksAPI } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import {
   cn,
   formatCurrency,
@@ -190,6 +192,7 @@ function Sparkline({
 
 export default function StockDetailPage({ params }: PageProps) {
   const ticker = params.ticker.toUpperCase();
+  const { userTier } = useAuth();
 
   const { data: stock, isLoading: stockLoading } = useQuery({
     queryKey: ['stock', ticker],
@@ -366,6 +369,8 @@ export default function StockDetailPage({ params }: PageProps) {
           <div className="deco-divider" />
           <StockMetrics stock={stock} />
         </section>
+
+        <AIReportCard key={ticker} ticker={ticker} userTier={userTier} />
 
         {stock.description ? (
           <section className="deco-panel p-6 md:p-7">

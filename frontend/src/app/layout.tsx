@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Suspense } from "react";
 import "./globals.css";
 import { ReactQueryProvider } from "@/lib/react-query";
+import { AuthProvider } from "@/lib/auth";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import CommandPalette from "@/components/ui/command-palette";
@@ -40,19 +41,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           />
         </noscript>
         <ReactQueryProvider>
-          <div className="flex min-h-screen flex-col">
-            <Suspense fallback={<div className="h-20 border-b border-border bg-card" />}>
-              <Header />
-            </Suspense>
-            <div className="flex-1">
-              <PageTransition>
-                <main className="min-h-full">{children}</main>
-              </PageTransition>
+          <AuthProvider>
+            <div className="flex min-h-screen flex-col">
+              <Suspense fallback={<div className="h-20 border-b border-border bg-card" />}>
+                <Header />
+              </Suspense>
+              <div className="flex-1">
+                <PageTransition>
+                  <main className="min-h-full">{children}</main>
+                </PageTransition>
+              </div>
+              <Footer />
             </div>
-            <Footer />
-          </div>
-          <CommandPalette />
-          <KeyboardShortcuts />
+            <CommandPalette />
+            <KeyboardShortcuts />
+          </AuthProvider>
         </ReactQueryProvider>
       </body>
     </html>

@@ -24,7 +24,7 @@ def _month_start() -> datetime:
 
 def _tier_limit(tier: str | None) -> int:
     normalized = (tier or "free").strip().lower()
-    if normalized == "pro":
+    if normalized in {"pro", "trader", "elite"}:
         return settings.ai_monthly_report_limit_pro
     if normalized == "admin":
         return settings.ai_monthly_report_limit_pro

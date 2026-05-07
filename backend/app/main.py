@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.config import settings
 from app.database.connection import engine, Base
-from app.routes import stocks, screener, auth, watchlist, admin
+from app.routes import stocks, screener, auth, watchlist, admin, ai_reports
 from app.jobs.stock_loader import start_scheduler
 from app.services.rate_limit import check_rate_limit
 import uvicorn
@@ -156,6 +156,7 @@ app.include_router(stocks.backtests_router, prefix=settings.API_V1_PREFIX)
 app.include_router(screener.router, prefix=settings.API_V1_PREFIX)
 app.include_router(watchlist.router, prefix=settings.API_V1_PREFIX)
 app.include_router(admin.router, prefix=settings.API_V1_PREFIX)
+app.include_router(ai_reports.router)
 
 #Root endpoint 
 @app.get("/")

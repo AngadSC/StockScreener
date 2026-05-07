@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Search,
+  Sparkles,
   Star,
   TrendingUp,
   X,
@@ -28,11 +29,13 @@ type NavItem = {
   label: string;
   icon: LucideIcon;
   requiresAuth?: boolean;
+  proBadge?: boolean;
 };
 
 const navItems: NavItem[] = [
   { href: '/', label: 'Market', icon: TrendingUp },
   { href: '/screener', label: 'Screener', icon: Search },
+  { href: '/ai-analyzer', label: 'AI Analyzer', icon: Sparkles, proBadge: true },
   { href: '/backtester', label: 'Backtester', icon: BarChart3 },
   { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
   { href: '/blog', label: 'Blog', icon: BookOpen },
@@ -142,12 +145,17 @@ export default function Header() {
     }
   };
 
-  const renderWatchlistAffordance = (item: NavItem, mobile = false) => {
+  const renderNavAffordance = (item: NavItem, mobile = false) => {
     const showLock = Boolean(item.requiresAuth && !isLoggedIn);
 
     return (
       <>
         <span>{item.label}</span>
+        {item.proBadge ? (
+          <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-[var(--accent)]">
+            Pro
+          </span>
+        ) : null}
         {showLock ? <Lock className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
         {showLock && !mobile ? (
           <span
@@ -187,7 +195,7 @@ export default function Header() {
         <span className="inline-flex items-center gap-2">
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="relative inline-flex items-center gap-1.5">
-            {renderWatchlistAffordance(item, mobile)}
+            {renderNavAffordance(item, mobile)}
           </span>
         </span>
       </Link>

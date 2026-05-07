@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from typing import List, Union
 from pathlib import Path 
 import json
@@ -68,6 +68,14 @@ class Settings(BaseSettings):
     RATE_LIMIT_HEAVY_PER_MINUTE: int = 20
     RATE_LIMIT_SCREENER_PER_MINUTE: int = 120
     RATE_LIMIT_DEFAULT_PER_MINUTE: int = 300
+
+    # ===== AI SETTINGS =====
+    news_api_key: str = Field(default="", validation_alias=AliasChoices("NEWS_API_KEY", "news_api_key"))
+    ai_model: str = Field(default="claude-sonnet-4-6", validation_alias=AliasChoices("AI_MODEL", "ai_model"))
+    ai_monthly_report_limit_pro: int = Field(
+        default=150,
+        validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_PRO", "ai_monthly_report_limit_pro"),
+    )
 
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []

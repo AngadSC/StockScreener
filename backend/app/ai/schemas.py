@@ -4,6 +4,20 @@ from typing import Any, Dict, List
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+def _clean_short_text(value: Any) -> str:
+    return " ".join(str(value).strip().split())
+
+
+def _truncate_at_word(value: str, max_length: int) -> str:
+    if len(value) <= max_length:
+        return value
+
+    truncated = value[:max_length].rstrip()
+    if " " in truncated:
+        truncated = truncated.rsplit(" ", 1)[0].rstrip(" -/,")
+    return truncated or value[:max_length].rstrip()
+
+
 class AIReportInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -43,6 +57,34 @@ class AIReportOutput(BaseModel):
     confirmation_signals: List[str] = Field(default_factory=list)
     news_summary: str = Field(..., min_length=1)
     final_verdict: str = Field(..., min_length=1)
+
+    @field_validator("swing_bias", mode="before")
+    @classmethod
+    def normalize_swing_bias(cls, value: Any) -> str:
+        cleaned = _clean_short_text(value)
+        lower_value = cleaned.lower()
+        if "bullish" in lower_value:
+            return "bullish"
+        if "bearish" in lower_value:
+            return "bearish"
+        if any(label in lower_value for label in ("neutral", "mixed", "sideways", "range-bound")):
+            return "neutral"
+        return _truncate_at_word(cleaned, 20)
+
+    @field_validator("setup_type", mode="before")
+    @classmethod
+    def normalize_setup_type(cls, value: Any) -> str:
+        cleaned = _clean_short_text(value)
+        lower_value = cleaned.lower()
+        if "breakout" in lower_value and "retest" in lower_value:
+            return "Breakout retest"
+        if "momentum" in lower_value and "continuation" in lower_value:
+            return "Momentum continuation"
+        if "pullback" in lower_value:
+            return "Pullback entry"
+        if "breakout" in lower_value:
+            return "Breakout"
+        return _truncate_at_word(cleaned, 50)
 
 
 class AIReportResponse(BaseModel):

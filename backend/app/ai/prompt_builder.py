@@ -16,19 +16,22 @@ SCORE_FIELDS = {
     "risk_score",
 }
 
+
+def _response_property(field: str) -> dict:
+    if field == "confirmation_signals":
+        return {"type": "array", "items": {"type": "string"}}
+    if field in SCORE_FIELDS:
+        return {"type": "number", "minimum": 0, "maximum": 100}
+    if field == "swing_bias":
+        return {"type": "string", "minLength": 1, "maxLength": 20}
+    if field == "setup_type":
+        return {"type": "string", "minLength": 1, "maxLength": 50}
+    return {"type": "string", "minLength": 1}
+
 OUTPUT_RESPONSE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "properties": {
-        field: (
-            {"type": "array", "items": {"type": "string"}}
-            if field == "confirmation_signals"
-            else {"type": "number"}
-            if field in SCORE_FIELDS
-            else {"type": "string"}
-        )
-        for field in OUTPUT_FIELDS
-    },
+    "properties": {field: _response_property(field) for field in OUTPUT_FIELDS},
     "required": list(OUTPUT_FIELDS),
 }
 OUTPUT_SCHEMA_JSON = json.dumps(OUTPUT_RESPONSE_SCHEMA, sort_keys=True)
@@ -38,6 +41,8 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
     "- Do not include input keys such as analysis_type, ticker, market_data, technical_data, fundamental_data, valuation_data, news_data, or constraints.\n"
+    "- swing_bias must be one short label such as bullish, bearish, or neutral, max 20 characters.\n"
+    "- setup_type must be a short setup label, max 50 characters.\n"
     "- Score fields must be numbers from 0 to 100.\n"
     "- confirmation_signals must be an array of short strings.\n"
     "- If supporting data is missing, state that in the relevant string fields instead of inventing facts.\n"

@@ -10,7 +10,13 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
         "type": "array",
         "items": {"type": "string"},
     }
-    assert OUTPUT_RESPONSE_SCHEMA["properties"]["technical_score"] == {"type": "number"}
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["technical_score"] == {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 100,
+    }
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["swing_bias"]["maxLength"] == 20
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["setup_type"]["maxLength"] == 50
 
 
 def test_output_instructions_warn_against_input_payload_shape() -> None:
@@ -18,3 +24,5 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "swing_bias" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "setup_quality_score" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "max 20 characters" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS

@@ -1,17 +1,28 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import date, datetime
 from math import isfinite
 from typing import Any, Mapping
 
 import pandas as pd
 import yfinance as yf
+from sqlalchemy.orm import Session
+
+from app.database.models import DailyOHLCV, Ticker
 
 
 PROVIDER = "yfinance"
 DAILY_INTERVAL = "1d"
 OHLC_COLUMNS = ("Open", "High", "Low", "Close")
 VOLUME_COLUMN = "Volume"
+
+
+@dataclass(frozen=True)
+class BackfillResult:
+    inserted_rows: int = 0
+    updated_rows: int = 0
+    skipped_rows: int = 0
 
 
 def _base_result(
@@ -176,3 +187,123 @@ def fetch_yfinance_daily_history(ticker: str, period: str = "1y") -> dict[str, A
     result = normalize_yfinance_history(history)
     result.update({"ticker": normalized_ticker, "period": period})
     return result
+
+
+def _normalized_candle(candle: Mapping[str, Any]) -> dict[str, Any] | None:
+    candle_date = _date(candle.get("date"))
+    open_price = _number(candle.get("open"))
+    high = _number(candle.get("high"))
+    low = _number(candle.get("low"))
+    close = _number(candle.get("close"))
+    volume = _volume(candle.get("volume"))
+
+    if (
+        candle_date is None
+        or open_price is None
+        or high is None
+        or low is None
+        or close is None
+        or volume is None
+    ):
+        return None
+
+    return {
+        "date": candle_date,
+        "open": open_price,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": volume,
+    }
+
+
+def _missing_critical_value(value: Any) -> bool:
+    return _number(value) is None
+
+
+def _missing_volume(value: Any) -> bool:
+    volume = _number(value)
+    return volume is None or volume <= 0
+
+
+def backfill_daily_ohlcv_from_candles(
+    db: Session,
+    ticker_obj: Ticker,
+    candles: list[dict[str, Any]],
+) -> BackfillResult:
+    """
+    Insert missing daily OHLCV rows and fill only incomplete existing rows.
+
+    The caller controls the transaction boundary; this function does not commit
+    or roll back the SQLAlchemy session.
+    """
+    if not candles:
+        return BackfillResult()
+
+    normalized_by_date: dict[date, dict[str, Any]] = {}
+    skipped_rows = 0
+    for candle in candles:
+        normalized = _normalized_candle(candle)
+        if normalized is None:
+            skipped_rows += 1
+            continue
+        candle_date = normalized["date"]
+        if candle_date in normalized_by_date:
+            skipped_rows += 1
+            continue
+        normalized_by_date[candle_date] = normalized
+
+    if not normalized_by_date:
+        return BackfillResult(skipped_rows=skipped_rows)
+
+    existing_rows = (
+        db.query(DailyOHLCV)
+        .filter(
+            DailyOHLCV.ticker_id == ticker_obj.id,
+            DailyOHLCV.date.in_(normalized_by_date.keys()),
+        )
+        .all()
+    )
+    existing_by_date = {row.date: row for row in existing_rows}
+
+    inserted_rows = 0
+    updated_rows = 0
+    for candle_date in sorted(normalized_by_date):
+        candle = normalized_by_date[candle_date]
+        existing = existing_by_date.get(candle_date)
+
+        if existing is None:
+            db.add(
+                DailyOHLCV(
+                    ticker_id=ticker_obj.id,
+                    date=candle_date,
+                    open=candle["open"],
+                    high=candle["high"],
+                    low=candle["low"],
+                    close=candle["close"],
+                    volume=candle["volume"],
+                )
+            )
+            inserted_rows += 1
+            continue
+
+        changed = False
+        for field_name in ("open", "high", "low", "close"):
+            if _missing_critical_value(getattr(existing, field_name)):
+                setattr(existing, field_name, candle[field_name])
+                changed = True
+
+        if _missing_volume(existing.volume):
+            existing.volume = candle["volume"]
+            changed = True
+
+        if changed:
+            updated_rows += 1
+        else:
+            skipped_rows += 1
+
+    return BackfillResult(
+        inserted_rows=inserted_rows,
+        updated_rows=updated_rows,
+        skipped_rows=skipped_rows,
+    )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Path, status
@@ -17,6 +18,7 @@ from app.database.models import AIStockReport, User
 from app.services.auth import get_current_user
 
 router = APIRouter(prefix="/api/ai-reports", tags=["ai-reports"])
+logger = logging.getLogger(__name__)
 
 ALLOWED_AI_REPORT_TIERS = {"pro", "trader", "elite"}
 
@@ -60,31 +62,74 @@ def create_ai_report(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ticker is required.")
 
     tier = _normalize_tier(current_user.tier)
+    user_id = str(current_user.id)
+    logger.info(
+        "AI report request started ticker=%s user_id=%s tier=%s provider=%s model=%s",
+        ticker_symbol,
+        user_id,
+        tier,
+        settings.ai_provider,
+        settings.ai_model,
+    )
 
     if tier not in ALLOWED_AI_REPORT_TIERS:
+        logger.info("AI report rejected by tier ticker=%s user_id=%s tier=%s", ticker_symbol, user_id, tier)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="AI reports require a pro, trader, or elite account tier.",
         )
 
-    user_id = str(current_user.id)
-    check_usage_limit(user_id, db)
+    try:
+        check_usage_limit(user_id, db)
+        logger.info("AI report usage limit passed ticker=%s user_id=%s", ticker_symbol, user_id)
 
-    cached_report = get_fresh_report(user_id, ticker_symbol, db)
-    if cached_report:
-        return _report_response(cached_report, cached=True)
+        cached_report = get_fresh_report(user_id, ticker_symbol, db)
+        if cached_report:
+            logger.info("AI report served from cache ticker=%s user_id=%s report_id=%s", ticker_symbol, user_id, cached_report.id)
+            return _report_response(cached_report, cached=True)
 
-    payload = build_ai_payload(ticker_symbol, db)
-    ai_response = generate_single_stock_report(payload, user_id, ticker_symbol, db)
-    usage = _pop_usage_metadata(ai_response)
-    saved_report = save_report(user_id, ticker_symbol, payload, ai_response, tier, db)
-    record_usage_event(
-        user_id=user_id,
-        ticker=ticker_symbol,
-        model_used=str(usage["model_used"]),
-        tokens_input=int(usage["tokens_input"]),
-        tokens_output=int(usage["tokens_output"]),
-        db=db,
-    )
+        payload = build_ai_payload(ticker_symbol, db)
+        logger.info(
+            "AI report payload built ticker=%s user_id=%s news_count=%s has_market_data=%s has_technical_data=%s",
+            ticker_symbol,
+            user_id,
+            len(payload.get("news_data", [])),
+            bool(payload.get("market_data")),
+            bool(payload.get("technical_data")),
+        )
 
-    return _report_response(saved_report, cached=False)
+        ai_response = generate_single_stock_report(payload, user_id, ticker_symbol, db)
+        usage = _pop_usage_metadata(ai_response)
+        logger.info(
+            "AI report LLM response validated ticker=%s user_id=%s model=%s input_tokens=%s output_tokens=%s",
+            ticker_symbol,
+            user_id,
+            usage["model_used"],
+            usage["tokens_input"],
+            usage["tokens_output"],
+        )
+
+        saved_report = save_report(user_id, ticker_symbol, payload, ai_response, tier, db)
+        record_usage_event(
+            user_id=user_id,
+            ticker=ticker_symbol,
+            model_used=str(usage["model_used"]),
+            tokens_input=int(usage["tokens_input"]),
+            tokens_output=int(usage["tokens_output"]),
+            db=db,
+        )
+        logger.info("AI report saved ticker=%s user_id=%s report_id=%s", ticker_symbol, user_id, saved_report.id)
+
+        return _report_response(saved_report, cached=False)
+    except HTTPException as exc:
+        logger.warning(
+            "AI report request failed ticker=%s user_id=%s status=%s detail=%s",
+            ticker_symbol,
+            user_id,
+            exc.status_code,
+            exc.detail,
+        )
+        raise
+    except Exception:
+        logger.exception("AI report request crashed ticker=%s user_id=%s", ticker_symbol, user_id)
+        raise

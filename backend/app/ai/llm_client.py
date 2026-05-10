@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from fastapi import HTTPException
@@ -11,6 +12,8 @@ from app.ai.prompt_builder import SYSTEM_PROMPT
 from app.ai.schemas import AIReportOutput
 from app.config import settings
 from app.database.models import AIUsageEvent
+
+logger = logging.getLogger(__name__)
 
 
 def _content_text(message: Any) -> str:
@@ -135,23 +138,56 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
         )
 
     client = OpenAI(api_key=api_key, base_url=settings.openai_base_url.rstrip("/"), timeout=60.0)
-    request: dict[str, Any] = {
+    base_request: dict[str, Any] = {
         "model": model,
-        "temperature": 0.3,
-        "max_tokens": 2500,
         "response_format": {"type": "json_object"},
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _retry_user_content(payload, retry)},
         ],
     }
+
+    request_variants = [
+        {"max_completion_tokens": 2500, "temperature": 0.3},
+        {"max_completion_tokens": 2500},
+        {"max_tokens": 2500, "temperature": 0.3},
+        {"max_tokens": 2500},
+    ]
+    last_error: BadRequestError | None = None
+
+    for overrides in request_variants:
+        request = {**base_request, **overrides}
+        try:
+            logger.info(
+                "OpenAI report request model=%s retry=%s params=%s response_format=%s",
+                model,
+                retry,
+                ",".join(sorted(overrides.keys())),
+                "response_format" in request,
+            )
+            return client.chat.completions.create(**request)
+        except BadRequestError as exc:
+            message = str(exc).lower()
+            logger.warning("OpenAI report request rejected model=%s params=%s error=%s", model, ",".join(sorted(overrides.keys())), exc)
+            retryable_parameter_error = any(
+                parameter in message
+                for parameter in ("max_tokens", "max_completion_tokens", "temperature")
+            )
+            if not retryable_parameter_error:
+                last_error = exc
+                break
+            last_error = exc
+
+    request = {**base_request, "max_completion_tokens": 2500}
+    request.pop("response_format", None)
     try:
+        logger.info("OpenAI report request retrying without response_format model=%s retry=%s", model, retry)
         return client.chat.completions.create(**request)
     except BadRequestError as exc:
-        if "response_format" not in str(exc).lower():
-            raise
-        request.pop("response_format", None)
-        return client.chat.completions.create(**request)
+        logger.warning("OpenAI report request failed without response_format model=%s error=%s", model, exc)
+        if last_error is not None:
+            raise last_error
+        raise
 
 
 def _openai_compatible_content(message: Any) -> str:
@@ -190,7 +226,10 @@ def _generate_with_anthropic(payload: dict, model: str, retry: bool) -> tuple[di
 def _generate_with_openai_compatible(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
     message = _create_openai_compatible_message(model, payload, retry=retry)
     input_tokens, output_tokens = _openai_compatible_usage_tokens(message)
-    parsed = _extract_json(_openai_compatible_content(message))
+    content = _openai_compatible_content(message)
+    if not content.strip():
+        logger.warning("OpenAI report response was empty model=%s input_tokens=%s output_tokens=%s", model, input_tokens, output_tokens)
+    parsed = _extract_json(content)
     return parsed, input_tokens, output_tokens
 
 
@@ -218,6 +257,14 @@ def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: S
 
     for attempt in range(2):
         try:
+            logger.info(
+                "AI report generation attempt ticker=%s user_id=%s provider=%s model=%s attempt=%s",
+                ticker.strip().upper(),
+                user_id,
+                settings.ai_provider,
+                model,
+                attempt + 1,
+            )
             parsed, input_tokens, output_tokens = _generate_raw_report(payload, model, retry=attempt > 0)
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
@@ -232,12 +279,27 @@ def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: S
             return result
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = str(exc)
+            logger.warning(
+                "AI report response validation failed ticker=%s user_id=%s attempt=%s error=%s",
+                ticker.strip().upper(),
+                user_id,
+                attempt + 1,
+                exc,
+            )
             if attempt == 0:
                 continue
-        except HTTPException:
+        except HTTPException as exc:
+            logger.warning(
+                "AI report HTTP failure ticker=%s user_id=%s status=%s detail=%s",
+                ticker.strip().upper(),
+                user_id,
+                exc.status_code,
+                exc.detail,
+            )
             raise
         except Exception as exc:
             last_error = str(exc)
+            logger.exception("AI report generation crashed ticker=%s user_id=%s", ticker.strip().upper(), user_id)
             break
 
     _record_llm_usage(

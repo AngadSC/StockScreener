@@ -192,8 +192,62 @@ def test_build_market_context_backfills_stale_db_candles_before_building_context
     assert data_quality["inserted_rows"] == len(all_days) - len(existing_days)
     assert data_quality["updated_rows"] == 0
     assert data_quality["latest_candle_date"] == "2026-05-08"
+    assert data_quality["warnings"] == []
     assert data_quality["errors"] == []
     assert data_quality["final_quality_reasons"] == []
+
+
+def test_build_market_context_repairs_ticker_with_no_existing_price_data(
+    sqlite_db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    ticker = Ticker(id=1, symbol="HOLX", name="Hologic Inc.", exchange="NASDAQ")
+    sqlite_db.add(ticker)
+    sqlite_db.commit()
+    monkeypatch.setattr(market_context, "_today", lambda: date(2026, 5, 10))
+
+    all_days = get_trading_days_between(date(2026, 2, 2), date(2026, 5, 8))
+    yf_candles = [_yf_candle(candle_date, 75.0 + index) for index, candle_date in enumerate(all_days)]
+
+    def fake_fetch(ticker_symbol: str, period: str = "1y") -> dict[str, Any]:
+        assert ticker_symbol == "HOLX"
+        assert period == "1y"
+        return {
+            "provider": "yfinance",
+            "interval": "1d",
+            "ticker": ticker_symbol,
+            "period": period,
+            "fetched_count": len(yf_candles),
+            "valid_count": len(yf_candles),
+            "dropped_count": 0,
+            "error": None,
+            "candles": yf_candles,
+        }
+
+    monkeypatch.setattr(market_context, "fetch_yfinance_daily_history", fake_fetch)
+
+    context = market_context.build_market_context("holx", sqlite_db)
+
+    rows = (
+        sqlite_db.query(DailyOHLCV)
+        .filter(DailyOHLCV.ticker_id == ticker.id)
+        .order_by(DailyOHLCV.date.asc())
+        .all()
+    )
+    data_quality = context["market_data"]["data_quality"]
+
+    assert len(rows) == len(all_days)
+    assert context["market_data"]["latest_db_date"] == "2026-05-08"
+    assert context["market_data"]["current"]["current_price"] == 75.0 + len(all_days) - 1
+    assert data_quality["initial_candle_count"] == 0
+    assert data_quality["final_candle_count"] == len(all_days)
+    assert data_quality["yfinance_used"] is True
+    assert data_quality["inserted_rows"] == len(all_days)
+    assert data_quality["updated_rows"] == 0
+    assert data_quality["initial_quality_reasons"] == ["no_candles"]
+    assert data_quality["final_quality_reasons"] == []
+    assert data_quality["warnings"] == []
+    assert data_quality["errors"] == []
 
 
 def test_build_market_context_reports_yfinance_fetch_errors(

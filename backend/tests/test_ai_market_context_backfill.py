@@ -208,4 +208,5 @@ def test_ai_payload_backfills_missing_ohlcv_and_rebuilds_context_from_db(
     assert data_quality["latest_candle_date"] == "2026-05-08"
     assert data_quality["missing_dates"] == []
     assert data_quality["final_quality_reasons"] == []
+    assert data_quality["warnings"] == []
     assert data_quality["errors"] == []

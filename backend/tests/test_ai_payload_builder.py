@@ -79,7 +79,7 @@ def _seed_ticker(sqlite_db: Session) -> Ticker:
 
 
 def _seed_complete_candles(sqlite_db: Session, ticker: Ticker) -> list[date]:
-    days = get_trading_days_between(date(2025, 10, 2), date(2026, 5, 8))
+    days = get_trading_days_between(date(2025, 5, 12), date(2026, 5, 8))
     for index, candle_date in enumerate(days):
         close = 100.0 + index
         sqlite_db.add(
@@ -177,6 +177,7 @@ def test_build_ai_payload_includes_technical_and_volume_summaries(
     assert technical_summary["latest_candle"]["date"] == "2026-05-08"
     assert technical_summary["sma_20"] is not None
     assert technical_summary["sma_50"] is not None
+    assert technical_summary["sma_200"] is not None
     assert technical_summary["rsi_14"] is not None
     assert technical_summary["trend"] != "insufficient_data"
     assert volume_summary["latest_volume"] is not None

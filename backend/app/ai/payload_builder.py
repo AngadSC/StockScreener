@@ -249,6 +249,8 @@ def build_ai_payload(ticker: str, db: Session) -> dict:
     all_candles = [_clean_candle(candle) for candle in market_data.get("historical_ohlcv", [])]
     candles = all_candles[-PRICE_HISTORY_LOOKBACK_CANDLES:]
     latest_candle = candles[-1] if candles else None
+    technical_summary = _technical_summary(all_candles)
+    volume_summary = _volume_summary(all_candles)
     fundamental_summary = _fundamental_summary(context.get("fundamental_data", {}))
     valuation_summary = _valuation_summary(context.get("valuation_data", {}))
     news_payload = get_recent_stock_news(ticker)
@@ -265,8 +267,8 @@ def build_ai_payload(ticker: str, db: Session) -> dict:
             "lookback_candle_count": len(candles),
             "available_candle_count": len(all_candles),
         },
-        "technical_summary": _technical_summary(candles),
-        "volume_summary": _volume_summary(candles),
+        "technical_summary": technical_summary,
+        "volume_summary": volume_summary,
         "fundamental_summary": fundamental_summary,
         "valuation_summary": valuation_summary,
         "news": news_payload,

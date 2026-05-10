@@ -193,7 +193,7 @@ def _finalize_data_quality(data_quality: dict[str, Any], final_quality: dict[str
     data_quality["final_quality_reasons"] = list(final_quality.get("reasons") or [])
     data_quality["missing_dates"] = list(final_quality.get("missing_dates") or [])
     data_quality["invalid_candle_dates"] = list(final_quality.get("invalid_candle_dates") or [])
-    _append_unique(data_quality["warnings"], final_quality.get("warnings") or [])
+    data_quality["warnings"] = list(final_quality.get("warnings") or [])
 
 
 def _fill_ohlcv_gaps_from_yfinance(
@@ -251,7 +251,7 @@ def _fill_ohlcv_gaps_from_yfinance(
 def build_market_context(ticker: str, db: Session) -> dict:
     ticker = ticker.strip().upper()
     end_date = _today()
-    start_date = end_date - timedelta(days=220)
+    start_date = end_date - timedelta(days=365)
 
     ticker_obj = db.query(Ticker).filter(Ticker.symbol == ticker).first()
     prices: list[DailyOHLCV] = []

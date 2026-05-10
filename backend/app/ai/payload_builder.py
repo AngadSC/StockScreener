@@ -26,6 +26,13 @@ def _round(value: Any, digits: int = 4) -> float | int | None:
     return int(rounded) if rounded.is_integer() else rounded
 
 
+def _int_or_zero(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _clean_candle(candle: dict[str, Any]) -> dict[str, Any]:
     volume = candle.get("volume")
     try:
@@ -191,6 +198,48 @@ def _data_quality(
         }
     )
     return quality
+
+
+def summarize_ai_payload_for_logs(payload: dict) -> dict[str, Any]:
+    price_history = payload.get("price_history") if isinstance(payload, dict) else {}
+    if not isinstance(price_history, dict):
+        price_history = {}
+
+    latest_candle = price_history.get("latest_candle")
+    if not isinstance(latest_candle, dict):
+        latest_candle = {}
+
+    data_quality = payload.get("data_quality") if isinstance(payload, dict) else {}
+    if not isinstance(data_quality, dict):
+        data_quality = {}
+
+    fundamental_summary = payload.get("fundamental_summary") if isinstance(payload, dict) else {}
+    if not isinstance(fundamental_summary, dict):
+        fundamental_summary = {}
+
+    valuation_summary = payload.get("valuation_summary") if isinstance(payload, dict) else {}
+    if not isinstance(valuation_summary, dict):
+        valuation_summary = {}
+
+    news = payload.get("news") if isinstance(payload, dict) else {}
+    if not isinstance(news, dict):
+        news = {}
+
+    technical_summary = payload.get("technical_summary") if isinstance(payload, dict) else {}
+
+    return {
+        "ticker": payload.get("ticker") if isinstance(payload, dict) else None,
+        "candle_count": price_history.get("lookback_candle_count"),
+        "available_candle_count": price_history.get("available_candle_count"),
+        "latest_candle_date": latest_candle.get("date") or data_quality.get("latest_candle_date"),
+        "yfinance_backfill_used": bool(data_quality.get("yfinance_used")),
+        "inserted_candle_count": _int_or_zero(data_quality.get("inserted_rows")),
+        "updated_candle_count": _int_or_zero(data_quality.get("updated_rows")),
+        "fundamental_available": bool(fundamental_summary.get("available")),
+        "valuation_available": bool(valuation_summary.get("available")),
+        "news_article_count": _int_or_zero(news.get("article_count") or data_quality.get("news_article_count")),
+        "technical_summary_available": bool(technical_summary),
+    }
 
 
 def build_ai_payload(ticker: str, db: Session) -> dict:

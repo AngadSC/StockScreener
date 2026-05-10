@@ -204,3 +204,82 @@ def test_build_ai_payload_represents_missing_fundamentals_without_crashing(
         "missing_reason": "No valuation fundamentals found in the database for this ticker.",
         "metrics": {},
     }
+
+
+def test_summarize_ai_payload_for_logs_excludes_large_or_sensitive_payload_content() -> None:
+    payload = {
+        "ticker": "AAPL",
+        "price_history": {
+            "lookback_candle_count": 120,
+            "available_candle_count": 151,
+            "latest_candle": {"date": "2026-05-08", "close": 212.12},
+            "candles": [
+                {"date": "2026-05-08", "open": 210, "high": 213, "low": 209, "close": 212, "volume": 1_000_000}
+            ],
+        },
+        "technical_summary": {"trend": "uptrend"},
+        "fundamental_summary": {"available": True, "metrics": {"market_cap": 3_000_000_000_000}},
+        "valuation_summary": {"available": False, "metrics": {}},
+        "news": {
+            "article_count": 2,
+            "articles": [
+                {
+                    "title": "Apple shares rally",
+                    "summary": "Full article summary should not be copied into logs.",
+                    "url": "https://example.com/aapl",
+                }
+            ],
+        },
+        "data_quality": {
+            "yfinance_used": True,
+            "inserted_rows": 3,
+            "updated_rows": 1,
+            "latest_candle_date": "2026-05-07",
+            "warnings": ["verbose warning"],
+        },
+        "constraints": {"api_key": "not-a-real-key"},
+    }
+
+    summary = payload_builder.summarize_ai_payload_for_logs(payload)
+
+    assert summary == {
+        "ticker": "AAPL",
+        "candle_count": 120,
+        "available_candle_count": 151,
+        "latest_candle_date": "2026-05-08",
+        "yfinance_backfill_used": True,
+        "inserted_candle_count": 3,
+        "updated_candle_count": 1,
+        "fundamental_available": True,
+        "valuation_available": False,
+        "news_article_count": 2,
+        "technical_summary_available": True,
+    }
+    assert "candles" not in summary
+    assert "articles" not in summary
+    assert "constraints" not in summary
+    assert "api_key" not in summary
+
+
+def test_summarize_ai_payload_for_logs_handles_missing_optional_blocks() -> None:
+    summary = payload_builder.summarize_ai_payload_for_logs(
+        {
+            "ticker": "MSFT",
+            "price_history": {"latest_candle": None},
+            "data_quality": {"inserted_rows": "bad", "updated_rows": None, "news_article_count": "4"},
+        }
+    )
+
+    assert summary == {
+        "ticker": "MSFT",
+        "candle_count": None,
+        "available_candle_count": None,
+        "latest_candle_date": None,
+        "yfinance_backfill_used": False,
+        "inserted_candle_count": 0,
+        "updated_candle_count": 0,
+        "fundamental_available": False,
+        "valuation_available": False,
+        "news_article_count": 4,
+        "technical_summary_available": False,
+    }

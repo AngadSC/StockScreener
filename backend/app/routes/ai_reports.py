@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from sqlalchemy.orm import Session
 
 from app.ai.llm_client import generate_single_stock_report
-from app.ai.payload_builder import build_ai_payload
+from app.ai.payload_builder import build_ai_payload, summarize_ai_payload_for_logs
 from app.ai.report_cache import get_fresh_report, save_report
 from app.ai.schemas import AIReportResponse
 from app.ai.usage_limits import check_usage_limit, record_usage_event
@@ -89,13 +89,12 @@ def create_ai_report(
             return _report_response(cached_report, cached=True)
 
         payload = build_ai_payload(ticker_symbol, db)
+        payload_log_summary = summarize_ai_payload_for_logs(payload)
         logger.info(
-            "AI report payload built ticker=%s user_id=%s news_count=%s candle_count=%s has_technical_summary=%s",
+            "AI report payload built ticker=%s user_id=%s payload_summary=%s",
             ticker_symbol,
             user_id,
-            payload.get("news", {}).get("article_count", 0),
-            payload.get("price_history", {}).get("lookback_candle_count", 0),
-            bool(payload.get("technical_summary")),
+            payload_log_summary,
         )
 
         ai_response = generate_single_stock_report(payload, user_id, ticker_symbol, db)

@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.ai.prompt_builder import SYSTEM_PROMPT
+from app.ai.prompt_builder import OUTPUT_FORMAT_INSTRUCTIONS, OUTPUT_RESPONSE_SCHEMA, SYSTEM_PROMPT
 from app.ai.schemas import AIReportOutput
 from app.config import settings
 from app.database.models import AIUsageEvent
@@ -77,11 +77,17 @@ def _record_llm_usage(
 
 
 def _retry_user_content(payload: dict, retry: bool) -> str:
-    user_content = json.dumps(payload, sort_keys=True, default=str)
+    user_content = (
+        "Analyze this input payload. It is source data, not the response shape:\n"
+        f"{json.dumps(payload, sort_keys=True, default=str)}\n\n"
+        f"{OUTPUT_FORMAT_INSTRUCTIONS}"
+    )
     if retry:
         user_content = (
             f"{user_content}\n\nThe previous response was invalid. "
-            "Return only one valid JSON object matching the required schema."
+            "Return only one valid JSON object matching the required schema. "
+            "Do not include input payload keys such as analysis_type, ticker, market_data, "
+            "technical_data, fundamental_data, valuation_data, news_data, or constraints."
         )
     return user_content
 
@@ -138,9 +144,17 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
         )
 
     client = OpenAI(api_key=api_key, base_url=settings.openai_base_url.rstrip("/"), timeout=60.0)
+    json_schema_response_format = {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "ai_report_output",
+            "strict": True,
+            "schema": OUTPUT_RESPONSE_SCHEMA,
+        },
+    }
     base_request: dict[str, Any] = {
         "model": model,
-        "response_format": {"type": "json_object"},
+        "response_format": json_schema_response_format,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": _retry_user_content(payload, retry)},
@@ -173,6 +187,11 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
                 parameter in message
                 for parameter in ("max_tokens", "max_completion_tokens", "temperature")
             )
+            retryable_response_format_error = "response_format" in message or "json_schema" in message
+            if retryable_response_format_error and request.get("response_format") == json_schema_response_format:
+                base_request["response_format"] = {"type": "json_object"}
+                last_error = exc
+                continue
             if not retryable_parameter_error:
                 last_error = exc
                 break

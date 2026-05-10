@@ -86,8 +86,9 @@ def _retry_user_content(payload: dict, retry: bool) -> str:
         user_content = (
             f"{user_content}\n\nThe previous response was invalid. "
             "Return only one valid JSON object matching the required schema. "
-            "Do not include input payload keys such as analysis_type, ticker, market_data, "
-            "technical_data, fundamental_data, valuation_data, news_data, or constraints."
+            "Do not include input payload keys such as analysis_type, ticker, company_profile, "
+            "price_history, technical_summary, volume_summary, fundamental_summary, "
+            "valuation_summary, news, data_quality, or constraints."
         )
     return user_content
 

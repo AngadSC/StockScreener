@@ -90,12 +90,12 @@ def create_ai_report(
 
         payload = build_ai_payload(ticker_symbol, db)
         logger.info(
-            "AI report payload built ticker=%s user_id=%s news_count=%s has_market_data=%s has_technical_data=%s",
+            "AI report payload built ticker=%s user_id=%s news_count=%s candle_count=%s has_technical_summary=%s",
             ticker_symbol,
             user_id,
-            len(payload.get("news_data", [])),
-            bool(payload.get("market_data")),
-            bool(payload.get("technical_data")),
+            payload.get("news", {}).get("article_count", 0),
+            payload.get("price_history", {}).get("lookback_candle_count", 0),
+            bool(payload.get("technical_summary")),
         )
 
         ai_response = generate_single_stock_report(payload, user_id, ticker_symbol, db)

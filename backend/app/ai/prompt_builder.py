@@ -40,7 +40,7 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "Output requirements:\n"
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
-    "- Do not include input keys such as analysis_type, ticker, market_data, technical_data, fundamental_data, valuation_data, news_data, or constraints.\n"
+    "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, or constraints.\n"
     "- swing_bias must be one short label such as bullish, bearish, or neutral, max 20 characters.\n"
     "- setup_type must be a short setup label, max 50 characters.\n"
     "- Score fields must be numbers from 0 to 100.\n"

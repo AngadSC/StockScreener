@@ -1,27 +1,238 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy.orm import Session
 
 from app.ai.market_context import build_market_context
 from app.ai.news_client import get_recent_stock_news
 from app.ai.schemas import AIReportInput
+from app.ai.technical_summary import build_technical_summary
+
+
+PRICE_HISTORY_LOOKBACK_CANDLES = 120
+
+
+def _round(value: Any, digits: int = 4) -> float | int | None:
+    if value is None:
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return None
+    if numeric != numeric:
+        return None
+    rounded = round(numeric, digits)
+    return int(rounded) if rounded.is_integer() else rounded
+
+
+def _clean_candle(candle: dict[str, Any]) -> dict[str, Any]:
+    volume = candle.get("volume")
+    try:
+        clean_volume = int(volume) if volume is not None else None
+    except (TypeError, ValueError):
+        clean_volume = None
+
+    return {
+        "date": candle.get("date"),
+        "open": _round(candle.get("open")),
+        "high": _round(candle.get("high")),
+        "low": _round(candle.get("low")),
+        "close": _round(candle.get("close")),
+        "volume": clean_volume,
+    }
+
+
+def _company_profile(
+    ticker: str,
+    market_data: dict[str, Any],
+    fundamental_data: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "ticker": ticker,
+        "name": market_data.get("name"),
+        "exchange": market_data.get("exchange"),
+        "sector": fundamental_data.get("sector"),
+        "industry": fundamental_data.get("industry"),
+    }
+
+
+def _technical_summary(candles: list[dict[str, Any]]) -> dict[str, Any]:
+    summary = build_technical_summary(candles)
+    return {
+        "latest_candle": summary.get("latest_candle"),
+        "trend": summary.get("trend"),
+        "sma_20": summary.get("sma_20"),
+        "sma_50": summary.get("sma_50"),
+        "sma_200": summary.get("sma_200"),
+        "rsi_14": summary.get("rsi_14"),
+        "atr_14": summary.get("atr_14"),
+        "returns": {
+            "return_5d": summary.get("return_5d"),
+            "return_10d": summary.get("return_10d"),
+            "return_20d": summary.get("return_20d"),
+            "return_60d": summary.get("return_60d"),
+        },
+        "price_levels": {
+            "high_20d": summary.get("high_20d"),
+            "low_20d": summary.get("low_20d"),
+            "high_60d": summary.get("high_60d"),
+            "low_60d": summary.get("low_60d"),
+            "support_20d": summary.get("20d_support"),
+            "resistance_20d": summary.get("20d_resistance"),
+            "distance_from_support_20d": summary.get("20d_distance_from_support"),
+            "distance_from_resistance_20d": summary.get("20d_distance_from_resistance"),
+        },
+        "moving_average_distances": {
+            "distance_from_sma_20": summary.get("distance_from_sma_20"),
+            "distance_from_sma_50": summary.get("distance_from_sma_50"),
+            "distance_from_sma_200": summary.get("distance_from_sma_200"),
+        },
+    }
+
+
+def _volume_trend(summary: dict[str, Any]) -> str:
+    ratio = summary.get("latest_volume_vs_average_volume_20d")
+    if ratio is None:
+        return "insufficient_data"
+    if ratio >= 1.5:
+        return "elevated"
+    if ratio <= 0.7:
+        return "light"
+    return "normal"
+
+
+def _volume_summary(candles: list[dict[str, Any]]) -> dict[str, Any]:
+    summary = build_technical_summary(candles)
+    latest_candle = summary.get("latest_candle") or {}
+    return {
+        "latest_volume": latest_candle.get("volume"),
+        "average_volume_20d": summary.get("average_volume_20d"),
+        "average_volume_30d": summary.get("average_volume_30d"),
+        "average_volume_50d": summary.get("average_volume_50d"),
+        "latest_volume_vs_average_volume_20d": summary.get("latest_volume_vs_average_volume_20d"),
+        "volume_trend": _volume_trend(summary),
+    }
+
+
+def _fundamental_summary(fundamental_data: dict[str, Any]) -> dict[str, Any]:
+    if not fundamental_data:
+        return {
+            "available": False,
+            "missing_reason": "No fundamentals found in the database for this ticker.",
+            "last_updated": None,
+            "metrics": {},
+        }
+
+    return {
+        "available": True,
+        "missing_reason": None,
+        "last_updated": fundamental_data.get("last_updated"),
+        "metrics": {
+            "market_cap": fundamental_data.get("market_cap"),
+            "beta": fundamental_data.get("beta"),
+            "profit_margin": fundamental_data.get("profit_margin"),
+            "operating_margin": fundamental_data.get("operating_margin"),
+            "roe": fundamental_data.get("roe"),
+            "roa": fundamental_data.get("roa"),
+            "debt_to_equity": fundamental_data.get("debt_to_equity"),
+            "current_ratio": fundamental_data.get("current_ratio"),
+            "quick_ratio": fundamental_data.get("quick_ratio"),
+            "revenue_growth": fundamental_data.get("revenue_growth"),
+            "earnings_growth": fundamental_data.get("earnings_growth"),
+            "dividend_yield": fundamental_data.get("dividend_yield"),
+            "dividend_rate": fundamental_data.get("dividend_rate"),
+            "payout_ratio": fundamental_data.get("payout_ratio"),
+        },
+    }
+
+
+def _valuation_summary(valuation_data: dict[str, Any]) -> dict[str, Any]:
+    if not valuation_data:
+        return {
+            "available": False,
+            "missing_reason": "No valuation fundamentals found in the database for this ticker.",
+            "metrics": {},
+        }
+
+    return {
+        "available": True,
+        "missing_reason": None,
+        "metrics": {
+            "pe_ratio": valuation_data.get("pe_ratio"),
+            "forward_pe": valuation_data.get("forward_pe"),
+            "peg_ratio": valuation_data.get("peg_ratio"),
+            "price_to_book": valuation_data.get("price_to_book"),
+            "price_to_sales": valuation_data.get("price_to_sales"),
+            "ev_to_ebitda": valuation_data.get("ev_to_ebitda"),
+            "fifty_two_week_high": valuation_data.get("fifty_two_week_high"),
+            "fifty_two_week_low": valuation_data.get("fifty_two_week_low"),
+        },
+    }
+
+
+def _data_quality(
+    source_quality: dict[str, Any],
+    *,
+    candles: list[dict[str, Any]],
+    fundamental_summary: dict[str, Any],
+    valuation_summary: dict[str, Any],
+    news_payload: dict[str, Any],
+) -> dict[str, Any]:
+    quality = dict(source_quality)
+    quality.update(
+        {
+            "source": "database_after_optional_backfill",
+            "price_history_candle_count": len(candles),
+            "price_history_lookback_limit": PRICE_HISTORY_LOOKBACK_CANDLES,
+            "has_fundamentals": bool(fundamental_summary.get("available")),
+            "has_valuation": bool(valuation_summary.get("available")),
+            "news_article_count": news_payload.get("article_count", 0),
+        }
+    )
+    return quality
 
 
 def build_ai_payload(ticker: str, db: Session) -> dict:
     ticker = ticker.strip().upper()
     context = build_market_context(ticker, db)
+    market_data = context.get("market_data", {})
+    all_candles = [_clean_candle(candle) for candle in market_data.get("historical_ohlcv", [])]
+    candles = all_candles[-PRICE_HISTORY_LOOKBACK_CANDLES:]
+    latest_candle = candles[-1] if candles else None
+    fundamental_summary = _fundamental_summary(context.get("fundamental_data", {}))
+    valuation_summary = _valuation_summary(context.get("valuation_data", {}))
+    news_payload = get_recent_stock_news(ticker)
+
     payload = {
         "ticker": ticker,
         "analysis_type": "swing_trade_research",
         "timeframe": "3-20 trading days",
-        "market_data": context.get("market_data", {}),
-        "technical_data": context.get("technical_data", {}),
-        "fundamental_data": context.get("fundamental_data", {}),
-        "valuation_data": context.get("valuation_data", {}),
-        "news_data": get_recent_stock_news(ticker),
+        "generated_at": context.get("generated_at"),
+        "company_profile": _company_profile(ticker, market_data, context.get("fundamental_data", {})),
+        "price_history": {
+            "candles": candles,
+            "latest_candle": latest_candle,
+            "lookback_candle_count": len(candles),
+            "available_candle_count": len(all_candles),
+        },
+        "technical_summary": _technical_summary(candles),
+        "volume_summary": _volume_summary(candles),
+        "fundamental_summary": fundamental_summary,
+        "valuation_summary": valuation_summary,
+        "news": news_payload,
+        "data_quality": _data_quality(
+            market_data.get("data_quality", {}),
+            candles=candles,
+            fundamental_summary=fundamental_summary,
+            valuation_summary=valuation_summary,
+            news_payload=news_payload,
+        ),
         "constraints": {
             "do_not_invent_data": True,
             "use_only_provided_data": True,
+            "use_price_history_for_entry_analysis": True,
+            "output_is_research_not_financial_advice": True,
         },
     }
     return AIReportInput.model_validate(payload).model_dump(mode="json")

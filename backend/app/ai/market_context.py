@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import and_
@@ -295,6 +295,7 @@ def build_market_context(ticker: str, db: Session) -> dict:
     market_data = {
         "ticker": ticker,
         "name": ticker_obj.name if ticker_obj else None,
+        "exchange": ticker_obj.exchange if ticker_obj else None,
         "historical_ohlcv": historical_ohlcv,
         "latest_db_close": _round(latest_db_price.close) if latest_db_price else None,
         "latest_db_date": latest_db_price.date.isoformat() if latest_db_price else None,
@@ -313,7 +314,7 @@ def build_market_context(ticker: str, db: Session) -> dict:
 
     return {
         "ticker": ticker,
-        "generated_at": datetime.utcnow().isoformat(),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "market_data": market_data,
         "technical_data": technical_data,
         "fundamental_data": fundamental_data,

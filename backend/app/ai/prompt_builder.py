@@ -7,6 +7,7 @@ from app.ai.schemas import AIReportOutput
 
 OUTPUT_FIELDS = tuple(AIReportOutput.model_fields.keys())
 SCORE_FIELDS = {
+    "confidence_score",
     "setup_quality_score",
     "entry_timing_score",
     "technical_score",
@@ -43,6 +44,11 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, or constraints.\n"
     "- swing_bias must be one short label such as bullish, bearish, or neutral, max 20 characters.\n"
     "- setup_type must be a short setup label, max 50 characters.\n"
+    "- action_label should be a concise action status such as buy-watch, wait, avoid, hold, or monitor.\n"
+    "- confidence_score must be a number from 0 to 100 representing confidence in the action_label.\n"
+    "- entry_zone, confirmation_trigger, invalidation_level, target_1, and target_2 must be actionable levels or conditions based only on provided price data; say data is missing if a level cannot be supported.\n"
+    "- risk_reward_summary must explain the setup's reward versus invalidation risk using the provided levels.\n"
+    "- watchlist_action must state the next practical tracking action.\n"
     "- Score fields must be numbers from 0 to 100.\n"
     "- confirmation_signals must be an array of short strings.\n"
     "- If supporting data is missing, state that in the relevant string fields instead of inventing facts.\n"

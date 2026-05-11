@@ -21,6 +21,17 @@ router = APIRouter(prefix="/api/ai-reports", tags=["ai-reports"])
 logger = logging.getLogger(__name__)
 
 ALLOWED_AI_REPORT_TIERS = {"pro", "trader", "elite"}
+LEGACY_ACTIONABLE_REPORT_DEFAULTS: dict[str, Any] = {
+    "action_label": "review_existing_report",
+    "confidence_score": 0,
+    "entry_zone": "Not included in this cached report.",
+    "confirmation_trigger": "Not included in this cached report.",
+    "invalidation_level": "Not included in this cached report.",
+    "target_1": "Not included in this cached report.",
+    "target_2": "Not included in this cached report.",
+    "risk_reward_summary": "Not included in this cached report.",
+    "watchlist_action": "Generate a fresh report for actionable levels.",
+}
 
 
 def _normalize_tier(tier: str | None) -> str:
@@ -29,13 +40,14 @@ def _normalize_tier(tier: str | None) -> str:
 
 def _report_response(report: AIStockReport, cached: bool) -> AIReportResponse:
     created_at = report.created_at or datetime.now(timezone.utc)
+    ai_report = {**LEGACY_ACTIONABLE_REPORT_DEFAULTS, **(report.ai_report or {})}
     return AIReportResponse.model_validate(
         {
             "ticker": report.ticker,
             "created_at": created_at,
             "cached": cached,
             "tier_used": report.tier_used or "unknown",
-            "report": report.ai_report or {},
+            "report": ai_report,
         }
     )
 

@@ -21,6 +21,12 @@ function getBiasClass(swingBias: string) {
   return 'border-[var(--border-strong)] bg-[rgba(152,152,176,0.08)] text-[var(--neutral)]';
 }
 
+function formatReportLabel(value: string) {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps) {
   return (
     <section className="deco-panel p-6 md:p-7">
@@ -36,12 +42,18 @@ export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps
 
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
         <div className="text-xs uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
-          Setup Type
+          Action
         </div>
-        <div className="heading-sm mt-2 text-[var(--text-primary)]">{report.setup_type}</div>
+        <div className="heading-sm mt-2 text-[var(--text-primary)]">
+          {formatReportLabel(report.action_label)}
+        </div>
+        <div className="mt-2 text-sm text-[var(--text-secondary)]">
+          {formatReportLabel(report.setup_type)}
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <AIScoreBadge label="Confidence" score={report.confidence_score} />
         <AIScoreBadge label="Setup Quality" score={report.setup_quality_score} />
         <AIScoreBadge label="Entry Timing" score={report.entry_timing_score} />
         <AIScoreBadge label="Risk" score={report.risk_score} />

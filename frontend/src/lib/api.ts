@@ -49,13 +49,30 @@ const getApiOrigin = () => {
   }
 };
 
+type FastAPIErrorDetail =
+  | string
+  | {
+      error?: string;
+      message?: string;
+      ticker?: string;
+      model?: string;
+      last_error?: string;
+    };
+
 type FastAPIErrorResponse = {
-  detail?: string;
+  detail?: FastAPIErrorDetail;
 };
 
 const getErrorDetail = (error: AxiosError<FastAPIErrorResponse>) => (
   typeof error.response?.data?.detail === 'string'
     ? error.response.data.detail
+    : typeof error.response?.data?.detail === 'object'
+      ? [
+          error.response.data.detail.message,
+          error.response.data.detail.error ? `Code: ${error.response.data.detail.error}` : undefined,
+          error.response.data.detail.model ? `Model: ${error.response.data.detail.model}` : undefined,
+          error.response.data.detail.last_error ? `Last error: ${error.response.data.detail.last_error}` : undefined,
+        ].filter(Boolean).join(' | ')
     : undefined
 );
 
@@ -267,6 +284,15 @@ export const generateAIReport = async (ticker: string): Promise<AIReportResponse
           error: 'limit_exceeded',
           status: 429,
           message: detail ?? 'AI report limit exceeded.',
+          detail,
+        };
+      }
+
+      if (error.response?.status) {
+        return {
+          error: 'generation_failed',
+          status: error.response.status,
+          message: detail ?? 'Unable to generate the AI report.',
           detail,
         };
       }

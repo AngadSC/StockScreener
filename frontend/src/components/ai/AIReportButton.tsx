@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Lock, Loader2, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -38,9 +39,11 @@ export default function AIReportButton({
 
   if (!canGenerate) {
     return (
-      <Button disabled variant="outline">
-        <Lock className="h-4 w-4" />
-        Upgrade to Pro
+      <Button asChild variant="outline">
+        <Link href="/pricing?feature=ai-report">
+          <Lock className="h-4 w-4" />
+          Upgrade to Pro
+        </Link>
       </Button>
     );
   }

@@ -1,6 +1,8 @@
 export interface AIReportOutput {
-  swing_bias: string;
+  action_label: 'buy_setup' | 'watchlist' | 'neutral' | 'avoid' | 'high_risk';
+  swing_bias: 'bullish' | 'bearish' | 'neutral' | 'mixed';
   setup_type: string;
+  confidence_score: number;
   setup_quality_score: number;
   entry_timing_score: number;
   technical_score: number;
@@ -8,11 +10,17 @@ export interface AIReportOutput {
   sentiment_score: number;
   valuation_score: number;
   risk_score: number;
+  trade_read: string;
   main_thesis: string;
+  entry_zone: string;
+  confirmation_trigger: string;
+  invalidation_level: string;
+  target_1: string;
+  target_2: string;
+  risk_reward_summary: string;
   why_it_could_move: string;
   why_it_could_fail: string;
-  entry_commentary: string;
-  invalidation: string;
+  watchlist_action: string;
   confirmation_signals: string[];
   news_summary: string;
   final_verdict: string;
@@ -50,9 +58,17 @@ export interface AIReportLimitExceededResponse {
   detail?: string;
 }
 
+export interface AIReportGenerationErrorResponse {
+  error: 'generation_failed';
+  status: number;
+  message: string;
+  detail?: string;
+}
+
 export type AIReportErrorResponse =
   | AIReportForbiddenResponse
-  | AIReportLimitExceededResponse;
+  | AIReportLimitExceededResponse
+  | AIReportGenerationErrorResponse;
 
 export type AIReportResponse = AIReportSuccessResponse | AIReportErrorResponse;
 

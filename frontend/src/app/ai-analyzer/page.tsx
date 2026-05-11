@@ -1,19 +1,55 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Lock, Search, Sparkles } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { screenerAPI } from '@/lib/api';
 import { isProTier, useAuth } from '@/lib/auth';
+import type { StockSuggestion } from '@/types/stock';
 
 export default function AiAnalyzerPage() {
   const { isLoading, isLoggedIn, userTier } = useAuth();
   const [tickerInput, setTickerInput] = useState('');
   const [submittedTicker, setSubmittedTicker] = useState('');
+  const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [isSuggestLoading, setIsSuggestLoading] = useState(false);
+  const latestQueryRef = useRef(0);
   const canAnalyze = isLoggedIn && isProTier(userTier);
+
+  useEffect(() => {
+    const trimmed = tickerInput.trim();
+
+    if (!trimmed || !canAnalyze) {
+      setSuggestions([]);
+      setSuggestOpen(false);
+      return;
+    }
+
+    const requestId = ++latestQueryRef.current;
+    const timer = setTimeout(async () => {
+      setIsSuggestLoading(true);
+      try {
+        const result = await screenerAPI.suggestStocks(trimmed, 6);
+        if (requestId !== latestQueryRef.current) return;
+        setSuggestions(result.results);
+        setSuggestOpen(true);
+      } catch {
+        if (requestId !== latestQueryRef.current) return;
+        setSuggestions([]);
+        setSuggestOpen(false);
+      } finally {
+        if (requestId === latestQueryRef.current) {
+          setIsSuggestLoading(false);
+        }
+      }
+    }, 220);
+
+    return () => clearTimeout(timer);
+  }, [canAnalyze, tickerInput]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -21,7 +57,19 @@ export default function AiAnalyzerPage() {
     if (!canAnalyze) return;
 
     const ticker = tickerInput.trim().toUpperCase();
-    if (ticker) setSubmittedTicker(ticker);
+    if (ticker) {
+      setSuggestOpen(false);
+      setSubmittedTicker(ticker);
+    }
+  };
+
+  const handleSuggestionSelect = (ticker: string) => {
+    const normalizedTicker = ticker.trim().toUpperCase();
+    setTickerInput(normalizedTicker);
+    setSuggestOpen(false);
+    if (canAnalyze) {
+      setSubmittedTicker(normalizedTicker);
+    }
   };
 
   return (
@@ -37,23 +85,71 @@ export default function AiAnalyzerPage() {
         </section>
 
         <section className="deco-panel p-5 md:p-6">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <Search
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]"
-                aria-hidden="true"
-              />
-              <Input
-                aria-label="Ticker symbol"
-                className="pl-10 uppercase"
-                disabled={isLoading || !canAnalyze}
-                maxLength={12}
-                onChange={(event) => setTickerInput(event.target.value)}
-                placeholder="AAPL"
-                value={tickerInput}
-              />
+              <div className="flex h-12 items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-4 text-sm transition-[border-color,box-shadow] duration-300 ease-out focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(108,92,231,0.14)]">
+                <Search className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" aria-hidden="true" />
+                <input
+                  aria-label="Ticker symbol"
+                  autoComplete="off"
+                  className="w-full border-none bg-transparent p-0 text-sm font-semibold uppercase text-[var(--text-primary)] shadow-none outline-none placeholder:font-normal placeholder:normal-case placeholder:text-[var(--text-secondary)] focus:border-none focus:shadow-none"
+                  disabled={isLoading || !canAnalyze}
+                  maxLength={12}
+                  onBlur={() => {
+                    setTimeout(() => setSuggestOpen(false), 150);
+                  }}
+                  onChange={(event) => setTickerInput(event.target.value)}
+                  onFocus={() => {
+                    if (suggestions.length > 0) setSuggestOpen(true);
+                  }}
+                  placeholder="Search ticker or company"
+                  type="text"
+                  value={tickerInput}
+                />
+              </div>
+              {suggestOpen ? (
+                <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-30 overflow-hidden rounded-[20px] border border-[var(--border-default)] bg-[var(--bg-surface-1)] shadow-[var(--shadow-lg)]">
+                  <div className="border-b border-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--text-secondary)]">
+                    {isSuggestLoading ? 'Searching' : 'Quick matches'}
+                  </div>
+                  <div className="deco-scroll max-h-64 overflow-auto py-1">
+                    {!isSuggestLoading && suggestions.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                        No matches found.
+                      </div>
+                    ) : null}
+                    {suggestions.map((item) => (
+                      <div
+                        key={item.ticker}
+                        className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--accent-subtle)]"
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          handleSuggestionSelect(item.ticker);
+                        }}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[var(--text-primary)]">
+                            {item.ticker}
+                          </div>
+                          <div
+                            className="truncate text-sm text-[var(--text-secondary)]"
+                            title={item.name || 'Company profile'}
+                          >
+                            {item.name || 'Company profile'}
+                          </div>
+                        </div>
+                        <div className="text-xs font-medium text-[var(--accent)]">Analyze</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
-            <Button disabled={isLoading || !canAnalyze || !tickerInput.trim()} type="submit">
+            <Button
+              className="h-12 rounded-full px-6"
+              disabled={isLoading || !canAnalyze || !tickerInput.trim()}
+              type="submit"
+            >
               <Sparkles className="h-4 w-4" />
               Analyze
             </Button>
@@ -104,7 +200,7 @@ export default function AiAnalyzerPage() {
                 </div>
               </div>
               <Button asChild>
-                <Link href="/contact">Upgrade to Pro</Link>
+                <Link href="/pricing?feature=ai-analyzer">Upgrade to Pro</Link>
               </Button>
             </div>
           </section>

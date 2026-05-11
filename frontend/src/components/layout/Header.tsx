@@ -21,6 +21,7 @@ import {
 import BrandMark from '@/components/layout/BrandMark';
 import { Button } from '@/components/ui/button';
 import { authAPI, screenerAPI } from '@/lib/api';
+import { isProTier } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import type { StockSuggestion } from '@/types/stock';
 
@@ -50,6 +51,7 @@ export default function Header() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userTier, setUserTier] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
@@ -62,10 +64,16 @@ export default function Header() {
 
     const loadSession = async () => {
       try {
-        await authAPI.getCurrentUser();
-        if (mounted) setIsLoggedIn(true);
+        const user = await authAPI.getCurrentUser();
+        if (mounted) {
+          setIsLoggedIn(true);
+          setUserTier(user.tier ?? 'free');
+        }
       } catch {
-        if (mounted) setIsLoggedIn(false);
+        if (mounted) {
+          setIsLoggedIn(false);
+          setUserTier('free');
+        }
       }
     };
 
@@ -140,6 +148,7 @@ export default function Header() {
       setIsMobileMenuOpen(false);
       await authAPI.logout();
       setIsLoggedIn(false);
+      setUserTier('free');
     } catch {
       window.location.href = '/auth/login';
     }
@@ -173,11 +182,13 @@ export default function Header() {
     const Icon = item.icon;
     const isActive = isNavItemActive(pathname, item.href);
     const showLock = Boolean(item.requiresAuth && !isLoggedIn);
+    const routeToPricing = Boolean(item.proBadge && userTier && !isProTier(userTier));
+    const href = routeToPricing ? `/pricing?feature=${encodeURIComponent(item.href.replace('/', ''))}` : item.href;
 
     return (
       <Link
         key={`${mobile ? 'mobile' : 'desktop'}-${item.href}`}
-        href={item.href}
+        href={href}
         data-active={mobile ? undefined : String(isActive)}
         title={showLock ? 'Sign in to access your Watchlist' : undefined}
         onClick={() => setIsMobileMenuOpen(false)}

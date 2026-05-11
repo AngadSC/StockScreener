@@ -1,4 +1,12 @@
-from app.ai.prompt_builder import OUTPUT_FIELDS, OUTPUT_FORMAT_INSTRUCTIONS, OUTPUT_RESPONSE_SCHEMA
+from app.ai.prompt_builder import (
+    ACTIONABLE_OUTPUT_INSTRUCTIONS,
+    DECISION_RULES,
+    OUTPUT_FIELDS,
+    OUTPUT_FORMAT_INSTRUCTIONS,
+    OUTPUT_RESPONSE_SCHEMA,
+    SYSTEM_PROMPT,
+    SYSTEM_ROLE,
+)
 from app.ai.schemas import AIReportOutput
 
 
@@ -8,7 +16,8 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
     assert set(OUTPUT_RESPONSE_SCHEMA["properties"]) == set(AIReportOutput.model_fields)
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["confirmation_signals"] == {
         "type": "array",
-        "items": {"type": "string"},
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 1,
     }
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["technical_score"] == {
         "type": "number",
@@ -20,7 +29,19 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
         "minimum": 0,
         "maximum": 100,
     }
-    assert OUTPUT_RESPONSE_SCHEMA["properties"]["swing_bias"]["maxLength"] == 20
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["action_label"]["enum"] == [
+        "buy_setup",
+        "watchlist",
+        "neutral",
+        "avoid",
+        "high_risk",
+    ]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["swing_bias"]["enum"] == [
+        "bullish",
+        "bearish",
+        "neutral",
+        "mixed",
+    ]
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["setup_type"]["maxLength"] == 50
 
 
@@ -32,5 +53,14 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "watchlist_action" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "setup_quality_score" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
-    assert "max 20 characters" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "buy_setup, watchlist, neutral, avoid, high_risk" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "bullish, bearish, neutral, mixed" in OUTPUT_FORMAT_INSTRUCTIONS
+
+
+def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
+    assert SYSTEM_ROLE in SYSTEM_PROMPT
+    assert DECISION_RULES in SYSTEM_PROMPT
+    assert ACTIONABLE_OUTPUT_INSTRUCTIONS in SYSTEM_PROMPT
+    assert "Do not force bullish output" in SYSTEM_PROMPT
+    assert "final_verdict must clearly say" in SYSTEM_PROMPT

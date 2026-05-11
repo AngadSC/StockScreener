@@ -20,14 +20,33 @@ SCORE_FIELDS = {
 
 def _response_property(field: str) -> dict:
     if field == "confirmation_signals":
-        return {"type": "array", "items": {"type": "string"}}
-    if field in SCORE_FIELDS:
+        return {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+    if field in SCORE_FIELDS or field == "confidence_score":
         return {"type": "number", "minimum": 0, "maximum": 100}
+    if field == "action_label":
+        return {
+            "type": "string",
+            "enum": ["buy_setup", "watchlist", "neutral", "avoid", "high_risk"],
+        }
     if field == "swing_bias":
-        return {"type": "string", "minLength": 1, "maxLength": 20}
+        return {
+            "type": "string",
+            "enum": ["bullish", "bearish", "neutral", "mixed"],
+        }
     if field == "setup_type":
         return {"type": "string", "minLength": 1, "maxLength": 50}
     return {"type": "string", "minLength": 1}
+
+
+SYSTEM_ROLE = (
+    "You are an AI swing-trade research analyst for QuantorSignal. "
+    "Your job is to convert structured stock data into a practical research decision for a 3-20 trading day timeframe. "
+    "Analyze only the provided data. Do not invent prices, fundamentals, news, filings, catalysts, or events. "
+    "Do not provide personalized financial advice. This is research output only.\n\n"
+    "The report must help the user decide whether the stock is actionable now, should be watched for confirmation, "
+    "has no clear edge, or should be avoided due to risk. Avoid generic commentary. Every field should be specific, "
+    "decision-oriented, and grounded in the provided data."
+)
 
 OUTPUT_RESPONSE_SCHEMA = {
     "type": "object",
@@ -42,9 +61,9 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
     "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, or constraints.\n"
-    "- swing_bias must be one short label such as bullish, bearish, or neutral, max 20 characters.\n"
-    "- setup_type must be a short setup label, max 50 characters.\n"
-    "- action_label should be a concise action status such as buy-watch, wait, avoid, hold, or monitor.\n"
+    "- action_label must be one of: buy_setup, watchlist, neutral, avoid, high_risk.\n"
+    "- swing_bias must be one of: bullish, bearish, neutral, mixed.\n"
+    "- setup_type must be a short label such as mean_reversion_bounce, breakout, pullback, momentum_continuation, breakdown_risk, no_clear_setup, max 50 characters.\n"
     "- confidence_score must be a number from 0 to 100 representing confidence in the action_label.\n"
     "- entry_zone, confirmation_trigger, invalidation_level, target_1, and target_2 must be actionable levels or conditions based only on provided price data; say data is missing if a level cannot be supported.\n"
     "- risk_reward_summary must explain the setup's reward versus invalidation risk using the provided levels.\n"
@@ -65,13 +84,37 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
     "- If OHLCV data_quality includes warnings, mention those limitations in the relevant report fields."
 )
 
+DECISION_RULES = (
+    "Decision rules:\n"
+    "- Use action_label='buy_setup' only when technical setup, entry timing, volume, and risk/reward are reasonably aligned.\n"
+    "- Use action_label='watchlist' when there are early positive signs but confirmation is missing.\n"
+    "- Use action_label='neutral' when signals are mixed or there is no clear edge.\n"
+    "- Use action_label='avoid' when the setup is weak, data quality is poor, or downside/risk dominates.\n"
+    "- Use action_label='high_risk' when the stock may move but risk is elevated due to weak fundamentals, poor liquidity, stale data, extreme volatility, or weak confirmation.\n"
+    "- Do not force bullish output. If the setup is weak, say so clearly.\n"
+    "- Entry zones, targets, and invalidation levels must come only from provided prices, support/resistance, moving averages, recent highs/lows, ATR, or candle data.\n"
+    "- If a precise entry, target, or invalidation level cannot be supported by provided data, state that it is not supported by the available data."
+)
+
+ACTIONABLE_OUTPUT_INSTRUCTIONS = (
+    "Actionable output instructions:\n"
+    "- Start from the decision, then justify it.\n"
+    "- final_verdict must clearly say one of: act now, wait for confirmation, watchlist only, no clear edge, or avoid.\n"
+    "- entry_zone should give a price area or say no supported entry zone.\n"
+    "- confirmation_trigger should describe the exact condition that would improve the setup, using provided levels when available.\n"
+    "- invalidation_level should identify the level or condition that weakens the thesis.\n"
+    "- target_1 and target_2 should use nearby resistance, moving averages, recent highs, or other provided levels. Do not invent targets.\n"
+    "- risk_reward_summary should explain whether upside appears worth the downside risk based only on provided levels.\n"
+    "- watchlist_action should say what the user should monitor next, such as volume expansion, close above SMA, higher low, RSI recovery, or support hold.\n"
+    "- Use plain English. Avoid vague phrases like 'could be interesting' unless followed by a concrete condition."
+)
+
 
 SYSTEM_PROMPT = (
-    "You are an AI swing-trade research analyst. Analyze the provided structured stock data only. "
-    "Do not invent prices, fundamentals, news, or events. Do not provide financial advice. "
-    "Give an explainable swing-trade research report for a 3-20 trading day timeframe. "
-    "Return valid JSON only. If data is missing, say it is missing. Do not guess.\n\n"
+    f"{SYSTEM_ROLE}\n\n"
     f"{INPUT_ANALYSIS_INSTRUCTIONS}\n\n"
+    f"{DECISION_RULES}\n\n"
+    f"{ACTIONABLE_OUTPUT_INSTRUCTIONS}\n\n"
     f"{OUTPUT_FORMAT_INSTRUCTIONS}"
 )
 

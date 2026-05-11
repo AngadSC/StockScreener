@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.ai.llm_client import generate_single_stock_report
 from app.ai.payload_builder import build_ai_payload, summarize_ai_payload_for_logs
 from app.ai.report_cache import get_fresh_report, save_report
-from app.ai.schemas import AIReportResponse
+from app.ai.schemas import AIReportOutput, AIReportResponse
 from app.ai.usage_limits import check_usage_limit, record_usage_event
 from app.config import settings
 from app.database.connection import get_db
@@ -22,15 +22,31 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_AI_REPORT_TIERS = {"pro", "trader", "elite"}
 LEGACY_ACTIONABLE_REPORT_DEFAULTS: dict[str, Any] = {
-    "action_label": "review_existing_report",
+    "action_label": "neutral",
+    "swing_bias": "neutral",
+    "setup_type": "no_clear_setup",
     "confidence_score": 0,
+    "setup_quality_score": 0,
+    "entry_timing_score": 0,
+    "technical_score": 0,
+    "fundamental_score": 0,
+    "sentiment_score": 0,
+    "valuation_score": 0,
+    "risk_score": 0,
+    "trade_read": "Not included in this cached report.",
+    "main_thesis": "Not included in this cached report.",
     "entry_zone": "Not included in this cached report.",
     "confirmation_trigger": "Not included in this cached report.",
     "invalidation_level": "Not included in this cached report.",
     "target_1": "Not included in this cached report.",
     "target_2": "Not included in this cached report.",
     "risk_reward_summary": "Not included in this cached report.",
+    "why_it_could_move": "Not included in this cached report.",
+    "why_it_could_fail": "Not included in this cached report.",
+    "confirmation_signals": ["Generate a fresh report for confirmation signals."],
     "watchlist_action": "Generate a fresh report for actionable levels.",
+    "news_summary": "Not included in this cached report.",
+    "final_verdict": "no clear edge - generate a fresh report for the updated report contract.",
 }
 
 
@@ -41,6 +57,7 @@ def _normalize_tier(tier: str | None) -> str:
 def _report_response(report: AIStockReport, cached: bool) -> AIReportResponse:
     created_at = report.created_at or datetime.now(timezone.utc)
     ai_report = {**LEGACY_ACTIONABLE_REPORT_DEFAULTS, **(report.ai_report or {})}
+    ai_report = {field: ai_report[field] for field in AIReportOutput.model_fields if field in ai_report}
     return AIReportResponse.model_validate(
         {
             "ticker": report.ticker,

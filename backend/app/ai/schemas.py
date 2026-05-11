@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -41,12 +41,16 @@ class AIReportInput(BaseModel):
         return value.strip().upper()
 
 
+ActionLabel = Literal["buy_setup", "watchlist", "neutral", "avoid", "high_risk"]
+SwingBias = Literal["bullish", "bearish", "neutral", "mixed"]
+
+
 class AIReportOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    swing_bias: str = Field(..., min_length=1, max_length=20)
+    action_label: ActionLabel
+    swing_bias: SwingBias
     setup_type: str = Field(..., min_length=1, max_length=50)
-    action_label: str = Field(..., min_length=1)
     confidence_score: float = Field(..., ge=0.0, le=100.0)
     setup_quality_score: float = Field(..., ge=0.0, le=100.0)
     entry_timing_score: float = Field(..., ge=0.0, le=100.0)
@@ -55,21 +59,36 @@ class AIReportOutput(BaseModel):
     sentiment_score: float = Field(..., ge=0.0, le=100.0)
     valuation_score: float = Field(..., ge=0.0, le=100.0)
     risk_score: float = Field(..., ge=0.0, le=100.0)
+    trade_read: str = Field(..., min_length=1)
     main_thesis: str = Field(..., min_length=1)
-    why_it_could_move: str = Field(..., min_length=1)
-    why_it_could_fail: str = Field(..., min_length=1)
     entry_zone: str = Field(..., min_length=1)
     confirmation_trigger: str = Field(..., min_length=1)
-    entry_commentary: str = Field(..., min_length=1)
     invalidation_level: str = Field(..., min_length=1)
-    invalidation: str = Field(..., min_length=1)
     target_1: str = Field(..., min_length=1)
     target_2: str = Field(..., min_length=1)
     risk_reward_summary: str = Field(..., min_length=1)
+    why_it_could_move: str = Field(..., min_length=1)
+    why_it_could_fail: str = Field(..., min_length=1)
+    confirmation_signals: List[str] = Field(default_factory=list, min_length=1)
     watchlist_action: str = Field(..., min_length=1)
-    confirmation_signals: List[str] = Field(default_factory=list)
     news_summary: str = Field(..., min_length=1)
     final_verdict: str = Field(..., min_length=1)
+
+    @field_validator("action_label", mode="before")
+    @classmethod
+    def normalize_action_label(cls, value: Any) -> str:
+        cleaned = _clean_short_text(value).lower().replace("-", "_").replace(" ", "_")
+        if cleaned in {"buy", "buy_watch", "buy_setup", "act_now", "actionable"}:
+            return "buy_setup"
+        if cleaned in {"wait", "monitor", "watch", "watchlist", "wait_for_confirmation"}:
+            return "watchlist"
+        if cleaned in {"hold", "no_clear_edge", "no_clear_setup", "mixed", "neutral", "review_existing_report"}:
+            return "neutral"
+        if cleaned in {"sell", "pass", "avoid", "weak_setup"}:
+            return "avoid"
+        if cleaned in {"high_risk", "risky", "speculative", "elevated_risk"}:
+            return "high_risk"
+        return cleaned
 
     @field_validator("swing_bias", mode="before")
     @classmethod
@@ -80,7 +99,9 @@ class AIReportOutput(BaseModel):
             return "bullish"
         if "bearish" in lower_value:
             return "bearish"
-        if any(label in lower_value for label in ("neutral", "mixed", "sideways", "range-bound")):
+        if any(label in lower_value for label in ("mixed", "conflicted", "two-sided")):
+            return "mixed"
+        if any(label in lower_value for label in ("neutral", "sideways", "range-bound", "range bound")):
             return "neutral"
         return _truncate_at_word(cleaned, 20)
 

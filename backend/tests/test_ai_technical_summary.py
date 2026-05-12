@@ -14,6 +14,7 @@ from app.ai.technical_summary import (
     high_low,
     latest_candle_summary,
     latest_volume_ratio,
+    price_action_structure,
     return_over,
     rsi_14,
     sma,
@@ -123,6 +124,7 @@ def test_latest_candle_summary_accepts_lightweight_objects() -> None:
 
 def test_build_technical_summary_rounds_values_and_classifies_trend() -> None:
     summary = build_technical_summary(_sample_candles())
+    structure = summary["price_action_structure"]
 
     assert summary["latest_candle"]["date"] == "2025-08-08"
     assert summary["sma_20"] == pytest.approx(309.5)
@@ -147,7 +149,42 @@ def test_build_technical_summary_rounds_values_and_classifies_trend() -> None:
     assert summary["high_20d"] == pytest.approx(321.0)
     assert summary["low_60d"] == pytest.approx(258.0)
     assert summary["20d_distance_from_resistance"] == pytest.approx(round((319.0 - 321.0) / 321.0, 4))
+    assert structure["setup_label"] == "compression_breakout_attempt"
+    assert structure["structure_label"] == "higher_highs_higher_lows"
+    assert structure["breakout_label"] == "breakout_attempt"
+    assert structure["range_label"] == "compressed_range"
+    assert structure["near_20d_high"] is True
+    assert structure["breakout_attempt"] is True
+    assert structure["higher_highs_higher_lows"] is True
+    assert structure["distance_to_support_pct"] == pytest.approx(round((319.0 - 298.0) / 319.0 * 100, 4))
+    assert structure["distance_to_resistance_pct"] == pytest.approx(round((320.0 - 319.0) / 319.0 * 100, 4))
+    assert "breakout_attempt" in structure["labels"]
     assert summary["trend"] == "strong_uptrend"
+
+
+def test_price_action_structure_detects_failed_breakout() -> None:
+    candles = _sample_candles(80)
+    for index, candle in enumerate(candles):
+        close = 100.0 + min(index, 60) * 0.1
+        candle["open"] = close - 0.2
+        candle["high"] = close + 0.6
+        candle["low"] = close - 0.6
+        candle["close"] = close
+
+    candles[-4]["close"] = 112.0
+    candles[-4]["high"] = 112.5
+    candles[-3]["close"] = 105.0
+    candles[-2]["close"] = 104.5
+    candles[-1]["close"] = 104.0
+    candles[-1]["high"] = 104.7
+    candles[-1]["low"] = 103.5
+
+    structure = price_action_structure(candles)
+
+    assert structure["failed_breakout"] is True
+    assert structure["breakout_label"] == "failed_breakout"
+    assert structure["setup_label"] == "failed_breakout"
+    assert "failed_breakout" in structure["labels"]
 
 
 def test_insufficient_history_returns_none_and_insufficient_trend() -> None:

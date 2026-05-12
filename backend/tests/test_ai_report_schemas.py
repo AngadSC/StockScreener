@@ -5,6 +5,54 @@ def _valid_report(**overrides):
     report = {
         "action_label": "watchlist",
         "swing_bias": "neutral",
+        "timeframe_ratings": {
+            "short_term": {
+                "rating": "watch",
+                "timeframe": "1-10 trading days",
+                "confidence_score": 55,
+                "reason": "Short-term confirmation is missing.",
+            },
+            "swing": {
+                "rating": "watch",
+                "timeframe": "2-8 weeks",
+                "confidence_score": 60,
+                "reason": "Swing setup needs a confirmed break above resistance.",
+            },
+            "long_term": {
+                "rating": "unknown",
+                "timeframe": "6-24 months",
+                "confidence_score": 20,
+                "reason": "Long-term evidence is incomplete.",
+            },
+        },
+        "price_action_structure": {
+            "setup_label": "breakout_attempt",
+            "structure_label": "higher_highs_higher_lows",
+            "breakout_label": "breakout_attempt",
+            "pullback_label": "pullback_to_sma20",
+            "range_label": "normal_range",
+            "gap_label": "no_recent_gap",
+            "labels": ["breakout_attempt", "pullback_to_sma20"],
+            "near_20d_high": True,
+            "near_60d_high": False,
+            "distance_to_support_pct": 3.2,
+            "distance_to_resistance_pct": 5.8,
+            "range_compression": False,
+            "higher_highs_higher_lows": True,
+            "lower_highs_lower_lows": False,
+            "gap_up_recent": False,
+            "gap_down_recent": False,
+            "failed_breakout": False,
+            "breakout_attempt": True,
+            "pullback_to_sma20": True,
+            "pullback_to_sma50": False,
+            "support_level": 100,
+            "resistance_level": 110,
+            "prior_20d_resistance": 110,
+            "sma_20": 102,
+            "sma_50": 98,
+            "sma_200": 90,
+        },
         "setup_type": "base_breakout",
         "confidence_score": 50,
         "setup_quality_score": 50,
@@ -59,3 +107,34 @@ def test_ai_report_output_allows_mixed_swing_bias() -> None:
     report = AIReportOutput.model_validate(_valid_report(swing_bias="mixed signals"))
 
     assert report.swing_bias == "mixed"
+
+
+def test_ai_report_output_normalizes_timeframe_ratings() -> None:
+    report = AIReportOutput.model_validate(
+        _valid_report(
+            timeframe_ratings={
+                "short_term": {
+                    "rating": "wait for confirmation",
+                    "timeframe": "1-10 trading days",
+                    "confidence_score": 45,
+                    "reason": "Needs volume.",
+                },
+                "swing": {
+                    "rating": "buy_setup",
+                    "timeframe": "2-8 weeks",
+                    "confidence_score": 70,
+                    "reason": "Breakout path is clear.",
+                },
+                "long_term": {
+                    "rating": "insufficient_data",
+                    "timeframe": "6-24 months",
+                    "confidence_score": 10,
+                    "reason": "Fundamentals are missing.",
+                },
+            }
+        )
+    )
+
+    assert report.timeframe_ratings.short_term.rating == "watch"
+    assert report.timeframe_ratings.swing.rating == "buy"
+    assert report.timeframe_ratings.long_term.rating == "unknown"

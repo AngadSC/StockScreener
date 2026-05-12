@@ -425,6 +425,283 @@ def support_resistance_distances(
     }
 
 
+def _percent_distance_to_support(candles: Sequence[CandleLike], support: float | None) -> float | None:
+    latest_close = _latest_close(candles)
+    if latest_close in (None, 0) or support is None:
+        return None
+    return (latest_close - support) / latest_close * 100
+
+
+def _percent_distance_to_resistance(candles: Sequence[CandleLike], resistance: float | None) -> float | None:
+    latest_close = _latest_close(candles)
+    if latest_close in (None, 0) or resistance is None:
+        return None
+    return (resistance - latest_close) / latest_close * 100
+
+
+def _within_pct_below(value: float | None, level: float | None, threshold_pct: float) -> bool:
+    if value in (None, 0) or level in (None, 0):
+        return False
+    return value <= level and ((level - value) / level * 100) <= threshold_pct
+
+
+def _window_range_pct(candles: Sequence[CandleLike], window: int) -> float | None:
+    ordered = _ordered(candles)
+    if window <= 0 or len(ordered) < window:
+        return None
+    highs = [_number(candle, "high") for candle in ordered[-window:]]
+    lows = [_number(candle, "low") for candle in ordered[-window:]]
+    if any(high is None for high in highs) or any(low is None for low in lows):
+        return None
+    high = max(high for high in highs if high is not None)
+    low = min(low for low in lows if low is not None)
+    if low == 0:
+        return None
+    return (high - low) / low * 100
+
+
+def _range_compression(candles: Sequence[CandleLike]) -> tuple[bool, str]:
+    recent_range = _window_range_pct(candles, 10)
+    medium_range = _window_range_pct(candles, 20)
+    larger_range = _window_range_pct(candles, 60)
+    if recent_range is None or medium_range is None:
+        return False, "insufficient_data"
+    if recent_range <= medium_range * 0.7 and (larger_range is None or recent_range <= larger_range * 0.45):
+        return True, "compressed_range"
+    if larger_range is not None and recent_range >= larger_range * 0.85:
+        return False, "wide_range"
+    return False, "normal_range"
+
+
+def _segment_high_low(candles: Sequence[CandleLike], start: int, end: int) -> tuple[float | None, float | None]:
+    segment = _ordered(candles)[start:end]
+    if not segment:
+        return None, None
+    highs = [_number(candle, "high") for candle in segment]
+    lows = [_number(candle, "low") for candle in segment]
+    if any(high is None for high in highs) or any(low is None for low in lows):
+        return None, None
+    return max(high for high in highs if high is not None), min(low for low in lows if low is not None)
+
+
+def _higher_or_lower_structure(candles: Sequence[CandleLike]) -> tuple[bool, bool]:
+    ordered = _ordered(candles)
+    if len(ordered) < 30:
+        return False, False
+
+    segments = [
+        _segment_high_low(ordered, -30, -20),
+        _segment_high_low(ordered, -20, -10),
+        _segment_high_low(ordered, -10, len(ordered)),
+    ]
+    highs = [segment[0] for segment in segments]
+    lows = [segment[1] for segment in segments]
+    if any(value is None for value in [*highs, *lows]):
+        return False, False
+
+    numeric_highs = [value for value in highs if value is not None]
+    numeric_lows = [value for value in lows if value is not None]
+    higher = numeric_highs[0] < numeric_highs[1] < numeric_highs[2] and numeric_lows[0] < numeric_lows[1] < numeric_lows[2]
+    lower = numeric_highs[0] > numeric_highs[1] > numeric_highs[2] and numeric_lows[0] > numeric_lows[1] > numeric_lows[2]
+    return higher, lower
+
+
+def _recent_gap_flags(candles: Sequence[CandleLike], window: int = 5) -> tuple[bool, bool]:
+    ordered = _ordered(candles)
+    if len(ordered) < 2:
+        return False, False
+
+    gap_up = False
+    gap_down = False
+    start_index = max(1, len(ordered) - window)
+    for index in range(start_index, len(ordered)):
+        open_price = _number(ordered[index], "open")
+        previous_high = _number(ordered[index - 1], "high")
+        previous_low = _number(ordered[index - 1], "low")
+        if open_price is None or previous_high is None or previous_low is None:
+            continue
+        gap_up = gap_up or open_price >= previous_high * 1.01
+        gap_down = gap_down or open_price <= previous_low * 0.99
+    return gap_up, gap_down
+
+
+def _prior_resistance(candles: Sequence[CandleLike], window: int = 20) -> float | None:
+    ordered = _ordered(candles)
+    if len(ordered) <= window:
+        return None
+    prior = ordered[-(window + 1) : -1]
+    highs = [_number(candle, "high") for candle in prior]
+    if any(high is None for high in highs):
+        return None
+    return max(high for high in highs if high is not None)
+
+
+def _failed_breakout(candles: Sequence[CandleLike], window: int = 10, resistance_window: int = 20) -> bool:
+    ordered = _ordered(candles)
+    latest_close = _latest_close(ordered)
+    if len(ordered) <= resistance_window + 1 or latest_close is None:
+        return False
+
+    start_index = max(resistance_window, len(ordered) - window)
+    for index in range(start_index, len(ordered)):
+        prior = ordered[index - resistance_window : index]
+        prior_highs = [_number(candle, "high") for candle in prior]
+        close = _number(ordered[index], "close")
+        if close is None or any(high is None for high in prior_highs):
+            continue
+        resistance = max(high for high in prior_highs if high is not None)
+        if close > resistance * 1.005 and latest_close < resistance:
+            return True
+    return False
+
+
+def _pullback_to_sma(candles: Sequence[CandleLike], moving_average: float | None, threshold_pct: float = 2.0) -> bool:
+    if moving_average in (None, 0):
+        return False
+    ordered = _ordered(candles)
+    if not ordered:
+        return False
+    latest = ordered[-1]
+    latest_low = _number(latest, "low")
+    latest_close = _number(latest, "close")
+    if latest_low is None or latest_close is None:
+        return False
+    touched_average = latest_low <= moving_average * (1 + threshold_pct / 100)
+    closed_above = latest_close >= moving_average * (1 - threshold_pct / 100)
+    return touched_average and closed_above
+
+
+def price_action_structure(candles: Sequence[CandleLike]) -> dict[str, Any]:
+    ordered = _ordered(candles)
+    latest_close = _latest_close(ordered)
+    latest_high = _number(ordered[-1], "high") if ordered else None
+    high_low_20d = high_low(ordered, 20)
+    high_low_60d = high_low(ordered, 60)
+    support = high_low_20d["low"]
+    resistance = _prior_resistance(ordered, 20) or high_low_20d["high"]
+    prior_resistance = _prior_resistance(ordered, 20)
+    sma20 = sma_20(ordered)
+    sma50 = sma_50(ordered)
+    sma200 = sma_200(ordered)
+
+    range_compressed, range_label = _range_compression(ordered)
+    higher_structure, lower_structure = _higher_or_lower_structure(ordered)
+    gap_up, gap_down = _recent_gap_flags(ordered, 5)
+    failed_breakout = _failed_breakout(ordered)
+    breakout_confirmed = breakout_volume_confirmed(ordered)
+    breakout_attempt = bool(
+        prior_resistance
+        and latest_close is not None
+        and latest_high is not None
+        and not breakout_confirmed
+        and not failed_breakout
+        and (latest_high >= prior_resistance * 0.995 or _within_pct_below(latest_close, prior_resistance, 2.0))
+    )
+    pullback20 = _pullback_to_sma(ordered, sma20)
+    pullback50 = _pullback_to_sma(ordered, sma50)
+
+    labels: list[str] = []
+    if higher_structure:
+        labels.append("higher_highs_higher_lows")
+    if lower_structure:
+        labels.append("lower_highs_lower_lows")
+    if range_compressed:
+        labels.append("range_compression")
+    if breakout_confirmed:
+        labels.append("confirmed_breakout")
+    elif failed_breakout:
+        labels.append("failed_breakout")
+    elif breakout_attempt:
+        labels.append("breakout_attempt")
+    if pullback20:
+        labels.append("pullback_to_sma20")
+    if pullback50:
+        labels.append("pullback_to_sma50")
+    if gap_up:
+        labels.append("recent_gap_up")
+    if gap_down:
+        labels.append("recent_gap_down")
+
+    if breakout_confirmed:
+        breakout_label = "confirmed_breakout"
+    elif failed_breakout:
+        breakout_label = "failed_breakout"
+    elif breakout_attempt:
+        breakout_label = "breakout_attempt"
+    elif _within_pct_below(latest_close, prior_resistance, 3.0):
+        breakout_label = "near_resistance"
+    else:
+        breakout_label = "no_breakout_setup" if len(ordered) >= 21 else "insufficient_data"
+
+    if higher_structure:
+        structure_label = "higher_highs_higher_lows"
+    elif lower_structure:
+        structure_label = "lower_highs_lower_lows"
+    elif range_compressed:
+        structure_label = "range_compression"
+    elif len(ordered) >= 30:
+        structure_label = "sideways_or_mixed"
+    else:
+        structure_label = "insufficient_data"
+
+    if pullback20:
+        pullback_label = "pullback_to_sma20"
+    elif pullback50:
+        pullback_label = "pullback_to_sma50"
+    elif latest_close is not None and sma20 not in (None, 0) and latest_close > sma20 * 1.08:
+        pullback_label = "extended_above_sma20"
+    elif latest_close is not None and sma50 is not None and latest_close < sma50:
+        pullback_label = "below_key_sma"
+    else:
+        pullback_label = "no_clear_pullback" if len(ordered) >= 50 else "insufficient_data"
+
+    if failed_breakout:
+        setup_label = "failed_breakout"
+    elif breakout_confirmed:
+        setup_label = "confirmed_breakout"
+    elif breakout_attempt and range_compressed:
+        setup_label = "compression_breakout_attempt"
+    elif breakout_attempt:
+        setup_label = "breakout_attempt"
+    elif higher_structure and (pullback20 or pullback50):
+        setup_label = "trend_pullback"
+    elif lower_structure:
+        setup_label = "downtrend_structure"
+    elif range_compressed:
+        setup_label = "base_compression"
+    else:
+        setup_label = "no_clear_setup" if len(ordered) >= 30 else "insufficient_data"
+
+    return {
+        "setup_label": setup_label,
+        "structure_label": structure_label,
+        "breakout_label": breakout_label,
+        "pullback_label": pullback_label,
+        "range_label": range_label,
+        "gap_label": "recent_gap_up" if gap_up else "recent_gap_down" if gap_down else "no_recent_gap",
+        "labels": labels or [setup_label],
+        "near_20d_high": _within_pct_below(latest_close, high_low_20d["high"], 3.0),
+        "near_60d_high": _within_pct_below(latest_close, high_low_60d["high"], 3.0),
+        "distance_to_support_pct": _percent_distance_to_support(ordered, support),
+        "distance_to_resistance_pct": _percent_distance_to_resistance(ordered, resistance),
+        "range_compression": range_compressed,
+        "higher_highs_higher_lows": higher_structure,
+        "lower_highs_lower_lows": lower_structure,
+        "gap_up_recent": gap_up,
+        "gap_down_recent": gap_down,
+        "failed_breakout": failed_breakout,
+        "breakout_attempt": breakout_attempt,
+        "pullback_to_sma20": pullback20,
+        "pullback_to_sma50": pullback50,
+        "support_level": support,
+        "resistance_level": resistance,
+        "prior_20d_resistance": prior_resistance,
+        "sma_20": sma20,
+        "sma_50": sma50,
+        "sma_200": sma200,
+    }
+
+
 def sma_distances(candles: Sequence[CandleLike]) -> dict[str, float | None]:
     sma20 = sma_20(candles)
     sma50 = sma_50(candles)
@@ -513,6 +790,7 @@ def build_technical_summary(candles: Sequence[CandleLike]) -> dict[str, Any]:
     volume_signals = volume_intelligence(candles)
     levels = high_lows(candles)
     support_resistance_20d = support_resistance_distances(candles, 20)
+    structure = price_action_structure(candles)
 
     return {
         "latest_candle": {key: _round(value) if isinstance(value, (float, int)) else value for key, value in latest_candle_summary(candles).items()},
@@ -531,5 +809,9 @@ def build_technical_summary(candles: Sequence[CandleLike]) -> dict[str, Any]:
         **{key: _round(value) for key, value in levels.items()},
         **{f"20d_{key}": _round(value) for key, value in support_resistance_20d.items()},
         **{key: _round(value) for key, value in sma_distances(candles).items()},
+        "price_action_structure": {
+            key: _round(value) if isinstance(value, (float, int)) and not isinstance(value, bool) else value
+            for key, value in structure.items()
+        },
         "trend": classify_trend(candles),
     }

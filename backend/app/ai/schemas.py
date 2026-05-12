@@ -43,6 +43,105 @@ class AIReportInput(BaseModel):
 
 ActionLabel = Literal["buy_setup", "watchlist", "neutral", "avoid", "high_risk"]
 SwingBias = Literal["bullish", "bearish", "neutral", "mixed"]
+TradeRating = Literal["buy", "watch", "avoid"]
+LongTermRating = Literal["accumulate", "hold", "avoid", "unknown"]
+
+
+class PriceActionStructure(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    setup_label: str = Field(..., min_length=1, max_length=60)
+    structure_label: str = Field(..., min_length=1, max_length=60)
+    breakout_label: str = Field(..., min_length=1, max_length=60)
+    pullback_label: str = Field(..., min_length=1, max_length=60)
+    range_label: str = Field(..., min_length=1, max_length=60)
+    gap_label: str = Field(..., min_length=1, max_length=60)
+    labels: List[str] = Field(..., min_length=1)
+    near_20d_high: bool
+    near_60d_high: bool
+    distance_to_support_pct: float | None = Field(...)
+    distance_to_resistance_pct: float | None = Field(...)
+    range_compression: bool
+    higher_highs_higher_lows: bool
+    lower_highs_lower_lows: bool
+    gap_up_recent: bool
+    gap_down_recent: bool
+    failed_breakout: bool
+    breakout_attempt: bool
+    pullback_to_sma20: bool
+    pullback_to_sma50: bool
+    support_level: float | None = Field(...)
+    resistance_level: float | None = Field(...)
+    prior_20d_resistance: float | None = Field(...)
+    sma_20: float | None = Field(...)
+    sma_50: float | None = Field(...)
+    sma_200: float | None = Field(...)
+
+
+class TradeTimeframeRating(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rating: TradeRating
+    timeframe: Literal["1-10 trading days", "2-8 weeks"]
+    confidence_score: float = Field(..., ge=0.0, le=100.0)
+    reason: str = Field(..., min_length=1)
+
+    @field_validator("rating", mode="before")
+    @classmethod
+    def normalize_trade_rating(cls, value: Any) -> str:
+        cleaned = _clean_short_text(value).lower().replace("-", "_").replace(" ", "_")
+        if cleaned in {"buy", "buy_setup", "actionable", "act_now", "accumulate"}:
+            return "buy"
+        if cleaned in {"watch", "watchlist", "wait", "neutral", "hold", "monitor", "wait_for_confirmation"}:
+            return "watch"
+        if cleaned in {"avoid", "pass", "sell", "high_risk", "weak_setup"}:
+            return "avoid"
+        return cleaned
+
+
+class LongTermTimeframeRating(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    rating: LongTermRating
+    timeframe: Literal["6-24 months"]
+    confidence_score: float = Field(..., ge=0.0, le=100.0)
+    reason: str = Field(..., min_length=1)
+
+    @field_validator("rating", mode="before")
+    @classmethod
+    def normalize_long_term_rating(cls, value: Any) -> str:
+        cleaned = _clean_short_text(value).lower().replace("-", "_").replace(" ", "_")
+        if cleaned in {"buy", "buy_setup", "accumulate", "strong_buy"}:
+            return "accumulate"
+        if cleaned in {"watch", "watchlist", "neutral", "hold", "monitor"}:
+            return "hold"
+        if cleaned in {"avoid", "pass", "sell", "high_risk"}:
+            return "avoid"
+        if cleaned in {"unknown", "insufficient_data", "not_enough_data", "unclear"}:
+            return "unknown"
+        return cleaned
+
+
+class TimeframeRatings(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    short_term: TradeTimeframeRating
+    swing: TradeTimeframeRating
+    long_term: LongTermTimeframeRating
+
+    @field_validator("short_term")
+    @classmethod
+    def require_short_term_timeframe(cls, value: TradeTimeframeRating) -> TradeTimeframeRating:
+        if value.timeframe != "1-10 trading days":
+            raise ValueError("short_term timeframe must be 1-10 trading days")
+        return value
+
+    @field_validator("swing")
+    @classmethod
+    def require_swing_timeframe(cls, value: TradeTimeframeRating) -> TradeTimeframeRating:
+        if value.timeframe != "2-8 weeks":
+            raise ValueError("swing timeframe must be 2-8 weeks")
+        return value
 
 
 class AIReportOutput(BaseModel):
@@ -50,6 +149,8 @@ class AIReportOutput(BaseModel):
 
     action_label: ActionLabel
     swing_bias: SwingBias
+    timeframe_ratings: TimeframeRatings
+    price_action_structure: PriceActionStructure
     setup_type: str = Field(..., min_length=1, max_length=50)
     confidence_score: float = Field(..., ge=0.0, le=100.0)
     setup_quality_score: float = Field(..., ge=0.0, le=100.0)

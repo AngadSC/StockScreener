@@ -18,9 +18,122 @@ SCORE_FIELDS = {
 }
 
 
+TRADE_TIMEFRAME_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "rating": {"type": "string", "enum": ["buy", "watch", "avoid"]},
+        "timeframe": {"type": "string", "enum": ["1-10 trading days", "2-8 weeks"]},
+        "confidence_score": {"type": "number", "minimum": 0, "maximum": 100},
+        "reason": {"type": "string", "minLength": 1},
+    },
+    "required": ["rating", "timeframe", "confidence_score", "reason"],
+}
+
+
+LONG_TERM_TIMEFRAME_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "rating": {"type": "string", "enum": ["accumulate", "hold", "avoid", "unknown"]},
+        "timeframe": {"type": "string", "enum": ["6-24 months"]},
+        "confidence_score": {"type": "number", "minimum": 0, "maximum": 100},
+        "reason": {"type": "string", "minLength": 1},
+    },
+    "required": ["rating", "timeframe", "confidence_score", "reason"],
+}
+
+
+PRICE_ACTION_STRUCTURE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "setup_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "structure_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "breakout_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "pullback_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "range_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "gap_label": {"type": "string", "minLength": 1, "maxLength": 60},
+        "labels": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+        "near_20d_high": {"type": "boolean"},
+        "near_60d_high": {"type": "boolean"},
+        "distance_to_support_pct": {"type": ["number", "null"]},
+        "distance_to_resistance_pct": {"type": ["number", "null"]},
+        "range_compression": {"type": "boolean"},
+        "higher_highs_higher_lows": {"type": "boolean"},
+        "lower_highs_lower_lows": {"type": "boolean"},
+        "gap_up_recent": {"type": "boolean"},
+        "gap_down_recent": {"type": "boolean"},
+        "failed_breakout": {"type": "boolean"},
+        "breakout_attempt": {"type": "boolean"},
+        "pullback_to_sma20": {"type": "boolean"},
+        "pullback_to_sma50": {"type": "boolean"},
+        "support_level": {"type": ["number", "null"]},
+        "resistance_level": {"type": ["number", "null"]},
+        "prior_20d_resistance": {"type": ["number", "null"]},
+        "sma_20": {"type": ["number", "null"]},
+        "sma_50": {"type": ["number", "null"]},
+        "sma_200": {"type": ["number", "null"]},
+    },
+    "required": [
+        "setup_label",
+        "structure_label",
+        "breakout_label",
+        "pullback_label",
+        "range_label",
+        "gap_label",
+        "labels",
+        "near_20d_high",
+        "near_60d_high",
+        "distance_to_support_pct",
+        "distance_to_resistance_pct",
+        "range_compression",
+        "higher_highs_higher_lows",
+        "lower_highs_lower_lows",
+        "gap_up_recent",
+        "gap_down_recent",
+        "failed_breakout",
+        "breakout_attempt",
+        "pullback_to_sma20",
+        "pullback_to_sma50",
+        "support_level",
+        "resistance_level",
+        "prior_20d_resistance",
+        "sma_20",
+        "sma_50",
+        "sma_200",
+    ],
+}
+
+
 def _response_property(field: str) -> dict:
     if field == "confirmation_signals":
         return {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+    if field == "timeframe_ratings":
+        return {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "short_term": {
+                    **TRADE_TIMEFRAME_SCHEMA,
+                    "properties": {
+                        **TRADE_TIMEFRAME_SCHEMA["properties"],
+                        "timeframe": {"type": "string", "enum": ["1-10 trading days"]},
+                    },
+                },
+                "swing": {
+                    **TRADE_TIMEFRAME_SCHEMA,
+                    "properties": {
+                        **TRADE_TIMEFRAME_SCHEMA["properties"],
+                        "timeframe": {"type": "string", "enum": ["2-8 weeks"]},
+                    },
+                },
+                "long_term": LONG_TERM_TIMEFRAME_SCHEMA,
+            },
+            "required": ["short_term", "swing", "long_term"],
+        }
+    if field == "price_action_structure":
+        return PRICE_ACTION_STRUCTURE_SCHEMA
     if field in SCORE_FIELDS or field == "confidence_score":
         return {"type": "number", "minimum": 0, "maximum": 100}
     if field == "action_label":
@@ -63,6 +176,10 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, or constraints.\n"
     "- action_label must be one of: buy_setup, watchlist, neutral, avoid, high_risk.\n"
     "- swing_bias must be one of: bullish, bearish, neutral, mixed.\n"
+    "- timeframe_ratings.short_term.rating must be one of: buy, watch, avoid, with timeframe exactly '1-10 trading days' and a 0-100 confidence_score.\n"
+    "- timeframe_ratings.swing.rating must be one of: buy, watch, avoid, with timeframe exactly '2-8 weeks' and a 0-100 confidence_score.\n"
+    "- timeframe_ratings.long_term.rating must be one of: accumulate, hold, avoid, unknown, with timeframe exactly '6-24 months' and a 0-100 confidence_score.\n"
+    "- price_action_structure must copy technical_summary.price_action_structure exactly; do not reinterpret or change its deterministic flags, levels, labels, or distances.\n"
     "- setup_type must be a short label such as mean_reversion_bounce, breakout, pullback, momentum_continuation, breakdown_risk, no_clear_setup, max 50 characters.\n"
     "- confidence_score must be a number from 0 to 100 representing confidence in the action_label.\n"
     "- entry_zone, confirmation_trigger, invalidation_level, target_1, and target_2 must be actionable levels or conditions based only on provided price data; say data is missing if a level cannot be supported.\n"
@@ -78,6 +195,7 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
     "Input analysis instructions:\n"
     "- The input payload contains deterministic technical calculations; treat calculated fields as source facts.\n"
     "- Use price_history.candles for price action, recent candle behavior, and entry context.\n"
+    "- Treat technical_summary.price_action_structure as deterministic source truth for setup labels, breakout state, range compression, trend structure, pullbacks, gaps, and support/resistance distances.\n"
     "- Treat volume_summary as primary evidence for setup quality, confirmation, and risk; prioritize relative volume, up/down volume balance, accumulation/distribution, OBV trend, breakout confirmation, dry-up near support, and volume/price confirmation.\n"
     "- Treat lagging indicators such as RSI, SMA, and moving-average trend as secondary context, not as the main reason for an action_label.\n"
     "- Use technical_summary for price levels, volatility, and context after checking volume behavior.\n"
@@ -89,11 +207,14 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
 DECISION_RULES = (
     "Decision rules:\n"
     "- Use action_label='buy_setup' only when price action, volume intelligence, entry timing, and risk/reward are reasonably aligned.\n"
+    "- action_label should summarize the swing timeframe decision, while timeframe_ratings must separately evaluate short-term, swing, and long-term suitability.\n"
     "- Use action_label='watchlist' when there are early positive signs but confirmation is missing.\n"
     "- Use action_label='neutral' when signals are mixed or there is no clear edge.\n"
     "- Use action_label='avoid' when the setup is weak, data quality is poor, or downside/risk dominates.\n"
     "- Use action_label='high_risk' when the stock may move but risk is elevated due to weak fundamentals, poor liquidity, stale data, extreme volatility, distribution, or weak volume confirmation.\n"
     "- Strong price moves without volume_price_confirmation, rising OBV, accumulation, or breakout_volume_confirmed should usually be treated as watchlist or neutral rather than buy_setup.\n"
+    "- A breakout_attempt or compression_breakout_attempt can be a watch or buy setup only when the trigger, invalidation, and volume confirmation path are clear.\n"
+    "- failed_breakout, lower_highs_lower_lows, or gap_down_recent should reduce short-term and swing confidence unless there is strong contrary evidence in the provided data.\n"
     "- Distribution days, falling OBV, or divergent volume/price behavior should reduce confidence even when RSI, SMA, or recent returns look favorable.\n"
     "- Do not force bullish output. If the setup is weak, say so clearly.\n"
     "- Entry zones, targets, and invalidation levels must come only from provided prices, support/resistance, moving averages, recent highs/lows, ATR, or candle data.\n"
@@ -103,6 +224,7 @@ DECISION_RULES = (
 ACTIONABLE_OUTPUT_INSTRUCTIONS = (
     "Actionable output instructions:\n"
     "- Start from the decision, then justify it.\n"
+    "- Timeframe reasons must be different and specific to their horizon; do not repeat the same reason for short_term, swing, and long_term.\n"
     "- final_verdict must clearly say one of: act now, wait for confirmation, watchlist only, no clear edge, or avoid.\n"
     "- entry_zone should give a price area or say no supported entry zone.\n"
     "- confirmation_trigger should describe the exact condition that would improve the setup, using provided levels when available.\n"

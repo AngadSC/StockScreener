@@ -1,6 +1,57 @@
+export interface PriceActionStructure {
+  setup_label: string;
+  structure_label: string;
+  breakout_label: string;
+  pullback_label: string;
+  range_label: string;
+  gap_label: string;
+  labels: string[];
+  near_20d_high: boolean;
+  near_60d_high: boolean;
+  distance_to_support_pct: number | null;
+  distance_to_resistance_pct: number | null;
+  range_compression: boolean;
+  higher_highs_higher_lows: boolean;
+  lower_highs_lower_lows: boolean;
+  gap_up_recent: boolean;
+  gap_down_recent: boolean;
+  failed_breakout: boolean;
+  breakout_attempt: boolean;
+  pullback_to_sma20: boolean;
+  pullback_to_sma50: boolean;
+  support_level: number | null;
+  resistance_level: number | null;
+  prior_20d_resistance: number | null;
+  sma_20: number | null;
+  sma_50: number | null;
+  sma_200: number | null;
+}
+
+export interface TradeTimeframeRating {
+  rating: 'buy' | 'watch' | 'avoid';
+  timeframe: '1-10 trading days' | '2-8 weeks';
+  confidence_score: number;
+  reason: string;
+}
+
+export interface LongTermTimeframeRating {
+  rating: 'accumulate' | 'hold' | 'avoid' | 'unknown';
+  timeframe: '6-24 months';
+  confidence_score: number;
+  reason: string;
+}
+
+export interface TimeframeRatings {
+  short_term: TradeTimeframeRating;
+  swing: TradeTimeframeRating;
+  long_term: LongTermTimeframeRating;
+}
+
 export interface AIReportOutput {
   action_label: 'buy_setup' | 'watchlist' | 'neutral' | 'avoid' | 'high_risk';
   swing_bias: 'bullish' | 'bearish' | 'neutral' | 'mixed';
+  timeframe_ratings: TimeframeRatings;
+  price_action_structure: PriceActionStructure;
   setup_type: string;
   confidence_score: number;
   setup_quality_score: number;

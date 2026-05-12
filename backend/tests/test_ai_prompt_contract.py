@@ -42,6 +42,26 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
         "neutral",
         "mixed",
     ]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["additionalProperties"] is False
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["required"] == [
+        "short_term",
+        "swing",
+        "long_term",
+    ]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["properties"]["short_term"]["properties"]["rating"]["enum"] == [
+        "buy",
+        "watch",
+        "avoid",
+    ]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["properties"]["long_term"]["properties"]["rating"]["enum"] == [
+        "accumulate",
+        "hold",
+        "avoid",
+        "unknown",
+    ]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["price_action_structure"]["additionalProperties"] is False
+    assert "breakout_label" in OUTPUT_RESPONSE_SCHEMA["properties"]["price_action_structure"]["properties"]
+    assert "confidence_score" in OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["properties"]["swing"]["properties"]
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["setup_type"]["maxLength"] == 50
 
 
@@ -51,6 +71,8 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "action_label" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "entry_zone" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "watchlist_action" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "timeframe_ratings" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "price_action_structure" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "setup_quality_score" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
@@ -65,5 +87,7 @@ def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
     assert "Do not force bullish output" in SYSTEM_PROMPT
     assert "final_verdict must clearly say" in SYSTEM_PROMPT
     assert "Treat volume_summary as primary evidence" in SYSTEM_PROMPT
+    assert "technical_summary.price_action_structure" in SYSTEM_PROMPT
+    assert "timeframe_ratings must separately evaluate" in SYSTEM_PROMPT
     assert "lagging indicators such as RSI, SMA" in SYSTEM_PROMPT
     assert "Distribution days, falling OBV" in SYSTEM_PROMPT

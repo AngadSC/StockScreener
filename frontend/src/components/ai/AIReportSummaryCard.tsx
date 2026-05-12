@@ -27,6 +27,54 @@ function formatReportLabel(value: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function getRatingClass(rating: string) {
+  const normalized = rating.trim().toLowerCase();
+
+  if (normalized === 'buy' || normalized === 'accumulate') {
+    return 'border-[var(--positive)]/35 bg-[var(--positive-bg)] text-[var(--positive)]';
+  }
+
+  if (normalized === 'avoid') {
+    return 'border-[var(--negative)]/35 bg-[var(--negative-bg)] text-[var(--negative)]';
+  }
+
+  return 'border-[var(--border-strong)] bg-[rgba(152,152,176,0.08)] text-[var(--neutral)]';
+}
+
+function TimeframeRatingCard({
+  label,
+  rating,
+  timeframe,
+  confidence,
+  reason,
+}: {
+  label: string;
+  rating: string;
+  timeframe: string;
+  confidence: number;
+  reason: string;
+}) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
+            {label}
+          </div>
+          <div className="mt-2 text-xs text-[var(--text-tertiary)]">{timeframe}</div>
+        </div>
+        <Badge className={cn('shrink-0 capitalize', getRatingClass(rating))}>
+          {formatReportLabel(rating)}
+        </Badge>
+      </div>
+      <div className="mt-3 text-sm font-semibold text-[var(--text-primary)]">
+        {Math.round(confidence)}% confidence
+      </div>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{reason}</p>
+    </div>
+  );
+}
+
 export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps) {
   return (
     <section className="deco-panel p-6 md:p-7">
@@ -58,6 +106,30 @@ export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps
         <AIScoreBadge label="Entry Timing" score={report.entry_timing_score} />
         <AIScoreBadge label="Risk" score={report.risk_score} />
         <AIScoreBadge label="Technical" score={report.technical_score} />
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <TimeframeRatingCard
+          label="Short Term"
+          rating={report.timeframe_ratings.short_term.rating}
+          timeframe={report.timeframe_ratings.short_term.timeframe}
+          confidence={report.timeframe_ratings.short_term.confidence_score}
+          reason={report.timeframe_ratings.short_term.reason}
+        />
+        <TimeframeRatingCard
+          label="Swing"
+          rating={report.timeframe_ratings.swing.rating}
+          timeframe={report.timeframe_ratings.swing.timeframe}
+          confidence={report.timeframe_ratings.swing.confidence_score}
+          reason={report.timeframe_ratings.swing.reason}
+        />
+        <TimeframeRatingCard
+          label="Long Term"
+          rating={report.timeframe_ratings.long_term.rating}
+          timeframe={report.timeframe_ratings.long_term.timeframe}
+          confidence={report.timeframe_ratings.long_term.confidence_score}
+          reason={report.timeframe_ratings.long_term.reason}
+        />
       </div>
     </section>
   );

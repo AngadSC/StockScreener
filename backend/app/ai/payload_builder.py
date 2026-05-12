@@ -90,6 +90,7 @@ def _technical_summary(candles: list[dict[str, Any]]) -> dict[str, Any]:
             "distance_from_support_20d": summary.get("20d_distance_from_support"),
             "distance_from_resistance_20d": summary.get("20d_distance_from_resistance"),
         },
+        "price_action_structure": summary.get("price_action_structure"),
         "moving_average_distances": {
             "distance_from_sma_20": summary.get("distance_from_sma_20"),
             "distance_from_sma_50": summary.get("distance_from_sma_50"),

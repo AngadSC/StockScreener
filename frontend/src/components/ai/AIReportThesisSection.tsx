@@ -37,10 +37,42 @@ function ActionItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+function formatStructureLabel(value: string) {
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatPercent(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return 'N/A';
+  }
+
+  return `${value.toFixed(1)}%`;
+}
+
+function formatPrice(value: number | null) {
+  if (value === null || Number.isNaN(value)) {
+    return 'N/A';
+  }
+
+  return `$${value.toFixed(2)}`;
+}
+
+function StructureMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
+      <div className="text-xs uppercase tracking-[0.1em] text-[var(--text-tertiary)]">{label}</div>
+      <div className="mt-2 text-sm font-semibold text-[var(--text-primary)]">{value}</div>
+    </div>
+  );
+}
+
 export default function AIReportThesisSection({ report }: AIReportThesisSectionProps) {
   const moveItems = toBulletItems(report.why_it_could_move);
   const failItems = toBulletItems(report.why_it_could_fail);
   const confirmationItems = toBulletItems(report.confirmation_signals);
+  const structure = report.price_action_structure;
 
   return (
     <section className="deco-panel p-6 md:p-7">
@@ -61,6 +93,30 @@ export default function AIReportThesisSection({ report }: AIReportThesisSectionP
         <ActionItem label="Target 1" value={report.target_1} />
         <ActionItem label="Target 2" value={report.target_2} />
         <ActionItem label="Watchlist Action" value={report.watchlist_action} />
+      </div>
+
+      <div className="mt-6 border-t border-[var(--border-subtle)] pt-5">
+        <h3 className="heading-sm text-[var(--text-primary)]">Price Structure</h3>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {structure.labels.map((label) => (
+            <span
+              key={label}
+              className="rounded-full border border-[var(--border-strong)] bg-[rgba(152,152,176,0.08)] px-3 py-1 text-xs font-medium text-[var(--text-secondary)]"
+            >
+              {formatStructureLabel(label)}
+            </span>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <StructureMetric label="Setup" value={formatStructureLabel(structure.setup_label)} />
+          <StructureMetric label="Breakout" value={formatStructureLabel(structure.breakout_label)} />
+          <StructureMetric label="Support" value={formatPrice(structure.support_level)} />
+          <StructureMetric label="Resistance" value={formatPrice(structure.resistance_level)} />
+          <StructureMetric label="To Support" value={formatPercent(structure.distance_to_support_pct)} />
+          <StructureMetric label="To Resistance" value={formatPercent(structure.distance_to_resistance_pct)} />
+          <StructureMetric label="Pullback" value={formatStructureLabel(structure.pullback_label)} />
+          <StructureMetric label="Range" value={formatStructureLabel(structure.range_label)} />
+        </div>
       </div>
 
       <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-5">

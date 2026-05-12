@@ -93,12 +93,24 @@ def _retry_user_content(payload: dict, retry: bool) -> str:
     return user_content
 
 
+def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict) -> dict[str, Any]:
+    technical_summary = payload.get("technical_summary") if isinstance(payload, dict) else {}
+    if not isinstance(technical_summary, dict):
+        return candidate
+
+    price_action_structure = technical_summary.get("price_action_structure")
+    if isinstance(price_action_structure, dict):
+        candidate = dict(candidate)
+        candidate["price_action_structure"] = price_action_structure
+    return candidate
+
+
 def _create_anthropic_message(client: Any, model: str, payload: dict, retry: bool) -> Any:
     user_content = _retry_user_content(payload, retry)
     try:
         return client.messages.create(
             model=model,
-            max_tokens=2500,
+            max_tokens=3500,
             temperature=0.3,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -114,7 +126,7 @@ def _create_anthropic_message(client: Any, model: str, payload: dict, retry: boo
     except TypeError:
         return client.messages.create(
             model=model,
-            max_tokens=2500,
+            max_tokens=3500,
             temperature=0.3,
             system=SYSTEM_PROMPT,
             messages=[{"role": "user", "content": user_content}],
@@ -163,10 +175,10 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
     }
 
     request_variants = [
-        {"max_completion_tokens": 2500, "temperature": 0.3},
-        {"max_completion_tokens": 2500},
-        {"max_tokens": 2500, "temperature": 0.3},
-        {"max_tokens": 2500},
+        {"max_completion_tokens": 3500, "temperature": 0.3},
+        {"max_completion_tokens": 3500},
+        {"max_tokens": 3500, "temperature": 0.3},
+        {"max_tokens": 3500},
     ]
     last_error: BadRequestError | None = None
 
@@ -198,7 +210,7 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
                 break
             last_error = exc
 
-    request = {**base_request, "max_completion_tokens": 2500}
+    request = {**base_request, "max_completion_tokens": 3500}
     request.pop("response_format", None)
     try:
         logger.info("OpenAI report request retrying without response_format model=%s retry=%s", model, retry)
@@ -289,6 +301,7 @@ def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: S
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
 
+            parsed = _attach_deterministic_report_fields(parsed, payload)
             validated = AIReportOutput.model_validate(parsed)
             result = validated.model_dump(mode="json")
             result["_usage"] = {

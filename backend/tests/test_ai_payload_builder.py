@@ -180,6 +180,11 @@ def test_build_ai_payload_includes_technical_and_volume_summaries(
     assert technical_summary["sma_200"] is not None
     assert technical_summary["rsi_14"] is not None
     assert technical_summary["trend"] != "insufficient_data"
+    assert technical_summary["price_action_structure"]["setup_label"]
+    assert technical_summary["price_action_structure"]["breakout_label"]
+    assert technical_summary["price_action_structure"]["labels"]
+    assert "distance_to_support_pct" in technical_summary["price_action_structure"]
+    assert "distance_to_resistance_pct" in technical_summary["price_action_structure"]
     assert volume_summary["latest_volume"] is not None
     assert volume_summary["average_volume_20d"] is not None
     assert volume_summary["latest_volume_vs_average_volume_20d"] is not None

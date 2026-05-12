@@ -183,6 +183,17 @@ def test_build_ai_payload_includes_technical_and_volume_summaries(
     assert volume_summary["latest_volume"] is not None
     assert volume_summary["average_volume_20d"] is not None
     assert volume_summary["latest_volume_vs_average_volume_20d"] is not None
+    assert volume_summary["relative_volume_1d"] is not None
+    assert volume_summary["relative_volume_5d"] is not None
+    assert volume_summary["up_day_volume_avg_20d"] is not None
+    assert "down_day_volume_avg_20d" in volume_summary
+    assert "up_down_volume_ratio" in volume_summary
+    assert volume_summary["volume_dry_up_near_support"] is False
+    assert volume_summary["breakout_volume_confirmed"] is False
+    assert volume_summary["distribution_days_20d"] == 0
+    assert volume_summary["accumulation_days_20d"] == 20
+    assert volume_summary["obv_trend"] in {"up", "down", "flat"}
+    assert volume_summary["volume_price_confirmation"] in {"confirmed", "divergent", "neutral"}
     assert volume_summary["volume_trend"] in {"elevated", "light", "normal"}
 
 

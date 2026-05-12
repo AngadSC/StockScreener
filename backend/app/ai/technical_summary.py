@@ -182,6 +182,203 @@ def latest_volume_ratio(candles: Sequence[CandleLike], window: int = 20) -> floa
     return latest_volume / baseline
 
 
+def relative_volume(candles: Sequence[CandleLike], recent_window: int, baseline_window: int = 20) -> float | None:
+    ordered = _ordered(candles)
+    if recent_window <= 0 or baseline_window <= 0 or len(ordered) < max(recent_window, baseline_window):
+        return None
+
+    recent_volumes = [_number(candle, "volume") for candle in ordered[-recent_window:]]
+    if any(volume is None for volume in recent_volumes):
+        return None
+
+    baseline = average_volume(ordered, baseline_window)
+    if baseline in (None, 0):
+        return None
+
+    return sum(volume for volume in recent_volumes if volume is not None) / recent_window / baseline
+
+
+def _recent_price_volume_pairs(
+    candles: Sequence[CandleLike], window: int = 20
+) -> list[tuple[CandleLike, CandleLike]]:
+    ordered = _ordered(candles)
+    if window <= 0 or len(ordered) < 2:
+        return []
+
+    start_index = max(1, len(ordered) - window)
+    return [(ordered[index - 1], ordered[index]) for index in range(start_index, len(ordered))]
+
+
+def up_down_volume_averages(candles: Sequence[CandleLike], window: int = 20) -> dict[str, float | None]:
+    up_day_volumes: list[float] = []
+    down_day_volumes: list[float] = []
+
+    for previous, current in _recent_price_volume_pairs(candles, window):
+        previous_close = _number(previous, "close")
+        current_close = _number(current, "close")
+        current_volume = _number(current, "volume")
+        if previous_close is None or current_close is None or current_volume is None:
+            continue
+        if current_close > previous_close:
+            up_day_volumes.append(current_volume)
+        elif current_close < previous_close:
+            down_day_volumes.append(current_volume)
+
+    up_average = sum(up_day_volumes) / len(up_day_volumes) if up_day_volumes else None
+    down_average = sum(down_day_volumes) / len(down_day_volumes) if down_day_volumes else None
+    ratio = None
+    if up_average is not None and down_average not in (None, 0):
+        ratio = up_average / down_average
+
+    return {
+        "up_day_volume_avg_20d": up_average,
+        "down_day_volume_avg_20d": down_average,
+        "up_down_volume_ratio": ratio,
+    }
+
+
+def volume_dry_up_near_support(candles: Sequence[CandleLike]) -> bool:
+    ordered = _ordered(candles)
+    if len(ordered) < 20:
+        return False
+
+    latest_close = _latest_close(ordered)
+    support = high_low(ordered, 20)["low"]
+    relative_volume_5d = relative_volume(ordered, 5, 20)
+    if latest_close is None or support in (None, 0) or relative_volume_5d is None:
+        return False
+
+    distance_from_support = (latest_close - support) / support
+    return 0 <= distance_from_support <= 0.03 and relative_volume_5d <= 0.75
+
+
+def breakout_volume_confirmed(candles: Sequence[CandleLike]) -> bool:
+    ordered = _ordered(candles)
+    if len(ordered) < 21:
+        return False
+
+    latest_close = _number(ordered[-1], "close")
+    prior_highs = [_number(candle, "high") for candle in ordered[-21:-1]]
+    relative_volume_1d = relative_volume(ordered, 1, 20)
+    if latest_close is None or any(high is None for high in prior_highs) or relative_volume_1d is None:
+        return False
+
+    prior_resistance = max(high for high in prior_highs if high is not None)
+    return latest_close > prior_resistance and relative_volume_1d >= 1.5
+
+
+def distribution_days(candles: Sequence[CandleLike], window: int = 20) -> int | None:
+    pairs = _recent_price_volume_pairs(candles, window)
+    if not pairs:
+        return None
+
+    count = 0
+    for previous, current in pairs:
+        previous_close = _number(previous, "close")
+        current_close = _number(current, "close")
+        previous_volume = _number(previous, "volume")
+        current_volume = _number(current, "volume")
+        if (
+            previous_close in (None, 0)
+            or current_close is None
+            or previous_volume is None
+            or current_volume is None
+        ):
+            continue
+        change = (current_close - previous_close) / previous_close
+        if change <= -0.002 and current_volume > previous_volume:
+            count += 1
+    return count
+
+
+def accumulation_days(candles: Sequence[CandleLike], window: int = 20) -> int | None:
+    pairs = _recent_price_volume_pairs(candles, window)
+    if not pairs:
+        return None
+
+    count = 0
+    for previous, current in pairs:
+        previous_close = _number(previous, "close")
+        current_close = _number(current, "close")
+        previous_volume = _number(previous, "volume")
+        current_volume = _number(current, "volume")
+        if (
+            previous_close in (None, 0)
+            or current_close is None
+            or previous_volume is None
+            or current_volume is None
+        ):
+            continue
+        change = (current_close - previous_close) / previous_close
+        if change >= 0.002 and current_volume > previous_volume:
+            count += 1
+    return count
+
+
+def obv_trend(candles: Sequence[CandleLike], window: int = 20) -> str:
+    ordered = _ordered(candles)
+    if len(ordered) < 2:
+        return "flat"
+
+    obv_values = [0.0]
+    for previous, current in zip(ordered, ordered[1:]):
+        previous_close = _number(previous, "close")
+        current_close = _number(current, "close")
+        current_volume = _number(current, "volume")
+        if previous_close is None or current_close is None or current_volume is None:
+            return "flat"
+        if current_close > previous_close:
+            obv_values.append(obv_values[-1] + current_volume)
+        elif current_close < previous_close:
+            obv_values.append(obv_values[-1] - current_volume)
+        else:
+            obv_values.append(obv_values[-1])
+
+    lookback = min(window, len(obv_values) - 1)
+    recent_volumes = [_number(candle, "volume") for candle in ordered[-lookback:]]
+    if not recent_volumes or any(volume is None for volume in recent_volumes):
+        return "flat"
+
+    net_obv_change = obv_values[-1] - obv_values[-(lookback + 1)]
+    average_recent_volume = sum(volume for volume in recent_volumes if volume is not None) / lookback
+    threshold = average_recent_volume * 1.5
+    if net_obv_change > threshold:
+        return "up"
+    if net_obv_change < -threshold:
+        return "down"
+    return "flat"
+
+
+def volume_price_confirmation(candles: Sequence[CandleLike]) -> str:
+    price_return = return_over(candles, 20)
+    if price_return is None:
+        price_return = return_over(candles, 10)
+    trend = obv_trend(candles)
+
+    if price_return is None or abs(price_return) < 0.02 or trend == "flat":
+        return "neutral"
+    if price_return > 0 and trend == "up":
+        return "confirmed"
+    if price_return < 0 and trend == "down":
+        return "confirmed"
+    return "divergent"
+
+
+def volume_intelligence(candles: Sequence[CandleLike]) -> dict[str, Any]:
+    up_down = up_down_volume_averages(candles, 20)
+    return {
+        "relative_volume_1d": relative_volume(candles, 1, 20),
+        "relative_volume_5d": relative_volume(candles, 5, 20),
+        **up_down,
+        "volume_dry_up_near_support": volume_dry_up_near_support(candles),
+        "breakout_volume_confirmed": breakout_volume_confirmed(candles),
+        "distribution_days_20d": distribution_days(candles, 20),
+        "accumulation_days_20d": accumulation_days(candles, 20),
+        "obv_trend": obv_trend(candles),
+        "volume_price_confirmation": volume_price_confirmation(candles),
+    }
+
+
 def high_low(candles: Sequence[CandleLike], window: int) -> dict[str, float | None]:
     ordered = _ordered(candles)
     if window <= 0 or len(ordered) < window:
@@ -313,6 +510,7 @@ def build_technical_summary(candles: Sequence[CandleLike]) -> dict[str, Any]:
     sma50 = sma_50(candles)
     sma200 = sma_200(candles)
     volume_averages = average_volumes(candles)
+    volume_signals = volume_intelligence(candles)
     levels = high_lows(candles)
     support_resistance_20d = support_resistance_distances(candles, 20)
 
@@ -326,6 +524,10 @@ def build_technical_summary(candles: Sequence[CandleLike]) -> dict[str, Any]:
         **{key: _round(value) for key, value in returns(candles).items()},
         **{key: _round(value) for key, value in volume_averages.items()},
         "latest_volume_vs_average_volume_20d": _round(latest_volume_ratio(candles, 20)),
+        **{
+            key: _round(value) if isinstance(value, (float, int)) and not isinstance(value, bool) else value
+            for key, value in volume_signals.items()
+        },
         **{key: _round(value) for key, value in levels.items()},
         **{f"20d_{key}": _round(value) for key, value in support_resistance_20d.items()},
         **{key: _round(value) for key, value in sma_distances(candles).items()},

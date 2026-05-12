@@ -118,6 +118,17 @@ def _volume_summary(candles: list[dict[str, Any]]) -> dict[str, Any]:
         "average_volume_30d": summary.get("average_volume_30d"),
         "average_volume_50d": summary.get("average_volume_50d"),
         "latest_volume_vs_average_volume_20d": summary.get("latest_volume_vs_average_volume_20d"),
+        "relative_volume_1d": summary.get("relative_volume_1d"),
+        "relative_volume_5d": summary.get("relative_volume_5d"),
+        "up_day_volume_avg_20d": summary.get("up_day_volume_avg_20d"),
+        "down_day_volume_avg_20d": summary.get("down_day_volume_avg_20d"),
+        "up_down_volume_ratio": summary.get("up_down_volume_ratio"),
+        "volume_dry_up_near_support": summary.get("volume_dry_up_near_support"),
+        "breakout_volume_confirmed": summary.get("breakout_volume_confirmed"),
+        "distribution_days_20d": summary.get("distribution_days_20d"),
+        "accumulation_days_20d": summary.get("accumulation_days_20d"),
+        "obv_trend": summary.get("obv_trend"),
+        "volume_price_confirmation": summary.get("volume_price_confirmation"),
         "volume_trend": _volume_trend(summary),
     }
 

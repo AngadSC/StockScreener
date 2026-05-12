@@ -133,6 +133,17 @@ def test_build_technical_summary_rounds_values_and_classifies_trend() -> None:
     assert summary["return_5d"] == pytest.approx(round((319.0 - 314.0) / 314.0, 4))
     assert summary["average_volume_20d"] == pytest.approx(3095.0)
     assert summary["latest_volume_vs_average_volume_20d"] == pytest.approx(round(3190.0 / 3095.0, 4))
+    assert summary["relative_volume_1d"] == pytest.approx(round(3190.0 / 3095.0, 4))
+    assert summary["relative_volume_5d"] == pytest.approx(round(3170.0 / 3095.0, 4))
+    assert summary["up_day_volume_avg_20d"] == pytest.approx(3095.0)
+    assert summary["down_day_volume_avg_20d"] is None
+    assert summary["up_down_volume_ratio"] is None
+    assert summary["volume_dry_up_near_support"] is False
+    assert summary["breakout_volume_confirmed"] is False
+    assert summary["distribution_days_20d"] == 0
+    assert summary["accumulation_days_20d"] == 20
+    assert summary["obv_trend"] == "up"
+    assert summary["volume_price_confirmation"] == "confirmed"
     assert summary["high_20d"] == pytest.approx(321.0)
     assert summary["low_60d"] == pytest.approx(258.0)
     assert summary["20d_distance_from_resistance"] == pytest.approx(round((319.0 - 321.0) / 321.0, 4))

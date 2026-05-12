@@ -78,7 +78,9 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
     "Input analysis instructions:\n"
     "- The input payload contains deterministic technical calculations; treat calculated fields as source facts.\n"
     "- Use price_history.candles for price action, recent candle behavior, and entry context.\n"
-    "- Use technical_summary and volume_summary as the primary calculated technical and volume facts.\n"
+    "- Treat volume_summary as primary evidence for setup quality, confirmation, and risk; prioritize relative volume, up/down volume balance, accumulation/distribution, OBV trend, breakout confirmation, dry-up near support, and volume/price confirmation.\n"
+    "- Treat lagging indicators such as RSI, SMA, and moving-average trend as secondary context, not as the main reason for an action_label.\n"
+    "- Use technical_summary for price levels, volatility, and context after checking volume behavior.\n"
     "- Use data_quality to qualify uncertainty in the analysis.\n"
     "- Do not invent missing fundamentals, news, filings, or price levels.\n"
     "- If OHLCV data_quality includes warnings, mention those limitations in the relevant report fields."
@@ -86,11 +88,13 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
 
 DECISION_RULES = (
     "Decision rules:\n"
-    "- Use action_label='buy_setup' only when technical setup, entry timing, volume, and risk/reward are reasonably aligned.\n"
+    "- Use action_label='buy_setup' only when price action, volume intelligence, entry timing, and risk/reward are reasonably aligned.\n"
     "- Use action_label='watchlist' when there are early positive signs but confirmation is missing.\n"
     "- Use action_label='neutral' when signals are mixed or there is no clear edge.\n"
     "- Use action_label='avoid' when the setup is weak, data quality is poor, or downside/risk dominates.\n"
-    "- Use action_label='high_risk' when the stock may move but risk is elevated due to weak fundamentals, poor liquidity, stale data, extreme volatility, or weak confirmation.\n"
+    "- Use action_label='high_risk' when the stock may move but risk is elevated due to weak fundamentals, poor liquidity, stale data, extreme volatility, distribution, or weak volume confirmation.\n"
+    "- Strong price moves without volume_price_confirmation, rising OBV, accumulation, or breakout_volume_confirmed should usually be treated as watchlist or neutral rather than buy_setup.\n"
+    "- Distribution days, falling OBV, or divergent volume/price behavior should reduce confidence even when RSI, SMA, or recent returns look favorable.\n"
     "- Do not force bullish output. If the setup is weak, say so clearly.\n"
     "- Entry zones, targets, and invalidation levels must come only from provided prices, support/resistance, moving averages, recent highs/lows, ATR, or candle data.\n"
     "- If a precise entry, target, or invalidation level cannot be supported by provided data, state that it is not supported by the available data."
@@ -105,7 +109,7 @@ ACTIONABLE_OUTPUT_INSTRUCTIONS = (
     "- invalidation_level should identify the level or condition that weakens the thesis.\n"
     "- target_1 and target_2 should use nearby resistance, moving averages, recent highs, or other provided levels. Do not invent targets.\n"
     "- risk_reward_summary should explain whether upside appears worth the downside risk based only on provided levels.\n"
-    "- watchlist_action should say what the user should monitor next, such as volume expansion, close above SMA, higher low, RSI recovery, or support hold.\n"
+    "- watchlist_action should say what the user should monitor next, such as relative-volume expansion, accumulation replacing distribution, OBV turning up, breakout volume confirmation, higher low, or support hold.\n"
     "- Use plain English. Avoid vague phrases like 'could be interesting' unless followed by a concrete condition."
 )
 

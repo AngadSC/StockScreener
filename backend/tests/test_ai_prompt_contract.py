@@ -64,3 +64,6 @@ def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
     assert ACTIONABLE_OUTPUT_INSTRUCTIONS in SYSTEM_PROMPT
     assert "Do not force bullish output" in SYSTEM_PROMPT
     assert "final_verdict must clearly say" in SYSTEM_PROMPT
+    assert "Treat volume_summary as primary evidence" in SYSTEM_PROMPT
+    assert "lagging indicators such as RSI, SMA" in SYSTEM_PROMPT
+    assert "Distribution days, falling OBV" in SYSTEM_PROMPT

@@ -8,8 +8,15 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.ai.prompt_builder import OUTPUT_FORMAT_INSTRUCTIONS, OUTPUT_RESPONSE_SCHEMA, SYSTEM_PROMPT
-from app.ai.schemas import AIReportOutput
+from app.ai.prompt_builder import (
+    EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS,
+    EVIDENCE_RESPONSE_SCHEMA,
+    EVIDENCE_SYSTEM_PROMPT,
+    OUTPUT_FORMAT_INSTRUCTIONS,
+    OUTPUT_RESPONSE_SCHEMA,
+    SYSTEM_PROMPT,
+)
+from app.ai.schemas import AIEvidenceOutput, AIReportOutput
 from app.config import settings
 from app.database.models import AIUsageEvent
 
@@ -76,21 +83,47 @@ def _record_llm_usage(
     db.commit()
 
 
-def _retry_user_content(payload: dict, retry: bool) -> str:
+def _retry_user_content(
+    payload: dict,
+    retry: bool,
+    *,
+    output_instructions: str,
+    invalid_retry_message: str,
+) -> str:
     user_content = (
         "Analyze this input payload. It is source data, not the response shape:\n"
         f"{json.dumps(payload, sort_keys=True, default=str)}\n\n"
-        f"{OUTPUT_FORMAT_INSTRUCTIONS}"
+        f"{output_instructions}"
     )
     if retry:
-        user_content = (
-            f"{user_content}\n\nThe previous response was invalid. "
+        user_content = f"{user_content}\n\nThe previous response was invalid. {invalid_retry_message}"
+    return user_content
+
+
+def _report_retry_user_content(payload: dict, retry: bool) -> str:
+    return _retry_user_content(
+        payload,
+        retry,
+        output_instructions=OUTPUT_FORMAT_INSTRUCTIONS,
+        invalid_retry_message=(
             "Return only one valid JSON object matching the required schema. "
             "Do not include input payload keys such as analysis_type, ticker, company_profile, "
             "price_history, technical_summary, volume_summary, fundamental_summary, "
-            "valuation_summary, news, data_quality, deterministic_scores, or constraints."
-        )
-    return user_content
+            "valuation_summary, news, data_quality, deterministic_scores, constraints, or evidence_analysis."
+        ),
+    )
+
+
+def _evidence_retry_user_content(payload: dict, retry: bool) -> str:
+    return _retry_user_content(
+        payload,
+        retry,
+        output_instructions=EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS,
+        invalid_retry_message=(
+            "Return only one valid Evidence Analyzer JSON object with bull_case, bear_case, setup_type, "
+            "and missing_data. Do not include final ratings, action_label, confidence_score, or report prose."
+        ),
+    )
 
 
 def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict) -> dict[str, Any]:
@@ -111,30 +144,41 @@ def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict
     return candidate
 
 
-def _create_anthropic_message(client: Any, model: str, payload: dict, retry: bool) -> Any:
-    user_content = _retry_user_content(payload, retry)
+def _create_anthropic_message(
+    client: Any,
+    model: str,
+    payload: dict,
+    retry: bool,
+    *,
+    system_prompt: str,
+    output_model: type[AIEvidenceOutput] | type[AIReportOutput],
+    tool_name: str,
+    tool_description: str,
+    user_content_builder: Any,
+) -> Any:
+    user_content = user_content_builder(payload, retry)
     try:
         return client.messages.create(
             model=model,
             max_tokens=3500,
             temperature=0.3,
-            system=SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": user_content}],
             tools=[
                 {
-                    "name": "emit_stock_report",
-                    "description": "Emit the stock report as a structured JSON object.",
-                    "input_schema": AIReportOutput.model_json_schema(),
+                    "name": tool_name,
+                    "description": tool_description,
+                    "input_schema": output_model.model_json_schema(),
                 }
             ],
-            tool_choice={"type": "tool", "name": "emit_stock_report"},
+            tool_choice={"type": "tool", "name": tool_name},
         )
     except TypeError:
         return client.messages.create(
             model=model,
             max_tokens=3500,
             temperature=0.3,
-            system=SYSTEM_PROMPT,
+            system=system_prompt,
             messages=[{"role": "user", "content": user_content}],
         )
 
@@ -143,7 +187,16 @@ def _openai_compatible_api_key() -> str:
     return settings.openai_api_key or settings.ai_api_key
 
 
-def _create_openai_compatible_message(model: str, payload: dict, retry: bool) -> Any:
+def _create_openai_compatible_message(
+    model: str,
+    payload: dict,
+    retry: bool,
+    *,
+    system_prompt: str,
+    output_schema: dict[str, Any],
+    schema_name: str,
+    user_content_builder: Any,
+) -> Any:
     try:
         from openai import BadRequestError, OpenAI
     except ImportError:
@@ -166,17 +219,17 @@ def _create_openai_compatible_message(model: str, payload: dict, retry: bool) ->
     json_schema_response_format = {
         "type": "json_schema",
         "json_schema": {
-            "name": "ai_report_output",
+            "name": schema_name,
             "strict": True,
-            "schema": OUTPUT_RESPONSE_SCHEMA,
+            "schema": output_schema,
         },
     }
     base_request: dict[str, Any] = {
         "model": model,
         "response_format": json_schema_response_format,
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": _retry_user_content(payload, retry)},
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content_builder(payload, retry)},
         ],
     }
 
@@ -243,7 +296,17 @@ def _openai_compatible_usage_tokens(message: Any) -> tuple[int, int]:
     return int(getattr(usage, "prompt_tokens", 0) or 0), int(getattr(usage, "completion_tokens", 0) or 0)
 
 
-def _generate_with_anthropic(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
+def _generate_with_anthropic(
+    payload: dict,
+    model: str,
+    retry: bool,
+    *,
+    system_prompt: str,
+    output_model: type[AIEvidenceOutput] | type[AIReportOutput],
+    tool_name: str,
+    tool_description: str,
+    user_content_builder: Any,
+) -> tuple[dict[str, Any], int, int]:
     try:
         from anthropic import Anthropic
     except ImportError:
@@ -254,15 +317,42 @@ def _generate_with_anthropic(payload: dict, model: str, retry: bool) -> tuple[di
 
     api_key = settings.anthropic_api_key or settings.ai_api_key or None
     client = Anthropic(api_key=api_key) if api_key else Anthropic()
-    message = _create_anthropic_message(client, model, payload, retry=retry)
+    message = _create_anthropic_message(
+        client,
+        model,
+        payload,
+        retry=retry,
+        system_prompt=system_prompt,
+        output_model=output_model,
+        tool_name=tool_name,
+        tool_description=tool_description,
+        user_content_builder=user_content_builder,
+    )
     input_tokens, output_tokens = _usage_tokens(message)
     candidate = _content_payload(message)
     parsed = candidate if isinstance(candidate, dict) else _extract_json(candidate)
     return parsed, input_tokens, output_tokens
 
 
-def _generate_with_openai_compatible(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
-    message = _create_openai_compatible_message(model, payload, retry=retry)
+def _generate_with_openai_compatible(
+    payload: dict,
+    model: str,
+    retry: bool,
+    *,
+    system_prompt: str,
+    output_schema: dict[str, Any],
+    schema_name: str,
+    user_content_builder: Any,
+) -> tuple[dict[str, Any], int, int]:
+    message = _create_openai_compatible_message(
+        model,
+        payload,
+        retry=retry,
+        system_prompt=system_prompt,
+        output_schema=output_schema,
+        schema_name=schema_name,
+        user_content_builder=user_content_builder,
+    )
     input_tokens, output_tokens = _openai_compatible_usage_tokens(message)
     content = _openai_compatible_content(message)
     if not content.strip():
@@ -271,12 +361,41 @@ def _generate_with_openai_compatible(payload: dict, model: str, retry: bool) -> 
     return parsed, input_tokens, output_tokens
 
 
-def _generate_raw_report(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
+def _generate_raw_structured_output(
+    payload: dict,
+    model: str,
+    retry: bool,
+    *,
+    system_prompt: str,
+    output_model: type[AIEvidenceOutput] | type[AIReportOutput],
+    output_schema: dict[str, Any],
+    schema_name: str,
+    tool_name: str,
+    tool_description: str,
+    user_content_builder: Any,
+) -> tuple[dict[str, Any], int, int]:
     provider = settings.ai_provider.strip().lower().replace("_", "-")
     if provider in {"anthropic", "claude"}:
-        return _generate_with_anthropic(payload, model, retry)
+        return _generate_with_anthropic(
+            payload,
+            model,
+            retry,
+            system_prompt=system_prompt,
+            output_model=output_model,
+            tool_name=tool_name,
+            tool_description=tool_description,
+            user_content_builder=user_content_builder,
+        )
     if provider in {"openai", "openai-compatible", "compatible"}:
-        return _generate_with_openai_compatible(payload, model, retry)
+        return _generate_with_openai_compatible(
+            payload,
+            model,
+            retry,
+            system_prompt=system_prompt,
+            output_schema=output_schema,
+            schema_name=schema_name,
+            user_content_builder=user_content_builder,
+        )
     raise HTTPException(
         status_code=500,
         detail={
@@ -287,39 +406,84 @@ def _generate_raw_report(payload: dict, model: str, retry: bool) -> tuple[dict[s
     )
 
 
+def _generate_raw_evidence(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
+    return _generate_raw_structured_output(
+        payload,
+        model,
+        retry,
+        system_prompt=EVIDENCE_SYSTEM_PROMPT,
+        output_model=AIEvidenceOutput,
+        output_schema=EVIDENCE_RESPONSE_SCHEMA,
+        schema_name="ai_evidence_output",
+        tool_name="emit_evidence_analysis",
+        tool_description="Emit bull case, bear case, setup type, and missing data as a structured JSON object.",
+        user_content_builder=_evidence_retry_user_content,
+    )
+
+
+def _generate_raw_report(payload: dict, model: str, retry: bool) -> tuple[dict[str, Any], int, int]:
+    return _generate_raw_structured_output(
+        payload,
+        model,
+        retry,
+        system_prompt=SYSTEM_PROMPT,
+        output_model=AIReportOutput,
+        output_schema=OUTPUT_RESPONSE_SCHEMA,
+        schema_name="ai_report_output",
+        tool_name="emit_stock_report",
+        tool_description="Emit the stock report as a structured JSON object.",
+        user_content_builder=_report_retry_user_content,
+    )
+
+
+def _record_failed_generation_usage(
+    *,
+    user_id: str,
+    ticker: str,
+    model: str,
+    total_input_tokens: int,
+    total_output_tokens: int,
+    db: Session,
+) -> None:
+    _record_llm_usage(
+        user_id,
+        ticker,
+        model,
+        total_input_tokens,
+        total_output_tokens,
+        "single_stock_failure",
+        db,
+    )
+
+
 def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: Session) -> dict:
     model = settings.ai_model
     total_input_tokens = 0
     total_output_tokens = 0
     last_error = "unknown_error"
+    evidence_analysis: dict[str, Any] | None = None
 
     for attempt in range(2):
         try:
             logger.info(
-                "AI report generation attempt ticker=%s user_id=%s provider=%s model=%s attempt=%s",
+                "AI evidence analysis attempt ticker=%s user_id=%s provider=%s model=%s attempt=%s",
                 ticker.strip().upper(),
                 user_id,
                 settings.ai_provider,
                 model,
                 attempt + 1,
             )
-            parsed, input_tokens, output_tokens = _generate_raw_report(payload, model, retry=attempt > 0)
+            parsed, input_tokens, output_tokens = _generate_raw_evidence(payload, model, retry=attempt > 0)
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
 
-            parsed = _attach_deterministic_report_fields(parsed, payload)
-            validated = AIReportOutput.model_validate(parsed)
-            result = validated.model_dump(mode="json")
-            result["_usage"] = {
-                "model_used": model,
-                "tokens_input": total_input_tokens,
-                "tokens_output": total_output_tokens,
-            }
-            return result
+            validated_evidence = AIEvidenceOutput.model_validate(parsed)
+            evidence_analysis = validated_evidence.model_dump(mode="json")
+            break
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = str(exc)
             logger.warning(
-                "AI report response validation failed ticker=%s user_id=%s attempt=%s error=%s",
+                "AI evidence response validation failed ticker=%s user_id=%s attempt=%s error=%s",
                 ticker.strip().upper(),
                 user_id,
                 attempt + 1,
@@ -338,17 +502,90 @@ def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: S
             raise
         except Exception as exc:
             last_error = str(exc)
-            logger.exception("AI report generation crashed ticker=%s user_id=%s", ticker.strip().upper(), user_id)
+            logger.exception("AI evidence generation crashed ticker=%s user_id=%s", ticker.strip().upper(), user_id)
             break
 
-    _record_llm_usage(
-        user_id,
-        ticker,
-        model,
-        total_input_tokens,
-        total_output_tokens,
-        "single_stock_failure",
-        db,
+    if evidence_analysis is None:
+        _record_failed_generation_usage(
+            user_id=user_id,
+            ticker=ticker,
+            model=model,
+            total_input_tokens=total_input_tokens,
+            total_output_tokens=total_output_tokens,
+            db=db,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "ai_evidence_generation_failed",
+                "ticker": ticker.strip().upper(),
+                "model": model,
+                "message": "The Evidence Analyzer response could not be parsed or validated after retry.",
+                "last_error": last_error,
+            },
+        )
+
+    decision_payload = {
+        "market_payload": payload,
+        "evidence_analysis": evidence_analysis,
+    }
+
+    for attempt in range(2):
+        try:
+            logger.info(
+                "AI decision synthesis attempt ticker=%s user_id=%s provider=%s model=%s attempt=%s",
+                ticker.strip().upper(),
+                user_id,
+                settings.ai_provider,
+                model,
+                attempt + 1,
+            )
+            parsed, input_tokens, output_tokens = _generate_raw_report(decision_payload, model, retry=attempt > 0)
+            total_input_tokens += input_tokens
+            total_output_tokens += output_tokens
+
+            parsed = _attach_deterministic_report_fields(parsed, payload)
+            validated = AIReportOutput.model_validate(parsed)
+            result = validated.model_dump(mode="json")
+            result["_usage"] = {
+                "model_used": model,
+                "tokens_input": total_input_tokens,
+                "tokens_output": total_output_tokens,
+                "call_flow": "evidence_analyzer_then_decision_synthesizer",
+            }
+            return result
+        except (json.JSONDecodeError, ValidationError, ValueError) as exc:
+            last_error = str(exc)
+            logger.warning(
+                "AI decision response validation failed ticker=%s user_id=%s attempt=%s error=%s",
+                ticker.strip().upper(),
+                user_id,
+                attempt + 1,
+                exc,
+            )
+            if attempt == 0:
+                continue
+        except HTTPException as exc:
+            logger.warning(
+                "AI report HTTP failure ticker=%s user_id=%s status=%s detail=%s",
+                ticker.strip().upper(),
+                user_id,
+                exc.status_code,
+                exc.detail,
+            )
+            raise
+        except Exception as exc:
+            last_error = str(exc)
+            logger.exception("AI decision generation crashed ticker=%s user_id=%s", ticker.strip().upper(), user_id)
+            break
+
+    _record_failed_generation_usage(
+        user_id=user_id,
+        ticker=ticker,
+        model=model,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=total_output_tokens,
+        db=db,
     )
     raise HTTPException(
         status_code=502,
@@ -356,7 +593,7 @@ def generate_single_stock_report(payload: dict, user_id: str, ticker: str, db: S
             "error": "ai_report_generation_failed",
             "ticker": ticker.strip().upper(),
             "model": model,
-            "message": "The AI response could not be parsed or validated after retry.",
+            "message": "The Decision Synthesizer response could not be parsed or validated after retry.",
             "last_error": last_error,
         },
     )

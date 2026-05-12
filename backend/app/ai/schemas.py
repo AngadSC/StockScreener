@@ -42,6 +42,31 @@ class AIReportInput(BaseModel):
         return value.strip().upper()
 
 
+class AIEvidenceOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    bull_case: List[str] = Field(..., min_length=1)
+    bear_case: List[str] = Field(..., min_length=1)
+    setup_type: str = Field(..., min_length=1, max_length=50)
+    missing_data: List[str] = Field(..., min_length=1)
+
+    @field_validator("bull_case", "bear_case", "missing_data", mode="before")
+    @classmethod
+    def normalize_string_list(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            return value
+
+        cleaned = [_clean_short_text(item) for item in value if _clean_short_text(item)]
+        return cleaned or ["None identified from provided data."]
+
+    @field_validator("setup_type", mode="before")
+    @classmethod
+    def normalize_setup_type(cls, value: Any) -> str:
+        return _truncate_at_word(_clean_short_text(value), 50)
+
+
 ActionLabel = Literal[
     "actionable_long",
     "long_watchlist",

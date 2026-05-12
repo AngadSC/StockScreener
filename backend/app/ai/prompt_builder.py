@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 
-from app.ai.schemas import AIReportOutput
+from app.ai.schemas import AIEvidenceOutput, AIReportOutput
 
 
+EVIDENCE_FIELDS = tuple(AIEvidenceOutput.model_fields.keys())
 OUTPUT_FIELDS = tuple(AIReportOutput.model_fields.keys())
 SCORE_FIELDS = {
     "confidence_score",
@@ -175,6 +176,14 @@ def _response_property(field: str) -> dict:
     return {"type": "string", "minLength": 1}
 
 
+def _evidence_response_property(field: str) -> dict:
+    if field in {"bull_case", "bear_case", "missing_data"}:
+        return {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
+    if field == "setup_type":
+        return {"type": "string", "minLength": 1, "maxLength": 50}
+    return {"type": "string", "minLength": 1}
+
+
 SYSTEM_ROLE = (
     "You are an AI swing-trade research analyst for QuantorSignal. "
     "Your job is to convert structured stock data into a practical research decision for a 3-20 trading day timeframe. "
@@ -185,6 +194,13 @@ SYSTEM_ROLE = (
     "decision-oriented, and grounded in the provided data."
 )
 
+EVIDENCE_ANALYZER_ROLE = (
+    "You are AI Call 1: Evidence Analyzer for QuantorSignal. "
+    "Your job is to read the backend feature-engineered stock payload and extract evidence only. "
+    "Do not make final ratings, action labels, confidence calls, or a user-facing report. "
+    "Analyze only the provided data. Do not invent prices, fundamentals, news, filings, catalysts, or events."
+)
+
 OUTPUT_RESPONSE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
@@ -193,11 +209,30 @@ OUTPUT_RESPONSE_SCHEMA = {
 }
 OUTPUT_SCHEMA_JSON = json.dumps(OUTPUT_RESPONSE_SCHEMA, sort_keys=True)
 
+EVIDENCE_RESPONSE_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {field: _evidence_response_property(field) for field in EVIDENCE_FIELDS},
+    "required": list(EVIDENCE_FIELDS),
+}
+EVIDENCE_SCHEMA_JSON = json.dumps(EVIDENCE_RESPONSE_SCHEMA, sort_keys=True)
+
+EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS = (
+    "Evidence Analyzer output requirements:\n"
+    f"- Return exactly one JSON object with these top-level keys only: {', '.join(EVIDENCE_FIELDS)}.\n"
+    "- bull_case must be an array of concise evidence strings supporting upside or long interest, grounded in the provided data.\n"
+    "- bear_case must be an array of concise evidence strings supporting downside, avoidance, or risk, grounded in the provided data.\n"
+    "- setup_type must be a short label such as mean_reversion_bounce, breakout, pullback, momentum_continuation, breakdown_risk, no_clear_setup, max 50 characters.\n"
+    "- missing_data must list missing or weak evidence that limits confidence, such as stale OHLCV, missing fundamentals, missing valuation, missing news, weak volume confirmation, or unsupported levels.\n"
+    "- Do not include ratings, action_label, timeframe_ratings, confidence_score, final_verdict, markdown, or prose outside JSON.\n"
+    f"- The JSON object must validate against this schema: {EVIDENCE_SCHEMA_JSON}"
+)
+
 OUTPUT_FORMAT_INSTRUCTIONS = (
     "Output requirements:\n"
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
-    "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, deterministic_scores, or constraints.\n"
+    "- Do not include input keys such as market_payload, evidence_analysis, analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, deterministic_scores, or constraints.\n"
     "- action_label must be one of: actionable_long, long_watchlist, neutral_wait, short_watchlist, actionable_short, avoid, high_risk.\n"
     "- directional_bias must be one of: bullish, bearish, neutral, mixed_bullish_lean, mixed_bearish_lean.\n"
     "- timeframe_ratings.short_term.rating must be one of: buy, watch, avoid, with timeframe exactly '1-10 trading days' and a 0-100 confidence_score.\n"
@@ -217,6 +252,8 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
 
 INPUT_ANALYSIS_INSTRUCTIONS = (
     "Input analysis instructions:\n"
+    "- Flow: Market Data -> Backend Feature Engineering -> AI Call 1 Evidence Analyzer -> AI Call 2 Decision Synthesizer.\n"
+    "- Backend feature engineering already separates trend, momentum, volume, price structure, support/resistance, volatility, risk/reward, fundamentals, and news into the structured payload.\n"
     "- The input payload contains deterministic technical calculations; treat calculated fields as source facts.\n"
     "- The input payload contains deterministic_scores. Every output score field must match its same-named deterministic_scores value exactly.\n"
     "- Treat risk_score and risk_reward_score as quality scores where higher is better risk control / reward-to-risk, not higher danger.\n"
@@ -230,6 +267,17 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
     "- Use data_quality to qualify uncertainty in the analysis.\n"
     "- Do not invent missing fundamentals, news, filings, or price levels.\n"
     "- If OHLCV data_quality includes warnings, mention those limitations in the relevant report fields."
+)
+
+EVIDENCE_ANALYSIS_INSTRUCTIONS = (
+    "Evidence analysis instructions:\n"
+    "- Read the feature-engineered payload after backend calculations for trend, momentum, volume, price structure, support/resistance, volatility, risk/reward, fundamentals, and news.\n"
+    "- Extract bull_case and bear_case from explicit payload facts only.\n"
+    "- Identify setup_type from technical_summary.price_action_structure, price levels, trend, momentum, and volume confirmation.\n"
+    "- Identify missing_data from data_quality, unavailable fundamentals or valuation, absent or low-materiality news, stale or thin OHLCV, unclear support/resistance, weak risk/reward, or missing confirmation.\n"
+    "- Treat volume_summary as primary evidence for setup quality, confirmation, and risk.\n"
+    "- Treat lagging indicators such as RSI, SMA, and moving-average trend as secondary context.\n"
+    "- Do not decide final stance, confidence, timeframe ratings, or report copy."
 )
 
 DECISION_RULES = (
@@ -269,9 +317,20 @@ ACTIONABLE_OUTPUT_INSTRUCTIONS = (
 )
 
 
+EVIDENCE_SYSTEM_PROMPT = (
+    f"{EVIDENCE_ANALYZER_ROLE}\n\n"
+    f"{EVIDENCE_ANALYSIS_INSTRUCTIONS}\n\n"
+    f"{EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS}"
+)
+
 SYSTEM_PROMPT = (
     f"{SYSTEM_ROLE}\n\n"
     f"{INPUT_ANALYSIS_INSTRUCTIONS}\n\n"
+    "Decision Synthesizer instructions:\n"
+    "- You are AI Call 2: Decision Synthesizer. Use the Evidence Analyzer output as the organized bull/bear/setup/missing-data layer, then synthesize the final ratings, final stance, confidence, and user-facing report.\n"
+    "- The original backend feature-engineered payload is provided under market_payload; the first-call evidence object is provided under evidence_analysis.\n"
+    "- Do not ignore the original feature-engineered payload. Resolve conflicts by relying on deterministic payload facts and the provided evidence analysis.\n"
+    "- If the evidence analysis overstates unsupported facts, defer to the original payload and mention limitations in the relevant report fields.\n\n"
     f"{DECISION_RULES}\n\n"
     f"{ACTIONABLE_OUTPUT_INSTRUCTIONS}\n\n"
     f"{OUTPUT_FORMAT_INSTRUCTIONS}"

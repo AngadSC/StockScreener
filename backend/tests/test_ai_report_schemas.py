@@ -1,5 +1,5 @@
 from app.ai.llm_client import _attach_deterministic_report_fields
-from app.ai.schemas import AIReportOutput
+from app.ai.schemas import AIEvidenceOutput, AIReportOutput
 
 
 def _valid_report(**overrides):
@@ -90,6 +90,22 @@ def _valid_report(**overrides):
     }
     report.update(overrides)
     return report
+
+
+def test_ai_evidence_output_normalizes_string_lists_and_setup_type() -> None:
+    evidence = AIEvidenceOutput.model_validate(
+        {
+            "bull_case": "Breakout attempt with improving volume.",
+            "bear_case": ["  Resistance is still nearby.  "],
+            "setup_type": "Breakout-retest / momentum continuation near resistance",
+            "missing_data": [],
+        }
+    )
+
+    assert evidence.bull_case == ["Breakout attempt with improving volume."]
+    assert evidence.bear_case == ["Resistance is still nearby."]
+    assert evidence.setup_type == "Breakout-retest / momentum continuation near"
+    assert evidence.missing_data == ["None identified from provided data."]
 
 
 def test_ai_report_output_normalizes_verbose_directional_bias() -> None:

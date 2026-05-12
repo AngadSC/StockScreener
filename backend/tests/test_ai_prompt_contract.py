@@ -1,13 +1,49 @@
 from app.ai.prompt_builder import (
     ACTIONABLE_OUTPUT_INSTRUCTIONS,
     DECISION_RULES,
+    EVIDENCE_FIELDS,
+    EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS,
+    EVIDENCE_RESPONSE_SCHEMA,
+    EVIDENCE_SYSTEM_PROMPT,
     OUTPUT_FIELDS,
     OUTPUT_FORMAT_INSTRUCTIONS,
     OUTPUT_RESPONSE_SCHEMA,
     SYSTEM_PROMPT,
     SYSTEM_ROLE,
 )
-from app.ai.schemas import AIReportOutput
+from app.ai.schemas import AIEvidenceOutput, AIReportOutput
+
+
+def test_evidence_response_schema_requires_evidence_fields() -> None:
+    assert EVIDENCE_RESPONSE_SCHEMA["additionalProperties"] is False
+    assert EVIDENCE_RESPONSE_SCHEMA["required"] == list(EVIDENCE_FIELDS)
+    assert set(EVIDENCE_RESPONSE_SCHEMA["properties"]) == set(AIEvidenceOutput.model_fields)
+    assert EVIDENCE_RESPONSE_SCHEMA["properties"]["bull_case"] == {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 1,
+    }
+    assert EVIDENCE_RESPONSE_SCHEMA["properties"]["bear_case"] == {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 1,
+    }
+    assert EVIDENCE_RESPONSE_SCHEMA["properties"]["missing_data"] == {
+        "type": "array",
+        "items": {"type": "string", "minLength": 1},
+        "minItems": 1,
+    }
+    assert EVIDENCE_RESPONSE_SCHEMA["properties"]["setup_type"]["maxLength"] == 50
+
+
+def test_evidence_prompt_stays_evidence_only() -> None:
+    assert "AI Call 1: Evidence Analyzer" in EVIDENCE_SYSTEM_PROMPT
+    assert "trend, momentum, volume, price structure, support/resistance, volatility, risk/reward, fundamentals, and news" in EVIDENCE_SYSTEM_PROMPT
+    assert "Do not make final ratings" in EVIDENCE_SYSTEM_PROMPT
+    assert "bull_case" in EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS
+    assert "bear_case" in EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS
+    assert "missing_data" in EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS
+    assert "Do not include ratings" in EVIDENCE_OUTPUT_FORMAT_INSTRUCTIONS
 
 
 def test_output_response_schema_requires_ui_report_fields() -> None:
@@ -78,6 +114,8 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "price_action_structure" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "setup_quality_score" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "deterministic_scores" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "market_payload" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "evidence_analysis" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "copied exactly from deterministic_scores" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
@@ -89,6 +127,11 @@ def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
     assert SYSTEM_ROLE in SYSTEM_PROMPT
     assert DECISION_RULES in SYSTEM_PROMPT
     assert ACTIONABLE_OUTPUT_INSTRUCTIONS in SYSTEM_PROMPT
+    assert "AI Call 2: Decision Synthesizer" in SYSTEM_PROMPT
+    assert "market_payload" in SYSTEM_PROMPT
+    assert "evidence_analysis" in SYSTEM_PROMPT
+    assert "Market Data -> Backend Feature Engineering -> AI Call 1 Evidence Analyzer -> AI Call 2 Decision Synthesizer" in SYSTEM_PROMPT
+    assert "trend, momentum, volume, price structure, support/resistance, volatility, risk/reward, fundamentals, and news" in SYSTEM_PROMPT
     assert "Do not force bullish or bearish output" in SYSTEM_PROMPT
     assert "final_verdict must clearly say" in SYSTEM_PROMPT
     assert "Treat volume_summary as primary evidence" in SYSTEM_PROMPT

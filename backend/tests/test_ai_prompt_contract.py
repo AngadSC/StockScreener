@@ -74,6 +74,8 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "timeframe_ratings" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "price_action_structure" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "setup_quality_score" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "deterministic_scores" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "copied exactly from deterministic_scores" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "buy_setup, watchlist, neutral, avoid, high_risk" in OUTPUT_FORMAT_INSTRUCTIONS
@@ -88,6 +90,8 @@ def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
     assert "final_verdict must clearly say" in SYSTEM_PROMPT
     assert "Treat volume_summary as primary evidence" in SYSTEM_PROMPT
     assert "technical_summary.price_action_structure" in SYSTEM_PROMPT
+    assert "Every output score field must match" in SYSTEM_PROMPT
+    assert "risk_score and risk_reward_score as quality scores" in SYSTEM_PROMPT
     assert "timeframe_ratings must separately evaluate" in SYSTEM_PROMPT
     assert "lagging indicators such as RSI, SMA" in SYSTEM_PROMPT
     assert "Distribution days, falling OBV" in SYSTEM_PROMPT

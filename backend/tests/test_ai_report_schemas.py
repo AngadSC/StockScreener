@@ -1,3 +1,4 @@
+from app.ai.llm_client import _attach_deterministic_report_fields
 from app.ai.schemas import AIReportOutput
 
 
@@ -58,10 +59,20 @@ def _valid_report(**overrides):
         "setup_quality_score": 50,
         "entry_timing_score": 50,
         "technical_score": 50,
+        "price_structure_score": 50,
+        "volume_score": 50,
+        "momentum_score": 50,
+        "trend_score": 50,
         "fundamental_score": 50,
+        "revenue_earnings_quality_score": 50,
         "sentiment_score": 50,
+        "news_score": 50,
         "valuation_score": 50,
         "risk_score": 50,
+        "risk_reward_score": 50,
+        "short_term_score": 50,
+        "swing_trade_score": 50,
+        "long_term_score": 50,
         "trade_read": "Watch for confirmation.",
         "main_thesis": "Thesis.",
         "entry_zone": "Near support.",
@@ -138,3 +149,39 @@ def test_ai_report_output_normalizes_timeframe_ratings() -> None:
     assert report.timeframe_ratings.short_term.rating == "watch"
     assert report.timeframe_ratings.swing.rating == "buy"
     assert report.timeframe_ratings.long_term.rating == "unknown"
+
+
+def test_deterministic_report_fields_override_llm_scores() -> None:
+    candidate = _valid_report(
+        technical_score=1,
+        volume_score=2,
+        news_score=3,
+        risk_reward_score=4,
+        swing_trade_score=5,
+    )
+    payload = {
+        "technical_summary": {
+            "price_action_structure": {
+                **candidate["price_action_structure"],
+                "setup_label": "confirmed_breakout",
+            }
+        },
+        "deterministic_scores": {
+            "technical_score": 71,
+            "volume_score": 82,
+            "news_score": 63,
+            "sentiment_score": 63,
+            "risk_reward_score": 57,
+            "swing_trade_score": 74,
+        },
+    }
+
+    report = AIReportOutput.model_validate(_attach_deterministic_report_fields(candidate, payload))
+
+    assert report.technical_score == 71
+    assert report.volume_score == 82
+    assert report.news_score == 63
+    assert report.sentiment_score == 63
+    assert report.risk_reward_score == 57
+    assert report.swing_trade_score == 74
+    assert report.price_action_structure.setup_label == "confirmed_breakout"

@@ -76,6 +76,25 @@ function TimeframeRatingCard({
 }
 
 export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps) {
+  const scoreBadges = [
+    ['Confidence', report.confidence_score],
+    ['Swing', report.swing_trade_score],
+    ['Short Term', report.short_term_score],
+    ['Long Term', report.long_term_score],
+    ['Setup Quality', report.setup_quality_score],
+    ['Entry Timing', report.entry_timing_score],
+    ['Technical', report.technical_score],
+    ['Price Structure', report.price_structure_score],
+    ['Volume', report.volume_score],
+    ['Momentum', report.momentum_score],
+    ['Risk/Reward', report.risk_reward_score],
+    ['Risk Control', report.risk_score],
+    ['News', report.news_score],
+    ['Fundamentals', report.fundamental_score],
+    ['Revenue/Earnings', report.revenue_earnings_quality_score],
+    ['Valuation', report.valuation_score],
+  ] as const;
+
   return (
     <section className="deco-panel p-6 md:p-7">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -101,11 +120,9 @@ export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps
       </div>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <AIScoreBadge label="Confidence" score={report.confidence_score} />
-        <AIScoreBadge label="Setup Quality" score={report.setup_quality_score} />
-        <AIScoreBadge label="Entry Timing" score={report.entry_timing_score} />
-        <AIScoreBadge label="Risk" score={report.risk_score} />
-        <AIScoreBadge label="Technical" score={report.technical_score} />
+        {scoreBadges.map(([label, score]) => (
+          <AIScoreBadge key={label} label={label} score={score} />
+        ))}
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">

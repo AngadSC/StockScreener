@@ -202,6 +202,31 @@ def test_build_ai_payload_includes_technical_and_volume_summaries(
     assert volume_summary["volume_trend"] in {"elevated", "light", "normal"}
 
 
+def test_build_ai_payload_includes_deterministic_scores(
+    sqlite_db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = _payload(sqlite_db, monkeypatch)
+
+    scores = payload["deterministic_scores"]
+    assert scores["setup_quality_score"] == scores["swing_trade_score"]
+    assert scores["entry_timing_score"] == scores["short_term_score"]
+    assert scores["sentiment_score"] == scores["news_score"]
+    for field in (
+        "technical_score",
+        "price_structure_score",
+        "volume_score",
+        "momentum_score",
+        "risk_reward_score",
+        "fundamental_score",
+        "valuation_score",
+        "long_term_score",
+    ):
+        assert 0 <= scores[field] <= 100
+    assert payload["constraints"]["score_fields_are_computed_in_code"] is True
+    assert "swing_trade" in scores["weighting_models"]
+
+
 def test_build_ai_payload_represents_missing_fundamentals_without_crashing(
     sqlite_db: Session,
     monkeypatch: pytest.MonkeyPatch,

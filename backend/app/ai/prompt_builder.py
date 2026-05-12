@@ -11,10 +11,20 @@ SCORE_FIELDS = {
     "setup_quality_score",
     "entry_timing_score",
     "technical_score",
+    "price_structure_score",
+    "volume_score",
+    "momentum_score",
+    "trend_score",
     "fundamental_score",
+    "revenue_earnings_quality_score",
     "sentiment_score",
+    "news_score",
     "valuation_score",
     "risk_score",
+    "risk_reward_score",
+    "short_term_score",
+    "swing_trade_score",
+    "long_term_score",
 }
 
 
@@ -173,7 +183,7 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "Output requirements:\n"
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
-    "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, or constraints.\n"
+    "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, deterministic_scores, or constraints.\n"
     "- action_label must be one of: buy_setup, watchlist, neutral, avoid, high_risk.\n"
     "- swing_bias must be one of: bullish, bearish, neutral, mixed.\n"
     "- timeframe_ratings.short_term.rating must be one of: buy, watch, avoid, with timeframe exactly '1-10 trading days' and a 0-100 confidence_score.\n"
@@ -181,11 +191,11 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "- timeframe_ratings.long_term.rating must be one of: accumulate, hold, avoid, unknown, with timeframe exactly '6-24 months' and a 0-100 confidence_score.\n"
     "- price_action_structure must copy technical_summary.price_action_structure exactly; do not reinterpret or change its deterministic flags, levels, labels, or distances.\n"
     "- setup_type must be a short label such as mean_reversion_bounce, breakout, pullback, momentum_continuation, breakdown_risk, no_clear_setup, max 50 characters.\n"
-    "- confidence_score must be a number from 0 to 100 representing confidence in the action_label.\n"
+    "- confidence_score must copy deterministic_scores.confidence_score exactly.\n"
     "- entry_zone, confirmation_trigger, invalidation_level, target_1, and target_2 must be actionable levels or conditions based only on provided price data; say data is missing if a level cannot be supported.\n"
     "- risk_reward_summary must explain the setup's reward versus invalidation risk using the provided levels.\n"
     "- watchlist_action must state the next practical tracking action.\n"
-    "- Score fields must be numbers from 0 to 100.\n"
+    "- Score fields must be numbers from 0 to 100 copied exactly from deterministic_scores; explain the scores in prose fields, but do not invent or adjust score values.\n"
     "- confirmation_signals must be an array of short strings.\n"
     "- If supporting data is missing, state that in the relevant string fields instead of inventing facts.\n"
     f"- The JSON object must validate against this schema: {OUTPUT_SCHEMA_JSON}"
@@ -194,6 +204,8 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
 INPUT_ANALYSIS_INSTRUCTIONS = (
     "Input analysis instructions:\n"
     "- The input payload contains deterministic technical calculations; treat calculated fields as source facts.\n"
+    "- The input payload contains deterministic_scores. Every output score field must match its same-named deterministic_scores value exactly.\n"
+    "- Treat risk_score and risk_reward_score as quality scores where higher is better risk control / reward-to-risk, not higher danger.\n"
     "- Use price_history.candles for price action, recent candle behavior, and entry context.\n"
     "- Treat technical_summary.price_action_structure as deterministic source truth for setup labels, breakout state, range compression, trend structure, pullbacks, gaps, and support/resistance distances.\n"
     "- Treat volume_summary as primary evidence for setup quality, confirmation, and risk; prioritize relative volume, up/down volume balance, accumulation/distribution, OBV trend, breakout confirmation, dry-up near support, and volume/price confirmation.\n"

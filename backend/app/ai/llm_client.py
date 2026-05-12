@@ -88,20 +88,26 @@ def _retry_user_content(payload: dict, retry: bool) -> str:
             "Return only one valid JSON object matching the required schema. "
             "Do not include input payload keys such as analysis_type, ticker, company_profile, "
             "price_history, technical_summary, volume_summary, fundamental_summary, "
-            "valuation_summary, news, data_quality, or constraints."
+            "valuation_summary, news, data_quality, deterministic_scores, or constraints."
         )
     return user_content
 
 
 def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict) -> dict[str, Any]:
+    candidate = dict(candidate)
     technical_summary = payload.get("technical_summary") if isinstance(payload, dict) else {}
     if not isinstance(technical_summary, dict):
-        return candidate
+        technical_summary = {}
 
     price_action_structure = technical_summary.get("price_action_structure")
     if isinstance(price_action_structure, dict):
-        candidate = dict(candidate)
         candidate["price_action_structure"] = price_action_structure
+
+    deterministic_scores = payload.get("deterministic_scores") if isinstance(payload, dict) else {}
+    if isinstance(deterministic_scores, dict):
+        for field in AIReportOutput.model_fields:
+            if field.endswith("_score") and field in deterministic_scores:
+                candidate[field] = deterministic_scores[field]
     return candidate
 
 

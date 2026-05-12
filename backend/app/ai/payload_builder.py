@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.ai.market_context import build_market_context
 from app.ai.news_client import get_recent_stock_news
 from app.ai.schemas import AIReportInput
+from app.ai.scoring import build_deterministic_scores
 from app.ai.technical_summary import build_technical_summary
 
 
@@ -266,6 +267,21 @@ def build_ai_payload(ticker: str, db: Session) -> dict:
     fundamental_summary = _fundamental_summary(context.get("fundamental_data", {}))
     valuation_summary = _valuation_summary(context.get("valuation_data", {}))
     news_payload = get_recent_stock_news(ticker)
+    data_quality = _data_quality(
+        market_data.get("data_quality", {}),
+        candles=candles,
+        fundamental_summary=fundamental_summary,
+        valuation_summary=valuation_summary,
+        news_payload=news_payload,
+    )
+    deterministic_scores = build_deterministic_scores(
+        technical_summary=technical_summary,
+        volume_summary=volume_summary,
+        fundamental_summary=fundamental_summary,
+        valuation_summary=valuation_summary,
+        news=news_payload,
+        data_quality=data_quality,
+    )
 
     payload = {
         "ticker": ticker,
@@ -284,16 +300,13 @@ def build_ai_payload(ticker: str, db: Session) -> dict:
         "fundamental_summary": fundamental_summary,
         "valuation_summary": valuation_summary,
         "news": news_payload,
-        "data_quality": _data_quality(
-            market_data.get("data_quality", {}),
-            candles=candles,
-            fundamental_summary=fundamental_summary,
-            valuation_summary=valuation_summary,
-            news_payload=news_payload,
-        ),
+        "data_quality": data_quality,
+        "deterministic_scores": deterministic_scores,
         "constraints": {
             "do_not_invent_data": True,
             "use_only_provided_data": True,
+            "score_fields_are_computed_in_code": True,
+            "ai_must_explain_scores_not_create_them": True,
             "use_price_history_for_entry_analysis": True,
             "output_is_research_not_financial_advice": True,
         },

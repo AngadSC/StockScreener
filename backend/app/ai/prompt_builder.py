@@ -149,12 +149,26 @@ def _response_property(field: str) -> dict:
     if field == "action_label":
         return {
             "type": "string",
-            "enum": ["buy_setup", "watchlist", "neutral", "avoid", "high_risk"],
+            "enum": [
+                "actionable_long",
+                "long_watchlist",
+                "neutral_wait",
+                "short_watchlist",
+                "actionable_short",
+                "avoid",
+                "high_risk",
+            ],
         }
-    if field == "swing_bias":
+    if field == "directional_bias":
         return {
             "type": "string",
-            "enum": ["bullish", "bearish", "neutral", "mixed"],
+            "enum": [
+                "bullish",
+                "bearish",
+                "neutral",
+                "mixed_bullish_lean",
+                "mixed_bearish_lean",
+            ],
         }
     if field == "setup_type":
         return {"type": "string", "minLength": 1, "maxLength": 50}
@@ -184,8 +198,8 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     f"- Return exactly one JSON object with these top-level keys only: {', '.join(OUTPUT_FIELDS)}.\n"
     "- Do not return the input payload, source data, nested research sections, markdown, or prose outside JSON.\n"
     "- Do not include input keys such as analysis_type, ticker, company_profile, price_history, technical_summary, volume_summary, fundamental_summary, valuation_summary, news, data_quality, deterministic_scores, or constraints.\n"
-    "- action_label must be one of: buy_setup, watchlist, neutral, avoid, high_risk.\n"
-    "- swing_bias must be one of: bullish, bearish, neutral, mixed.\n"
+    "- action_label must be one of: actionable_long, long_watchlist, neutral_wait, short_watchlist, actionable_short, avoid, high_risk.\n"
+    "- directional_bias must be one of: bullish, bearish, neutral, mixed_bullish_lean, mixed_bearish_lean.\n"
     "- timeframe_ratings.short_term.rating must be one of: buy, watch, avoid, with timeframe exactly '1-10 trading days' and a 0-100 confidence_score.\n"
     "- timeframe_ratings.swing.rating must be one of: buy, watch, avoid, with timeframe exactly '2-8 weeks' and a 0-100 confidence_score.\n"
     "- timeframe_ratings.long_term.rating must be one of: accumulate, hold, avoid, unknown, with timeframe exactly '6-24 months' and a 0-100 confidence_score.\n"
@@ -211,6 +225,8 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
     "- Treat volume_summary as primary evidence for setup quality, confirmation, and risk; prioritize relative volume, up/down volume balance, accumulation/distribution, OBV trend, breakout confirmation, dry-up near support, and volume/price confirmation.\n"
     "- Treat lagging indicators such as RSI, SMA, and moving-average trend as secondary context, not as the main reason for an action_label.\n"
     "- Use technical_summary for price levels, volatility, and context after checking volume behavior.\n"
+    "- Use news.articles as classified catalyst inputs. Each article may include event_type, sentiment, materiality, time_horizon, summary, and why_it_matters; weigh high-materiality guidance, earnings, FDA, lawsuit, merger, macro, and analyst-rating events more than generic headlines.\n"
+    "- Do not treat news naively. A positive headline with low materiality should not override weak technicals, and a high-materiality negative catalyst should weaken an otherwise bullish setup.\n"
     "- Use data_quality to qualify uncertainty in the analysis.\n"
     "- Do not invent missing fundamentals, news, filings, or price levels.\n"
     "- If OHLCV data_quality includes warnings, mention those limitations in the relevant report fields."
@@ -218,17 +234,22 @@ INPUT_ANALYSIS_INSTRUCTIONS = (
 
 DECISION_RULES = (
     "Decision rules:\n"
-    "- Use action_label='buy_setup' only when price action, volume intelligence, entry timing, and risk/reward are reasonably aligned.\n"
+    "- Use action_label='actionable_long' only when price action, volume intelligence, entry timing, risk/reward, and catalyst context are reasonably aligned for a long setup.\n"
     "- action_label should summarize the swing timeframe decision, while timeframe_ratings must separately evaluate short-term, swing, and long-term suitability.\n"
-    "- Use action_label='watchlist' when there are early positive signs but confirmation is missing.\n"
-    "- Use action_label='neutral' when signals are mixed or there is no clear edge.\n"
+    "- Use action_label='long_watchlist' when bullish structure or a positive catalyst is forming, but trigger, timing, or confirmation is missing.\n"
+    "- Use action_label='neutral_wait' when signals are mixed or there is no clear edge.\n"
+    "- Use action_label='short_watchlist' when downside risk is forming, but a short trigger or risk/reward is not confirmed.\n"
+    "- Use action_label='actionable_short' only when bearish price action, confirmation, and risk/reward are aligned.\n"
     "- Use action_label='avoid' when the setup is weak, data quality is poor, or downside/risk dominates.\n"
     "- Use action_label='high_risk' when the stock may move but risk is elevated due to weak fundamentals, poor liquidity, stale data, extreme volatility, distribution, or weak volume confirmation.\n"
-    "- Strong price moves without volume_price_confirmation, rising OBV, accumulation, or breakout_volume_confirmed should usually be treated as watchlist or neutral rather than buy_setup.\n"
+    "- Strong price moves without volume_price_confirmation, rising OBV, accumulation, or breakout_volume_confirmed should usually be treated as long_watchlist or neutral_wait rather than actionable_long.\n"
     "- A breakout_attempt or compression_breakout_attempt can be a watch or buy setup only when the trigger, invalidation, and volume confirmation path are clear.\n"
     "- failed_breakout, lower_highs_lower_lows, or gap_down_recent should reduce short-term and swing confidence unless there is strong contrary evidence in the provided data.\n"
     "- Distribution days, falling OBV, or divergent volume/price behavior should reduce confidence even when RSI, SMA, or recent returns look favorable.\n"
-    "- Do not force bullish output. If the setup is weak, say so clearly.\n"
+    "- Do not force bullish or bearish output. If the setup is weak or unconfirmed, say so clearly with neutral_wait, long_watchlist, short_watchlist, avoid, or high_risk.\n"
+    "- Set directional_bias separately from action_label. For example, use directional_bias='bullish' with action_label='long_watchlist' when bullish structure is forming but not actionable yet.\n"
+    "- If technicals are neutral but a high-materiality positive catalyst exists, explain that the stock is worth watching instead of pretending the chart is confirmed.\n"
+    "- If the technical setup is bullish but recent negative guidance, litigation, FDA rejection, or another high-materiality negative catalyst exists, weaken the thesis and actionability.\n"
     "- Entry zones, targets, and invalidation levels must come only from provided prices, support/resistance, moving averages, recent highs/lows, ATR, or candle data.\n"
     "- If a precise entry, target, or invalidation level cannot be supported by provided data, state that it is not supported by the available data."
 )
@@ -237,7 +258,7 @@ ACTIONABLE_OUTPUT_INSTRUCTIONS = (
     "Actionable output instructions:\n"
     "- Start from the decision, then justify it.\n"
     "- Timeframe reasons must be different and specific to their horizon; do not repeat the same reason for short_term, swing, and long_term.\n"
-    "- final_verdict must clearly say one of: act now, wait for confirmation, watchlist only, no clear edge, or avoid.\n"
+    "- final_verdict must clearly say one of: actionable long, long watchlist, neutral wait, short watchlist, actionable short, avoid, or high risk.\n"
     "- entry_zone should give a price area or say no supported entry zone.\n"
     "- confirmation_trigger should describe the exact condition that would improve the setup, using provided levels when available.\n"
     "- invalidation_level should identify the level or condition that weakens the thesis.\n"

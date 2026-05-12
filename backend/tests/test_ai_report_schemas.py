@@ -4,8 +4,8 @@ from app.ai.schemas import AIReportOutput
 
 def _valid_report(**overrides):
     report = {
-        "action_label": "watchlist",
-        "swing_bias": "neutral",
+        "action_label": "long_watchlist",
+        "directional_bias": "neutral",
         "timeframe_ratings": {
             "short_term": {
                 "rating": "watch",
@@ -92,12 +92,12 @@ def _valid_report(**overrides):
     return report
 
 
-def test_ai_report_output_normalizes_verbose_swing_bias() -> None:
+def test_ai_report_output_normalizes_verbose_directional_bias() -> None:
     report = AIReportOutput.model_validate(
-        _valid_report(swing_bias="Bullish (trend continuation)")
+        _valid_report(directional_bias="Bullish (trend continuation)")
     )
 
-    assert report.swing_bias == "bullish"
+    assert report.directional_bias == "bullish"
 
 
 def test_ai_report_output_shortens_verbose_setup_type() -> None:
@@ -111,13 +111,22 @@ def test_ai_report_output_shortens_verbose_setup_type() -> None:
 def test_ai_report_output_normalizes_legacy_action_label() -> None:
     report = AIReportOutput.model_validate(_valid_report(action_label="wait"))
 
-    assert report.action_label == "watchlist"
+    assert report.action_label == "long_watchlist"
 
 
-def test_ai_report_output_allows_mixed_swing_bias() -> None:
-    report = AIReportOutput.model_validate(_valid_report(swing_bias="mixed signals"))
+def test_ai_report_output_allows_mixed_directional_bias() -> None:
+    report = AIReportOutput.model_validate(_valid_report(directional_bias="mixed bearish lean"))
 
-    assert report.swing_bias == "mixed"
+    assert report.directional_bias == "mixed_bearish_lean"
+
+
+def test_ai_report_output_accepts_legacy_swing_bias_key() -> None:
+    legacy_report = _valid_report()
+    legacy_report["swing_bias"] = legacy_report.pop("directional_bias")
+
+    report = AIReportOutput.model_validate(legacy_report)
+
+    assert report.directional_bias == "neutral"
 
 
 def test_ai_report_output_normalizes_timeframe_ratings() -> None:

@@ -40,12 +40,17 @@ def test_newsapi_data_cleaning(monkeypatch) -> None:
 
     assert articles == [
         {
+            "headline": "Apple beats estimates",
             "title": "Apple beats estimates",
             "source": "Example News",
             "published_at": "2026-05-08T13:00:00Z",
             "url": "https://example.com/aapl?ref=home",
-            "summary": "Profit growth continues.",
+            "event_type": "earnings",
             "sentiment": "positive",
+            "materiality": "high",
+            "time_horizon": "immediate",
+            "summary": "Profit growth continues.",
+            "why_it_matters": "High-materiality earnings news can change near-term estimate and momentum assumptions.",
         }
     ]
 
@@ -66,12 +71,17 @@ def test_yfinance_news_cleaning() -> None:
     )
 
     assert article == {
+        "headline": "Apple faces warning",
         "title": "Apple faces warning",
         "source": "Yahoo Finance",
         "published_at": "2026-05-08T11:40:00Z",
         "url": "https://finance.yahoo.com/news/apple-warning",
-        "summary": "Shares fall on risk.",
+        "event_type": "unknown",
         "sentiment": "negative",
+        "materiality": "low",
+        "time_horizon": "medium_term",
+        "summary": "Shares fall on risk.",
+        "why_it_matters": "Low-materiality headline may affect sentiment, but event details are limited.",
     }
 
 
@@ -113,6 +123,8 @@ def test_get_recent_stock_news_dedupes_by_url_and_normalized_title(monkeypatch) 
     assert payload["provider_used"] == "newsapi"
     assert payload["article_count"] == 1
     assert payload["articles"][0]["title"] == "Apple shares rally"
+    assert payload["articles"][0]["event_type"] == "unknown"
+    assert payload["articles"][0]["materiality"] == "low"
     assert payload["data_quality"]["available"] is True
     assert payload["data_quality"]["latest_article_date"] == "2026-05-08T13:00:00Z"
     assert "Dropped 2 duplicate news article(s)." in payload["data_quality"]["warnings"]
@@ -140,6 +152,8 @@ def test_get_recent_stock_news_reports_provider_fallback_metadata(monkeypatch) -
 
     assert payload["provider_used"] == "yfinance"
     assert payload["article_count"] == 1
+    assert payload["articles"][0]["event_type"] == "analyst_rating"
+    assert payload["articles"][0]["materiality"] == "medium"
     assert payload["data_quality"] == {
         "available": True,
         "latest_article_date": "2026-05-07T19:00:00Z",

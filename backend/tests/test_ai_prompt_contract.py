@@ -30,17 +30,20 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
         "maximum": 100,
     }
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["action_label"]["enum"] == [
-        "buy_setup",
-        "watchlist",
-        "neutral",
+        "actionable_long",
+        "long_watchlist",
+        "neutral_wait",
+        "short_watchlist",
+        "actionable_short",
         "avoid",
         "high_risk",
     ]
-    assert OUTPUT_RESPONSE_SCHEMA["properties"]["swing_bias"]["enum"] == [
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["directional_bias"]["enum"] == [
         "bullish",
         "bearish",
         "neutral",
-        "mixed",
+        "mixed_bullish_lean",
+        "mixed_bearish_lean",
     ]
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["additionalProperties"] is False
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["required"] == [
@@ -67,7 +70,7 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
 
 def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "top-level keys only" in OUTPUT_FORMAT_INSTRUCTIONS
-    assert "swing_bias" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "directional_bias" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "action_label" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "entry_zone" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "watchlist_action" in OUTPUT_FORMAT_INSTRUCTIONS
@@ -78,15 +81,15 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "copied exactly from deterministic_scores" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "Do not return the input payload" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
-    assert "buy_setup, watchlist, neutral, avoid, high_risk" in OUTPUT_FORMAT_INSTRUCTIONS
-    assert "bullish, bearish, neutral, mixed" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "actionable_long, long_watchlist, neutral_wait, short_watchlist, actionable_short, avoid, high_risk" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "bullish, bearish, neutral, mixed_bullish_lean, mixed_bearish_lean" in OUTPUT_FORMAT_INSTRUCTIONS
 
 
 def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:
     assert SYSTEM_ROLE in SYSTEM_PROMPT
     assert DECISION_RULES in SYSTEM_PROMPT
     assert ACTIONABLE_OUTPUT_INSTRUCTIONS in SYSTEM_PROMPT
-    assert "Do not force bullish output" in SYSTEM_PROMPT
+    assert "Do not force bullish or bearish output" in SYSTEM_PROMPT
     assert "final_verdict must clearly say" in SYSTEM_PROMPT
     assert "Treat volume_summary as primary evidence" in SYSTEM_PROMPT
     assert "technical_summary.price_action_structure" in SYSTEM_PROMPT

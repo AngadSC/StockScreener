@@ -75,7 +75,7 @@ def save_report(
         report_date=date.today(),
         tier_used=tier_used,
         report_type=payload.get("analysis_type", "single_stock"),
-        swing_bias=ai_response.get("swing_bias"),
+        swing_bias=ai_response.get("directional_bias") or ai_response.get("swing_bias"),
         setup_type=ai_response.get("setup_type"),
         setup_quality_score=ai_response.get("setup_quality_score"),
         entry_timing_score=ai_response.get("entry_timing_score"),

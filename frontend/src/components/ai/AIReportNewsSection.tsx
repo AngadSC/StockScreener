@@ -11,6 +11,10 @@ function getArticleHeadline(article: NewsArticle) {
   return article.headline ?? article.title ?? article.url ?? 'Source article';
 }
 
+function formatNewsTag(value?: string) {
+  return value?.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 export default function AIReportNewsSection({
   report,
   newsSources = [],
@@ -49,6 +53,21 @@ export default function AIReportNewsSection({
                     {article.source ? (
                       <span className="mt-1 block text-xs text-[var(--text-tertiary)]">
                         {article.source}
+                      </span>
+                    ) : null}
+                    <span className="mt-2 flex flex-wrap gap-2">
+                      {[article.event_type, article.sentiment, article.materiality].filter(Boolean).map((value) => (
+                        <span
+                          key={value}
+                          className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[11px] text-[var(--text-tertiary)]"
+                        >
+                          {formatNewsTag(value)}
+                        </span>
+                      ))}
+                    </span>
+                    {article.why_it_matters ? (
+                      <span className="mt-2 block text-xs leading-5 text-[var(--text-secondary)]">
+                        {article.why_it_matters}
                       </span>
                     ) : null}
                   </span>

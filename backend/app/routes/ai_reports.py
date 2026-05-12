@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 ALLOWED_AI_REPORT_TIERS = {"pro", "trader", "elite"}
 LEGACY_ACTIONABLE_REPORT_DEFAULTS: dict[str, Any] = {
-    "action_label": "neutral",
-    "swing_bias": "neutral",
+    "action_label": "neutral_wait",
+    "directional_bias": "neutral",
     "timeframe_ratings": {
         "short_term": {
             "rating": "watch",
@@ -104,7 +104,7 @@ LEGACY_ACTIONABLE_REPORT_DEFAULTS: dict[str, Any] = {
     "confirmation_signals": ["Generate a fresh report for confirmation signals."],
     "watchlist_action": "Generate a fresh report for actionable levels.",
     "news_summary": "Not included in this cached report.",
-    "final_verdict": "no clear edge - generate a fresh report for the updated report contract.",
+    "final_verdict": "neutral wait - generate a fresh report for the updated report contract.",
 }
 
 
@@ -115,6 +115,8 @@ def _normalize_tier(tier: str | None) -> str:
 def _report_response(report: AIStockReport, cached: bool) -> AIReportResponse:
     created_at = report.created_at or datetime.now(timezone.utc)
     ai_report = {**LEGACY_ACTIONABLE_REPORT_DEFAULTS, **(report.ai_report or {})}
+    if "directional_bias" not in ai_report and "swing_bias" in ai_report:
+        ai_report["directional_bias"] = ai_report["swing_bias"]
     ai_report = {field: ai_report[field] for field in AIReportOutput.model_fields if field in ai_report}
     return AIReportResponse.model_validate(
         {

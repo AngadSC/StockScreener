@@ -48,8 +48,20 @@ export interface TimeframeRatings {
 }
 
 export interface AIReportOutput {
-  action_label: 'buy_setup' | 'watchlist' | 'neutral' | 'avoid' | 'high_risk';
-  swing_bias: 'bullish' | 'bearish' | 'neutral' | 'mixed';
+  action_label:
+    | 'actionable_long'
+    | 'long_watchlist'
+    | 'neutral_wait'
+    | 'short_watchlist'
+    | 'actionable_short'
+    | 'avoid'
+    | 'high_risk';
+  directional_bias:
+    | 'bullish'
+    | 'bearish'
+    | 'neutral'
+    | 'mixed_bullish_lean'
+    | 'mixed_bearish_lean';
   timeframe_ratings: TimeframeRatings;
   price_action_structure: PriceActionStructure;
   setup_type: string;
@@ -95,6 +107,10 @@ export interface NewsArticle {
   published_at?: string;
   summary?: string;
   sentiment?: string;
+  event_type?: string;
+  materiality?: 'low' | 'medium' | 'high' | string;
+  time_horizon?: 'immediate' | 'medium_term' | 'long_term' | string;
+  why_it_matters?: string;
 }
 
 export interface AIReportSuccessResponse {

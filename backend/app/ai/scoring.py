@@ -314,10 +314,15 @@ def _news_score(news: dict[str, Any]) -> int:
         if not isinstance(article, dict):
             continue
         sentiment = article.get("sentiment")
+        materiality = article.get("materiality")
+        event_type = article.get("event_type")
+        weight = {"high": 1.8, "medium": 1.2, "low": 0.7}.get(materiality, 1.0)
         if sentiment == "positive":
-            value += 8
+            value += 8 * weight
         elif sentiment == "negative":
-            value -= 10
+            value -= 10 * weight
+        if event_type in {"guidance", "earnings", "FDA", "lawsuit", "merger"} and materiality == "high":
+            value += 2 if sentiment == "positive" else -2 if sentiment == "negative" else 0
 
     return _score(value)
 

@@ -7,14 +7,14 @@ interface AIReportSummaryCardProps {
   report: AIReportOutput;
 }
 
-function getBiasClass(swingBias: string) {
-  const normalizedBias = swingBias.trim().toLowerCase();
+function getBiasClass(directionalBias: string) {
+  const normalizedBias = directionalBias.trim().toLowerCase();
 
-  if (normalizedBias === 'bullish') {
+  if (normalizedBias === 'bullish' || normalizedBias === 'mixed_bullish_lean') {
     return 'border-[var(--positive)]/35 bg-[var(--positive-bg)] text-[var(--positive)]';
   }
 
-  if (normalizedBias === 'bearish') {
+  if (normalizedBias === 'bearish' || normalizedBias === 'mixed_bearish_lean') {
     return 'border-[var(--negative)]/35 bg-[var(--negative-bg)] text-[var(--negative)]';
   }
 
@@ -102,8 +102,8 @@ export default function AIReportSummaryCard({ report }: AIReportSummaryCardProps
           <div className="eyebrow">AI Report</div>
           <h2 className="heading-lg mt-2 text-[var(--text-primary)]">Summary</h2>
         </div>
-        <Badge className={cn('capitalize', getBiasClass(report.swing_bias))}>
-          {report.swing_bias}
+        <Badge className={cn('capitalize', getBiasClass(report.directional_bias))}>
+          {formatReportLabel(report.directional_bias)}
         </Badge>
       </div>
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _clean_short_text(value: Any) -> str:
@@ -42,8 +42,22 @@ class AIReportInput(BaseModel):
         return value.strip().upper()
 
 
-ActionLabel = Literal["buy_setup", "watchlist", "neutral", "avoid", "high_risk"]
-SwingBias = Literal["bullish", "bearish", "neutral", "mixed"]
+ActionLabel = Literal[
+    "actionable_long",
+    "long_watchlist",
+    "neutral_wait",
+    "short_watchlist",
+    "actionable_short",
+    "avoid",
+    "high_risk",
+]
+DirectionalBias = Literal[
+    "bullish",
+    "bearish",
+    "neutral",
+    "mixed_bullish_lean",
+    "mixed_bearish_lean",
+]
 TradeRating = Literal["buy", "watch", "avoid"]
 LongTermRating = Literal["accumulate", "hold", "avoid", "unknown"]
 
@@ -149,7 +163,7 @@ class AIReportOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     action_label: ActionLabel
-    swing_bias: SwingBias
+    directional_bias: DirectionalBias
     timeframe_ratings: TimeframeRatings
     price_action_structure: PriceActionStructure
     setup_type: str = Field(..., min_length=1, max_length=50)
@@ -186,33 +200,76 @@ class AIReportOutput(BaseModel):
     news_summary: str = Field(..., min_length=1)
     final_verdict: str = Field(..., min_length=1)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_bias_key(cls, value: Any) -> Any:
+        if isinstance(value, dict) and "directional_bias" not in value and "swing_bias" in value:
+            normalized = dict(value)
+            normalized["directional_bias"] = normalized.pop("swing_bias")
+            return normalized
+        return value
+
     @field_validator("action_label", mode="before")
     @classmethod
     def normalize_action_label(cls, value: Any) -> str:
         cleaned = _clean_short_text(value).lower().replace("-", "_").replace(" ", "_")
-        if cleaned in {"buy", "buy_watch", "buy_setup", "act_now", "actionable"}:
-            return "buy_setup"
-        if cleaned in {"wait", "monitor", "watch", "watchlist", "wait_for_confirmation"}:
-            return "watchlist"
-        if cleaned in {"hold", "no_clear_edge", "no_clear_setup", "mixed", "neutral", "review_existing_report"}:
-            return "neutral"
-        if cleaned in {"sell", "pass", "avoid", "weak_setup"}:
+        if cleaned in {
+            "buy",
+            "buy_setup",
+            "act_now",
+            "actionable",
+            "actionable_bullish",
+            "actionable_long",
+            "long",
+        }:
+            return "actionable_long"
+        if cleaned in {
+            "buy_watch",
+            "wait",
+            "monitor",
+            "watch",
+            "watchlist",
+            "bullish_watch",
+            "long_watch",
+            "long_watchlist",
+            "wait_for_confirmation",
+        }:
+            return "long_watchlist"
+        if cleaned in {
+            "hold",
+            "no_clear_edge",
+            "no_clear_setup",
+            "mixed",
+            "neutral",
+            "neutral_wait",
+            "review_existing_report",
+        }:
+            return "neutral_wait"
+        if cleaned in {"bearish_watch", "short_watch", "short_watchlist"}:
+            return "short_watchlist"
+        if cleaned in {"sell", "short", "actionable_bearish", "actionable_short"}:
+            return "actionable_short"
+        if cleaned in {"pass", "avoid", "weak_setup"}:
             return "avoid"
         if cleaned in {"high_risk", "risky", "speculative", "elevated_risk"}:
             return "high_risk"
         return cleaned
 
-    @field_validator("swing_bias", mode="before")
+    @field_validator("directional_bias", mode="before")
     @classmethod
-    def normalize_swing_bias(cls, value: Any) -> str:
+    def normalize_directional_bias(cls, value: Any) -> str:
         cleaned = _clean_short_text(value)
         lower_value = cleaned.lower()
+        if any(label in lower_value for label in ("mixed_bearish", "bearish lean", "bearish_lean")):
+            return "mixed_bearish_lean"
+        if any(label in lower_value for label in ("mixed_bullish", "bullish lean", "bullish_lean")):
+            return "mixed_bullish_lean"
         if "bullish" in lower_value:
             return "bullish"
         if "bearish" in lower_value:
             return "bearish"
         if any(label in lower_value for label in ("mixed", "conflicted", "two-sided")):
-            return "mixed"
+            return "mixed_bullish_lean"
         if any(label in lower_value for label in ("neutral", "sideways", "range-bound", "range bound")):
             return "neutral"
         return _truncate_at_word(cleaned, 20)

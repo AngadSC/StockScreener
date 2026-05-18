@@ -93,6 +93,13 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_PRO", "ai_monthly_report_limit_pro"),
     )
 
+    # ===== STRIPE BILLING =====
+    STRIPE_SECRET_KEY: str = ""
+    STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRO_PRICE_ID: str = ""
+    STRIPE_SUCCESS_URL: str = "http://localhost:3000/ai-analyzer?checkout=success"
+    STRIPE_CANCEL_URL: str = "http://localhost:3000/pricing?checkout=cancelled"
+
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []
     

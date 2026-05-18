@@ -111,6 +111,19 @@ export const authAPI = {
 };
 
 // ====================================
+// BILLING API
+// ====================================
+
+export const billingAPI = {
+  createCheckoutSession: async (): Promise<{ url: string; id: string }> => {
+    const response = await api.post<{ url: string; id: string }>(
+      '/billing/create-checkout-session'
+    );
+    return response.data;
+  },
+};
+
+// ====================================
 // STOCKS API
 // ====================================
 

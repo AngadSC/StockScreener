@@ -1,9 +1,10 @@
 import Link from 'next/link';
-import { Check, Clock, CreditCard, Sparkles } from 'lucide-react';
+import { Check, Clock, CreditCard } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ProCheckoutButton } from './ProCheckoutButton';
 
 type Plan = {
   name: string;
@@ -18,7 +19,7 @@ type Plan = {
   badge?: string;
 };
 
-const proCheckoutUrl = process.env.NEXT_PUBLIC_STRIPE_PRO_CHECKOUT_URL?.trim();
+const proFallbackCheckoutUrl = process.env.NEXT_PUBLIC_STRIPE_PRO_CHECKOUT_URL?.trim();
 
 const plans: Plan[] = [
   {
@@ -44,7 +45,7 @@ const plans: Plan[] = [
       'Founder pricing while available',
     ],
     status: 'checkout',
-    cta: proCheckoutUrl ? 'Continue to checkout' : 'Checkout link not configured',
+    cta: 'Continue to checkout',
     highlight: true,
     badge: 'Founders Edition',
   },
@@ -140,19 +141,11 @@ export default function PricingPage() {
                   </Button>
                 ) : null}
 
-                {plan.status === 'checkout' && proCheckoutUrl ? (
-                  <Button asChild className="w-full rounded-full">
-                    <a href={proCheckoutUrl}>
-                      <Sparkles className="h-4 w-4" />
-                      {plan.cta}
-                    </a>
-                  </Button>
-                ) : null}
-
-                {plan.status === 'checkout' && !proCheckoutUrl ? (
-                  <Button disabled className="w-full rounded-full">
-                    {plan.cta}
-                  </Button>
+                {plan.status === 'checkout' ? (
+                  <ProCheckoutButton
+                    label={plan.cta}
+                    fallbackUrl={proFallbackCheckoutUrl}
+                  />
                 ) : null}
 
                 {plan.status === 'soon' ? (
@@ -168,11 +161,11 @@ export default function PricingPage() {
         <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-5 md:p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <div className="eyebrow">Payment Setup</div>
-              <h2 className="heading-md mt-2 text-[var(--text-primary)]">Add the checkout URL when it is ready</h2>
+              <div className="eyebrow">Secure checkout</div>
+              <h2 className="heading-md mt-2 text-[var(--text-primary)]">Pro access is granted automatically</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                Set <span className="font-mono text-[var(--text-primary)]">NEXT_PUBLIC_STRIPE_PRO_CHECKOUT_URL</span> to
-                your Stripe Payment Link or checkout URL to activate the Pro button.
+                After payment, Stripe notifies our backend and your account is upgraded to Pro
+                immediately — no manual step required.
               </p>
             </div>
             <Button asChild variant="outline" className="rounded-full">

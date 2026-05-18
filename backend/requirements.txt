@@ -28,6 +28,7 @@ numpy==2.2.1
 httpx==0.28.1
 anthropic==0.96.0
 openai==2.32.0
+stripe==11.4.1
 ta==0.11.0
 scikit-learn==1.6.1
 matplotlib==3.10.0

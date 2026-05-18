@@ -17,6 +17,10 @@ class User(Base):
     tier = Column(String(20), default="free")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    stripe_customer_id = Column(String(64), unique=True, index=True)
+    stripe_subscription_id = Column(String(64), index=True)
+    subscription_status = Column(String(32))
+    subscription_current_period_end = Column(DateTime(timezone=True))
     
     watchlists = relationship("Watchlist", back_populates="user", cascade="all, delete-orphan")
     ai_stock_reports = relationship("AIStockReport", back_populates="user", cascade="all, delete-orphan")

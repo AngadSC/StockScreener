@@ -80,6 +80,36 @@ def create_checkout_session(
     return {"url": session.url, "id": session.id}
 
 
+@router.post("/create-portal-session")
+def create_portal_session(
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Create a Stripe Customer Portal session so Pro users can manage or cancel
+    their subscription, and return its URL for the frontend to redirect to.
+    """
+    sdk = _stripe_client()
+
+    if not current_user.stripe_customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active subscription",
+        )
+
+    try:
+        session = sdk.billing_portal.Session.create(
+            customer=current_user.stripe_customer_id,
+            return_url=settings.STRIPE_PORTAL_RETURN_URL,
+        )
+    except stripe.error.StripeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Stripe error: {exc.user_message or str(exc)}",
+        )
+
+    return {"url": session.url}
+
+
 def _find_user_for_event(db: Session, *, user_id_meta: Optional[str], customer_id: Optional[str]) -> Optional[User]:
     if user_id_meta:
         try:

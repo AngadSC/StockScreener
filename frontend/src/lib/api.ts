@@ -121,6 +121,13 @@ export const billingAPI = {
     );
     return response.data;
   },
+
+  createPortalSession: async (): Promise<{ url: string }> => {
+    const response = await api.post<{ url: string }>(
+      '/billing/create-portal-session'
+    );
+    return response.data;
+  },
 };
 
 // ====================================

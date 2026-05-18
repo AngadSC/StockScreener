@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Lock, Search, Sparkles } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
+import { ManageSubscriptionButton } from '@/components/billing/ManageSubscriptionButton';
 import { Button } from '@/components/ui/button';
 import { screenerAPI } from '@/lib/api';
 import { isProTier, useAuth } from '@/lib/auth';
@@ -75,13 +76,16 @@ export default function AiAnalyzerPage() {
   return (
     <div className="container-custom py-8 md:py-10">
       <div className="mx-auto max-w-4xl space-y-6">
-        <section className="space-y-4">
-          <div className="eyebrow">Pro Research</div>
-          <h1 className="heading-xl text-[var(--text-primary)]">AI Swing Analyzer</h1>
-          <p className="max-w-[56ch] text-sm leading-6 text-[var(--text-secondary)]">
-            Generate a setup-focused swing report for a ticker using market context, news, and
-            technical structure.
-          </p>
+        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="space-y-4">
+            <div className="eyebrow">Pro Research</div>
+            <h1 className="heading-xl text-[var(--text-primary)]">AI Swing Analyzer</h1>
+            <p className="max-w-[56ch] text-sm leading-6 text-[var(--text-secondary)]">
+              Generate a setup-focused swing report for a ticker using market context, news, and
+              technical structure.
+            </p>
+          </div>
+          <ManageSubscriptionButton userTier={userTier} />
         </section>
 
         <section className="deco-panel p-5 md:p-6">

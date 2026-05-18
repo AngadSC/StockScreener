@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     STRIPE_PRO_PRICE_ID: str = ""
     STRIPE_SUCCESS_URL: str = "http://localhost:3000/ai-analyzer?checkout=success"
     STRIPE_CANCEL_URL: str = "http://localhost:3000/pricing?checkout=cancelled"
+    STRIPE_PORTAL_RETURN_URL: str = "http://localhost:3000/ai-analyzer"
 
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []

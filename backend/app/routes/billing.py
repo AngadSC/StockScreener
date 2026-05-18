@@ -96,12 +96,15 @@ def create_portal_session(
             detail="No active subscription",
         )
 
+    print(f"[portal] return_url={settings.STRIPE_PORTAL_RETURN_URL!r} customer={current_user.stripe_customer_id!r}", flush=True)
+
     try:
         session = sdk.billing_portal.Session.create(
             customer=current_user.stripe_customer_id,
             return_url=settings.STRIPE_PORTAL_RETURN_URL,
         )
     except stripe.error.StripeError as exc:
+        print(f"[portal] stripe error: {exc!r}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Stripe error: {exc.user_message or str(exc)}",

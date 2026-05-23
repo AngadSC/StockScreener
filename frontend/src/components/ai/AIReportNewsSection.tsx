@@ -11,8 +11,36 @@ function getArticleHeadline(article: NewsArticle) {
   return article.headline ?? article.title ?? article.url ?? 'Source article';
 }
 
+const NEWS_TAG_OVERRIDES: Record<string, string> = {
+  analyst_rating: 'Analyst Rating',
+  fda: 'FDA',
+  medium_term: 'Medium Term',
+  long_term: 'Long Term',
+  immediate: 'Immediate',
+  positive: 'Positive',
+  negative: 'Negative',
+  neutral: 'Neutral',
+  high: 'High',
+  medium: 'Medium',
+  low: 'Low',
+  guidance: 'Guidance',
+  earnings: 'Earnings',
+  lawsuit: 'Lawsuit',
+  merger: 'Merger',
+  macro: 'Macro',
+  insider: 'Insider',
+  product: 'Product',
+};
+
 function formatNewsTag(value?: string) {
-  return value?.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+  if (!value) return value;
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, '_');
+  if (normalized in NEWS_TAG_OVERRIDES) {
+    return NEWS_TAG_OVERRIDES[normalized];
+  }
+  return value
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export default function AIReportNewsSection({

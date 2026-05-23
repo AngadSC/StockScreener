@@ -21,9 +21,36 @@ function getBiasClass(directionalBias: string) {
   return 'border-[var(--border-strong)] bg-[rgba(152,152,176,0.08)] text-[var(--neutral)]';
 }
 
+const LABEL_OVERRIDES: Record<string, string> = {
+  actionable_long: 'Actionable Long',
+  long_watchlist: 'Long Watchlist',
+  neutral_wait: 'Neutral — Wait',
+  short_watchlist: 'Short Watchlist',
+  actionable_short: 'Actionable Short',
+  avoid: 'Avoid',
+  high_risk: 'High Risk',
+  bullish: 'Bullish',
+  bearish: 'Bearish',
+  neutral: 'Neutral',
+  mixed_bullish_lean: 'Mixed — Bullish Lean',
+  mixed_bearish_lean: 'Mixed — Bearish Lean',
+  buy: 'Buy',
+  watch: 'Watch',
+  accumulate: 'Accumulate',
+  hold: 'Hold',
+  unknown: 'Unknown',
+};
+
 function formatReportLabel(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, '_');
+  if (normalized in LABEL_OVERRIDES) {
+    return LABEL_OVERRIDES[normalized];
+  }
   return value
     .replace(/[_-]+/g, ' ')
+    .replace(/\bsma(\d+)\b/gi, 'SMA$1')
+    .replace(/\bobv\b/gi, 'OBV')
+    .replace(/\brsi\b/gi, 'RSI')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

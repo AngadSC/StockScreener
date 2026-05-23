@@ -37,9 +37,44 @@ function ActionItem({ label, value }: { label: string; value: string }) {
   );
 }
 
+const STRUCTURE_LABEL_OVERRIDES: Record<string, string> = {
+  insufficient_data: 'Insufficient Data',
+  no_clear_setup: 'No Clear Setup',
+  legacy_cached_report: 'Not Available',
+  confirmed_breakout: 'Confirmed Breakout',
+  failed_breakout: 'Failed Breakout',
+  breakout_attempt: 'Breakout Attempt',
+  compression_breakout_attempt: 'Compression Breakout Attempt',
+  trend_pullback: 'Trend Pullback',
+  base_compression: 'Base Compression',
+  extended_above_sma20: 'Extended Above SMA 20',
+  below_key_sma: 'Below Key SMA',
+  pullback_to_sma20: 'Pullback to SMA 20',
+  pullback_to_sma50: 'Pullback to SMA 50',
+  near_20d_high: 'Near 20-Day High',
+  near_60d_high: 'Near 60-Day High',
+  higher_highs_higher_lows: 'Higher Highs / Higher Lows',
+  lower_highs_lower_lows: 'Lower Highs / Lower Lows',
+  range_compression: 'Range Compression',
+  gap_up_recent: 'Recent Gap Up',
+  gap_down_recent: 'Recent Gap Down',
+  mean_reversion_bounce: 'Mean Reversion Bounce',
+  momentum_continuation: 'Momentum Continuation',
+  breakdown_risk: 'Breakdown Risk',
+  breakout_retest: 'Breakout Retest',
+  pullback_entry: 'Pullback Entry',
+};
+
 function formatStructureLabel(value: string) {
+  const normalized = value.trim().toLowerCase().replace(/[_-]+/g, '_');
+  if (normalized in STRUCTURE_LABEL_OVERRIDES) {
+    return STRUCTURE_LABEL_OVERRIDES[normalized];
+  }
   return value
     .replace(/[_-]+/g, ' ')
+    .replace(/\bsma(\d+)\b/gi, 'SMA $1')
+    .replace(/\bobv\b/gi, 'OBV')
+    .replace(/\brsi\b/gi, 'RSI')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 

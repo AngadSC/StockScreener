@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, RotateCcw } from 'lucide-react';
+import { AlertCircle, ChevronDown, RotateCcw } from 'lucide-react';
 
 import AIReportButton from '@/components/ai/AIReportButton';
 import AIReportNewsSection from '@/components/ai/AIReportNewsSection';
 import AIReportSummaryCard from '@/components/ai/AIReportSummaryCard';
 import AIReportThesisSection from '@/components/ai/AIReportThesisSection';
+import AITradeCardSection from '@/components/ai/AITradeCardSection';
 import { Button } from '@/components/ui/button';
 import { generateAIReport } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import type { AIReportOutput, AIReportState } from '@/types/ai';
 
 const PRO_TIERS = new Set(['pro', 'trader', 'elite']);
@@ -27,6 +29,51 @@ function isSuccessResponse(
 ): response is Extract<Awaited<ReturnType<typeof generateAIReport>>, { report: AIReportOutput }> {
   return 'report' in response;
 }
+
+// ── Collapsible Full Report ───────────────────────────────────────────────────
+
+function CollapsibleFullReport({
+  report,
+  hasTradeCard,
+}: {
+  report: AIReportOutput;
+  hasTradeCard: boolean;
+}) {
+  // Auto-open only when there is no trade card (backward compatibility)
+  const [open, setOpen] = useState(!hasTradeCard);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          'deco-panel flex w-full items-center justify-between px-6 py-4 text-sm font-medium',
+          'text-[var(--text-secondary)] transition-colors duration-[180ms]',
+          'hover:text-[var(--text-primary)]'
+        )}
+      >
+        <span>{open ? 'Hide Full Report' : 'Open Full Report'}</span>
+        <ChevronDown
+          className={cn(
+            'h-4 w-4 shrink-0 text-[var(--text-tertiary)] transition-transform duration-[200ms]',
+            open && 'rotate-180'
+          )}
+        />
+      </button>
+
+      {open ? (
+        <div className="mt-0 space-y-5">
+          <AIReportSummaryCard report={report} />
+          <AIReportThesisSection report={report} />
+          <AIReportNewsSection report={report} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────────────────
 
 export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
   const [state, setState] = useState<AIReportState>(() =>
@@ -140,9 +187,13 @@ export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
 
       {state === 'loaded' && report ? (
         <>
-          <AIReportSummaryCard report={report} />
-          <AIReportThesisSection report={report} />
-          <AIReportNewsSection report={report} />
+          {/* Primary: AI Trade Card — shown first if available */}
+          {report.trade_card ? (
+            <AITradeCardSection ticker={normalizedTicker} card={report.trade_card} />
+          ) : null}
+
+          {/* Full Report — collapsed by default when trade card is present */}
+          <CollapsibleFullReport report={report} hasTradeCard={!!report.trade_card} />
         </>
       ) : null}
     </div>

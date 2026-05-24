@@ -117,7 +117,116 @@ PRICE_ACTION_STRUCTURE_SCHEMA = {
 }
 
 
+TRADE_CARD_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "decision": {
+            "type": "string",
+            "enum": [
+                "Long Setup Active",
+                "Conditional Long",
+                "Bullish Watch",
+                "No Trade",
+                "Conditional Short",
+                "Short Setup Active",
+                "Avoid",
+                "High Risk",
+            ],
+        },
+        "ai_lean": {"type": "string", "enum": ["bullish", "bearish", "neutral"]},
+        "best_action_now": {
+            "type": "string",
+            "enum": [
+                "buy_now",
+                "wait_for_breakout",
+                "wait_for_pullback",
+                "hold_if_in",
+                "avoid",
+                "short_now",
+                "wait_for_breakdown",
+            ],
+        },
+        "verdict": {"type": "string", "minLength": 1, "maxLength": 300},
+        "setup_type": {"type": "string", "minLength": 1, "maxLength": 60},
+        "confidence_label": {"type": "string", "enum": ["low", "moderate", "strong", "very_strong"]},
+        "setup_score": {"type": "number", "minimum": 0, "maximum": 100},
+        "trade_levels": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "current_price": {"type": ["number", "null"]},
+                "preferred_entry": {"type": ["number", "null"]},
+                "aggressive_entry_min": {"type": ["number", "null"]},
+                "aggressive_entry_max": {"type": ["number", "null"]},
+                "confirmation_trigger": {"type": ["number", "null"]},
+                "add_level": {"type": ["number", "null"]},
+                "invalidation_level": {"type": ["number", "null"]},
+                "target_1": {"type": ["number", "null"]},
+                "target_2": {"type": ["number", "null"]},
+                "chase_above": {"type": ["number", "null"]},
+                "method": {"type": ["string", "null"]},
+                "warnings": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": [
+                "current_price",
+                "preferred_entry",
+                "aggressive_entry_min",
+                "aggressive_entry_max",
+                "confirmation_trigger",
+                "add_level",
+                "invalidation_level",
+                "target_1",
+                "target_2",
+                "chase_above",
+                "method",
+                "warnings",
+            ],
+        },
+        "main_reason": {"type": "string", "minLength": 1},
+        "main_risk": {"type": "string", "minLength": 1},
+        "bull_case": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+        "bear_case": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1},
+        "if_then_plan": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "if_trigger_hits": {"type": "string", "minLength": 1},
+                "if_rejects": {"type": "string", "minLength": 1},
+                "if_breaks_invalidation": {"type": "string", "minLength": 1},
+                "if_already_holding": {"type": "string", "minLength": 1},
+                "if_missed_entry": {"type": "string", "minLength": 1},
+            },
+            "required": [
+                "if_trigger_hits",
+                "if_rejects",
+                "if_breaks_invalidation",
+                "if_already_holding",
+                "if_missed_entry",
+            ],
+        },
+    },
+    "required": [
+        "decision",
+        "ai_lean",
+        "best_action_now",
+        "verdict",
+        "setup_type",
+        "confidence_label",
+        "setup_score",
+        "trade_levels",
+        "main_reason",
+        "main_risk",
+        "bull_case",
+        "bear_case",
+        "if_then_plan",
+    ],
+}
+
+
 def _response_property(field: str) -> dict:
+    if field == "trade_card":
+        return {"oneOf": [{"type": "null"}, TRADE_CARD_SCHEMA]}
     if field == "confirmation_signals":
         return {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1}
     if field == "timeframe_ratings":
@@ -201,11 +310,12 @@ EVIDENCE_ANALYZER_ROLE = (
     "Analyze only the provided data. Do not invent prices, fundamentals, news, filings, catalysts, or events."
 )
 
+_OPTIONAL_OUTPUT_FIELDS = {"trade_card"}
 OUTPUT_RESPONSE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {field: _response_property(field) for field in OUTPUT_FIELDS},
-    "required": list(OUTPUT_FIELDS),
+    "required": [field for field in OUTPUT_FIELDS if field not in _OPTIONAL_OUTPUT_FIELDS],
 }
 OUTPUT_SCHEMA_JSON = json.dumps(OUTPUT_RESPONSE_SCHEMA, sort_keys=True)
 
@@ -247,6 +357,28 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "- Score fields must be numbers from 0 to 100 copied exactly from deterministic_scores; explain the scores in prose fields, but do not invent or adjust score values.\n"
     "- confirmation_signals must be an array of short strings.\n"
     "- If supporting data is missing, state that in the relevant string fields instead of inventing facts.\n"
+    "- trade_card must be included in the output as a top-level field. It must follow the TRADE_CARD_SCHEMA exactly.\n"
+    "- trade_card.decision mapping rules:\n"
+    "  * 'Long Setup Active' = strong uptrend + confirmed breakout + volume confirmation\n"
+    "  * 'Conditional Long' = uptrend + near resistance + no breakout confirmation yet, OR setup forming but awaiting trigger\n"
+    "  * 'Bullish Watch' = bullish structure but no clean entry, or constructive but needs catalyst\n"
+    "  * 'No Trade' = mixed/sideways/no edge\n"
+    "  * 'Conditional Short' = downtrend + near support, breakdown pending\n"
+    "  * 'Short Setup Active' = downtrend + breakdown + volume confirmation\n"
+    "  * 'Avoid' = failed breakout / distribution / high risk / weak setup\n"
+    "  * 'High Risk' = setup may exist but risk is elevated\n"
+    "- trade_card.verdict must be exactly ONE sentence. It must state what the AI would do and what makes it actionable or not actionable. It must NOT be only 'wait and watch.'\n"
+    "- trade_card.trade_levels: If backend-provided trade_levels are in the payload under deterministic_scores.trade_levels, copy them directly. Do NOT invent prices. If deterministic levels are null, set those fields to null.\n"
+    "- trade_card.setup_score must copy deterministic_scores.setup_quality_score exactly.\n"
+    "- trade_card.confidence_label mapping based on deterministic_scores.confidence_score:\n"
+    "  * 0-39: 'low'\n"
+    "  * 40-59: 'moderate'\n"
+    "  * 60-79: 'strong'\n"
+    "  * 80-100: 'very_strong'\n"
+    "- trade_card.bull_case and bear_case: use the Evidence Analyzer bull_case/bear_case output, shortened to 2-4 items max of 15 words each or fewer.\n"
+    "- trade_card.if_then_plan must include specific conditions and levels, NOT generic 'wait' language.\n"
+    "- The payload may include deterministic_scores.trade_levels with pre-calculated price levels. If present and non-null, these are computed from ATR, support, resistance, and price structure. Copy them into trade_card.trade_levels exactly. Do not substitute your own prices.\n"
+    "- If deterministic_scores.trade_levels is missing or trade_levels.method is 'no_setup', set all price fields in trade_card.trade_levels to null and add a warning explaining insufficient price structure.\n"
     f"- The JSON object must validate against this schema: {OUTPUT_SCHEMA_JSON}"
 )
 
@@ -299,7 +431,17 @@ DECISION_RULES = (
     "- If technicals are neutral but a high-materiality positive catalyst exists, explain that the stock is worth watching instead of pretending the chart is confirmed.\n"
     "- If the technical setup is bullish but recent negative guidance, litigation, FDA rejection, or another high-materiality negative catalyst exists, weaken the thesis and actionability.\n"
     "- Entry zones, targets, and invalidation levels must come only from provided prices, support/resistance, moving averages, recent highs/lows, ATR, or candle data.\n"
-    "- If a precise entry, target, or invalidation level cannot be supported by provided data, state that it is not supported by the available data."
+    "- If a precise entry, target, or invalidation level cannot be supported by provided data, state that it is not supported by the available data.\n"
+    "- You are not allowed to end the trade_card.verdict with only 'wait and watch.' If the setup is not actionable yet, state the direction you favor, the exact price or condition that would make it actionable, and what invalidates it.\n"
+    "- If all signals are mixed with no clear edge, use decision='No Trade' and explain why in verdict.\n"
+    "- trade_card.decision should match action_label per these mappings:\n"
+    "  * actionable_long -> 'Long Setup Active'\n"
+    "  * long_watchlist -> 'Conditional Long' if there is a specific price trigger, 'Bullish Watch' if more general\n"
+    "  * neutral_wait -> 'No Trade'\n"
+    "  * short_watchlist -> 'Conditional Short' or 'Bullish Watch' depending on context\n"
+    "  * actionable_short -> 'Short Setup Active'\n"
+    "  * avoid -> 'Avoid'\n"
+    "  * high_risk -> 'High Risk'"
 )
 
 ACTIONABLE_OUTPUT_INSTRUCTIONS = (
@@ -313,7 +455,12 @@ ACTIONABLE_OUTPUT_INSTRUCTIONS = (
     "- target_1 and target_2 should use nearby resistance, moving averages, recent highs, or other provided levels. Do not invent targets.\n"
     "- risk_reward_summary should explain whether upside appears worth the downside risk based only on provided levels.\n"
     "- watchlist_action should say what the user should monitor next, such as relative-volume expansion, accumulation replacing distribution, OBV turning up, breakout volume confirmation, higher low, or support hold.\n"
-    "- Use plain English. Avoid vague phrases like 'could be interesting' unless followed by a concrete condition."
+    "- Use plain English. Avoid vague phrases like 'could be interesting' unless followed by a concrete condition.\n"
+    "- trade_card.if_then_plan.if_trigger_hits: state what to do when the confirmation_trigger is hit (e.g., 'Enter long at $X, target $Y1 and $Y2, stop at $Z').\n"
+    "- trade_card.if_then_plan.if_rejects: state what happens if price rejects at resistance (e.g., 'Exit or don't enter, reassess at $X support').\n"
+    "- trade_card.if_then_plan.if_breaks_invalidation: state what happens when invalidation_level is breached.\n"
+    "- trade_card.if_then_plan.if_already_holding: give position management guidance.\n"
+    "- trade_card.if_then_plan.if_missed_entry: give advice on whether to chase or wait for another entry."
 )
 
 

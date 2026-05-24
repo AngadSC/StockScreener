@@ -105,6 +105,7 @@ LEGACY_ACTIONABLE_REPORT_DEFAULTS: dict[str, Any] = {
     "watchlist_action": "Generate a fresh report for actionable levels.",
     "news_summary": "Not included in this cached report.",
     "final_verdict": "neutral wait - generate a fresh report for the updated report contract.",
+    "trade_card": None,
 }
 
 

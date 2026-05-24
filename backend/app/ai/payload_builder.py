@@ -9,6 +9,7 @@ from app.ai.news_client import get_recent_stock_news
 from app.ai.schemas import AIReportInput
 from app.ai.scoring import build_deterministic_scores
 from app.ai.technical_summary import build_technical_summary
+from app.ai.trade_levels import build_trade_levels
 
 
 PRICE_HISTORY_LOOKBACK_CANDLES = 120
@@ -282,6 +283,7 @@ def build_ai_payload(ticker: str, db: Session) -> dict:
         news=news_payload,
         data_quality=data_quality,
     )
+    deterministic_scores["trade_levels"] = build_trade_levels(technical_summary, deterministic_scores)
 
     payload = {
         "ticker": ticker,

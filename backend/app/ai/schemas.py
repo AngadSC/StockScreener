@@ -67,6 +67,75 @@ class AIEvidenceOutput(BaseModel):
         return _truncate_at_word(_clean_short_text(value), 50)
 
 
+class TradeLevels(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    current_price: float | None = None
+    preferred_entry: float | None = None
+    aggressive_entry_min: float | None = None
+    aggressive_entry_max: float | None = None
+    confirmation_trigger: float | None = None
+    add_level: float | None = None
+    invalidation_level: float | None = None
+    target_1: float | None = None
+    target_2: float | None = None
+    chase_above: float | None = None
+    method: str | None = None
+    warnings: List[str] = []
+
+
+TradeCardDecision = Literal[
+    "Long Setup Active",
+    "Conditional Long",
+    "Bullish Watch",
+    "No Trade",
+    "Conditional Short",
+    "Short Setup Active",
+    "Avoid",
+    "High Risk",
+]
+
+TradeCardBestAction = Literal[
+    "buy_now",
+    "wait_for_breakout",
+    "wait_for_pullback",
+    "hold_if_in",
+    "avoid",
+    "short_now",
+    "wait_for_breakdown",
+]
+
+TradeCardConfidence = Literal["low", "moderate", "strong", "very_strong"]
+
+
+class IfThenPlan(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    if_trigger_hits: str
+    if_rejects: str
+    if_breaks_invalidation: str
+    if_already_holding: str
+    if_missed_entry: str
+
+
+class AITradeCard(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    decision: TradeCardDecision
+    ai_lean: Literal["bullish", "bearish", "neutral"]
+    best_action_now: TradeCardBestAction
+    verdict: str = Field(..., min_length=1, max_length=300)
+    setup_type: str = Field(..., min_length=1, max_length=60)
+    confidence_label: TradeCardConfidence
+    setup_score: float = Field(..., ge=0.0, le=100.0)
+    trade_levels: TradeLevels
+    main_reason: str = Field(..., min_length=1, max_length=400)
+    main_risk: str = Field(..., min_length=1, max_length=400)
+    bull_case: List[str] = Field(..., min_length=1)
+    bear_case: List[str] = Field(..., min_length=1)
+    if_then_plan: IfThenPlan
+
+
 ActionLabel = Literal[
     "actionable_long",
     "long_watchlist",
@@ -224,6 +293,16 @@ class AIReportOutput(BaseModel):
     watchlist_action: str = Field(..., min_length=1)
     news_summary: str = Field(..., min_length=1)
     final_verdict: str = Field(..., min_length=1)
+    trade_card: AITradeCard | None = None
+
+    @field_validator("trade_card", mode="before")
+    @classmethod
+    def validate_trade_card(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return AITradeCard.model_validate(value)
+        return value
 
     @model_validator(mode="before")
     @classmethod

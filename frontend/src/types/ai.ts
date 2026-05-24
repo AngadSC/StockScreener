@@ -97,6 +97,7 @@ export interface AIReportOutput {
   confirmation_signals: string[];
   news_summary: string;
   final_verdict: string;
+  trade_card?: AITradeCard | null;
 }
 
 export interface NewsArticle {
@@ -111,6 +112,68 @@ export interface NewsArticle {
   materiality?: 'low' | 'medium' | 'high' | string;
   time_horizon?: 'immediate' | 'medium_term' | 'long_term' | string;
   why_it_matters?: string;
+}
+
+// ── Trade Card Types ──────────────────────────────────────────────────────────
+
+export interface TradeLevels {
+  current_price: number | null;
+  preferred_entry: number | null;
+  aggressive_entry_min: number | null;
+  aggressive_entry_max: number | null;
+  confirmation_trigger: number | null;
+  add_level: number | null;
+  invalidation_level: number | null;
+  target_1: number | null;
+  target_2: number | null;
+  chase_above: number | null;
+  method: string | null; // "breakout" | "pullback" | "breakdown" | "no_setup"
+  warnings: string[];
+}
+
+export interface IfThenPlan {
+  if_trigger_hits: string;
+  if_rejects: string;
+  if_breaks_invalidation: string;
+  if_already_holding: string;
+  if_missed_entry: string;
+}
+
+export type TradeCardDecision =
+  | 'Long Setup Active'
+  | 'Conditional Long'
+  | 'Bullish Watch'
+  | 'No Trade'
+  | 'Conditional Short'
+  | 'Short Setup Active'
+  | 'Avoid'
+  | 'High Risk';
+
+export type TradeCardBestAction =
+  | 'buy_now'
+  | 'wait_for_breakout'
+  | 'wait_for_pullback'
+  | 'hold_if_in'
+  | 'avoid'
+  | 'short_now'
+  | 'wait_for_breakdown';
+
+export type TradeCardConfidence = 'low' | 'moderate' | 'strong' | 'very_strong';
+
+export interface AITradeCard {
+  decision: TradeCardDecision;
+  ai_lean: 'bullish' | 'bearish' | 'neutral';
+  best_action_now: TradeCardBestAction;
+  verdict: string;
+  setup_type: string;
+  confidence_label: TradeCardConfidence;
+  setup_score: number;
+  trade_levels: TradeLevels;
+  main_reason: string;
+  main_risk: string;
+  bull_case: string[];
+  bear_case: string[];
+  if_then_plan: IfThenPlan;
 }
 
 export interface AIReportSuccessResponse {

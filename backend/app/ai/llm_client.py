@@ -141,6 +141,16 @@ def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict
         for field in AIReportOutput.model_fields:
             if field.endswith("_score") and field in deterministic_scores:
                 candidate[field] = deterministic_scores[field]
+
+    # Enforce deterministic trade levels onto the trade card (LLM must not invent prices)
+    trade_levels = deterministic_scores.get("trade_levels") if isinstance(deterministic_scores, dict) else None
+    if isinstance(trade_levels, dict):
+        existing_trade_card = candidate.get("trade_card")
+        if isinstance(existing_trade_card, dict):
+            # LLM produced a trade card — overwrite only the trade_levels with deterministic values
+            candidate["trade_card"] = {**existing_trade_card, "trade_levels": trade_levels}
+        # If trade_card is None or missing, leave it as-is (optional field)
+
     return candidate
 
 
@@ -431,7 +441,7 @@ def _generate_raw_report(payload: dict, model: str, retry: bool) -> tuple[dict[s
         output_schema=OUTPUT_RESPONSE_SCHEMA,
         schema_name="ai_report_output",
         tool_name="emit_stock_report",
-        tool_description="Emit the stock report as a structured JSON object.",
+        tool_description="Emit the stock report as a structured JSON object. Include a trade_card field with the AI Trade Card object.",
         user_content_builder=_report_retry_user_content,
     )
 

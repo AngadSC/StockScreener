@@ -210,3 +210,19 @@ def test_deterministic_report_fields_override_llm_scores() -> None:
     assert report.risk_reward_score == 57
     assert report.swing_trade_score == 74
     assert report.price_action_structure.setup_label == "confirmed_breakout"
+
+
+def test_deterministic_report_fields_fill_missing_timeframe_reasons() -> None:
+    candidate = _valid_report()
+    candidate["timeframe_ratings"]["short_term"].pop("reason")
+    candidate["timeframe_ratings"]["swing"].pop("reason")
+    original_timeframe_ratings = {
+        horizon: dict(rating)
+        for horizon, rating in candidate["timeframe_ratings"].items()
+    }
+
+    report = AIReportOutput.model_validate(_attach_deterministic_report_fields(candidate, {}))
+
+    assert report.timeframe_ratings.short_term.reason == "Short-term: Watch for confirmation."
+    assert report.timeframe_ratings.swing.reason == "Swing: Thesis."
+    assert candidate["timeframe_ratings"] == original_timeframe_ratings

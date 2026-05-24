@@ -101,6 +101,12 @@ def test_output_response_schema_requires_ui_report_fields() -> None:
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["price_action_structure"]["additionalProperties"] is False
     assert "breakout_label" in OUTPUT_RESPONSE_SCHEMA["properties"]["price_action_structure"]["properties"]
     assert "confidence_score" in OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["properties"]["swing"]["properties"]
+    assert OUTPUT_RESPONSE_SCHEMA["properties"]["timeframe_ratings"]["properties"]["short_term"]["required"] == [
+        "rating",
+        "timeframe",
+        "confidence_score",
+        "reason",
+    ]
     assert OUTPUT_RESPONSE_SCHEMA["properties"]["setup_type"]["maxLength"] == 50
 
 
@@ -121,6 +127,7 @@ def test_output_instructions_warn_against_input_payload_shape() -> None:
     assert "max 50 characters" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "actionable_long, long_watchlist, neutral_wait, short_watchlist, actionable_short, avoid, high_risk" in OUTPUT_FORMAT_INSTRUCTIONS
     assert "bullish, bearish, neutral, mixed_bullish_lean, mixed_bearish_lean" in OUTPUT_FORMAT_INSTRUCTIONS
+    assert "timeframe_ratings.short_term.reason" in OUTPUT_FORMAT_INSTRUCTIONS
 
 
 def test_system_prompt_includes_decision_and_actionable_rubrics() -> None:

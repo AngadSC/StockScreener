@@ -126,6 +126,59 @@ def _evidence_retry_user_content(payload: dict, retry: bool) -> str:
     )
 
 
+_TIMEFRAME_REASON_FALLBACK_FIELDS = {
+    "short_term": ("trade_read", "confirmation_trigger", "watchlist_action", "entry_zone", "final_verdict"),
+    "swing": ("main_thesis", "risk_reward_summary", "why_it_could_move", "final_verdict"),
+    "long_term": ("news_summary", "why_it_could_fail", "main_thesis", "final_verdict"),
+}
+_TIMEFRAME_REASON_DEFAULTS = {
+    "short_term": "Short-term rating is based on the provided evidence and deterministic short-term score.",
+    "swing": "Swing rating is based on the provided evidence and deterministic swing-trade score.",
+    "long_term": "Long-term rating is based on the provided evidence and deterministic long-term score.",
+}
+_TIMEFRAME_REASON_PREFIXES = {
+    "short_term": "Short-term: ",
+    "swing": "Swing: ",
+    "long_term": "Long-term: ",
+}
+
+
+def _first_non_empty_string(candidate: dict[str, Any], fields: tuple[str, ...]) -> str | None:
+    for field in fields:
+        value = candidate.get(field)
+        if isinstance(value, str) and value.strip():
+            return " ".join(value.strip().split())
+    return None
+
+
+def _fill_missing_timeframe_rating_reasons(candidate: dict[str, Any]) -> dict[str, Any]:
+    timeframe_ratings = candidate.get("timeframe_ratings")
+    if not isinstance(timeframe_ratings, dict):
+        return candidate
+
+    repaired_ratings = dict(timeframe_ratings)
+    changed = False
+    for horizon, fallback_fields in _TIMEFRAME_REASON_FALLBACK_FIELDS.items():
+        rating = repaired_ratings.get(horizon)
+        if not isinstance(rating, dict):
+            continue
+
+        reason = rating.get("reason")
+        if isinstance(reason, str) and reason.strip():
+            continue
+
+        fallback = _first_non_empty_string(candidate, fallback_fields) or _TIMEFRAME_REASON_DEFAULTS[horizon]
+        repaired_ratings[horizon] = {
+            **rating,
+            "reason": f"{_TIMEFRAME_REASON_PREFIXES[horizon]}{fallback}",
+        }
+        changed = True
+
+    if not changed:
+        return candidate
+    return {**candidate, "timeframe_ratings": repaired_ratings}
+
+
 def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict) -> dict[str, Any]:
     candidate = dict(candidate)
     technical_summary = payload.get("technical_summary") if isinstance(payload, dict) else {}
@@ -150,6 +203,8 @@ def _attach_deterministic_report_fields(candidate: dict[str, Any], payload: dict
             # LLM produced a trade card — overwrite only the trade_levels with deterministic values
             candidate["trade_card"] = {**existing_trade_card, "trade_levels": trade_levels}
         # If trade_card is None or missing, leave it as-is (optional field)
+
+    candidate = _fill_missing_timeframe_rating_reasons(candidate)
 
     return candidate
 

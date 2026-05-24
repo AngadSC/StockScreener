@@ -310,12 +310,11 @@ EVIDENCE_ANALYZER_ROLE = (
     "Analyze only the provided data. Do not invent prices, fundamentals, news, filings, catalysts, or events."
 )
 
-_OPTIONAL_OUTPUT_FIELDS = {"trade_card"}
 OUTPUT_RESPONSE_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
     "properties": {field: _response_property(field) for field in OUTPUT_FIELDS},
-    "required": [field for field in OUTPUT_FIELDS if field not in _OPTIONAL_OUTPUT_FIELDS],
+    "required": list(OUTPUT_FIELDS),
 }
 OUTPUT_SCHEMA_JSON = json.dumps(OUTPUT_RESPONSE_SCHEMA, sort_keys=True)
 
@@ -348,6 +347,7 @@ OUTPUT_FORMAT_INSTRUCTIONS = (
     "- timeframe_ratings.short_term.rating must be one of: buy, watch, avoid, with timeframe exactly '1-10 trading days' and a 0-100 confidence_score.\n"
     "- timeframe_ratings.swing.rating must be one of: buy, watch, avoid, with timeframe exactly '2-8 weeks' and a 0-100 confidence_score.\n"
     "- timeframe_ratings.long_term.rating must be one of: accumulate, hold, avoid, unknown, with timeframe exactly '6-24 months' and a 0-100 confidence_score.\n"
+    "- timeframe_ratings.short_term.reason, timeframe_ratings.swing.reason, and timeframe_ratings.long_term.reason are required non-empty strings.\n"
     "- price_action_structure must copy technical_summary.price_action_structure exactly; do not reinterpret or change its deterministic flags, levels, labels, or distances.\n"
     "- setup_type must be a short label such as mean_reversion_bounce, breakout, pullback, momentum_continuation, breakdown_risk, no_clear_setup, max 50 characters.\n"
     "- confidence_score must copy deterministic_scores.confidence_score exactly.\n"

@@ -115,7 +115,15 @@ export type BacktestStrategyFamily =
   | 'volume_breakout'
   | 'golden_cross'
   | 'macd_trend'
-  | 'rsi_trend_filter';
+  | 'rsi_trend_filter'
+  | 'price_momentum'
+  | 'sector_momentum'
+  | 'extreme_reversal'
+  | 'gap_fill'
+  | 'momentum_filter'
+  | 'volatility_regime'
+  | 'overnight_edge'
+  | 'relative_strength';
 
 export interface BacktestStrategyConfig {
   family: BacktestStrategyFamily;

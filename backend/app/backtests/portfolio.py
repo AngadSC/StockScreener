@@ -8,6 +8,7 @@ from typing import Any, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
+import yfinance as yf
 from ta.momentum import RSIIndicator
 from ta.trend import EMAIndicator, MACD, SMAIndicator
 from ta.volatility import BollingerBands
@@ -30,6 +31,14 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "golden_cross": {"fast_sma": 50, "slow_sma": 200},
     "macd_trend": {"fast_ema": 12, "slow_ema": 26, "signal_period": 9},
     "rsi_trend_filter": {"trend_ma": 200, "rsi_period": 14, "entry_rsi": 55.0, "exit_rsi": 45.0},
+    "price_momentum": {"momentum_window": 252, "exit_ma": 50},
+    "sector_momentum": {"rotation_window": 126, "rs_percentile": 0.8},
+    "extreme_reversal": {"peak_lookback": 20, "drop_pct": 0.10, "recovery_pct": 0.03},
+    "gap_fill": {"gap_threshold": 0.03, "fill_ratio": 0.5},
+    "momentum_filter": {"momentum_window": 126, "trend_window": 20},
+    "volatility_regime": {"vix_entry": 20.0, "vix_exit": 25.0, "trend_ma": 50},
+    "overnight_edge": {"lookback": 20},
+    "relative_strength": {"lookback": 63, "rs_threshold": 0.0},
 }
 
 PERIODS_PER_YEAR = {"1d": 252, "1wk": 52, "1mo": 12}
@@ -286,6 +295,98 @@ def _prepare_strategy_frame(
         df["exit_signal"] = (
             (df["Close"] < df["trend_ma"]) | _cross_value_below(df["rsi"], exit_rsi)
         ).fillna(False)
+
+    elif family == "price_momentum":
+        momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
+        exit_ma = _coerce_int(merged.get("exit_ma"), defaults["exit_ma"])
+        df["returns_nm"] = df["Close"].pct_change(momentum_window)
+        df["exit_ma_line"] = SMAIndicator(df["Close"], window=exit_ma).sma_indicator()
+        df["entry_signal"] = ((df["returns_nm"] > 0) & (df["Close"] > df["exit_ma_line"])).fillna(False)
+        df["exit_signal"] = ((df["returns_nm"] <= 0) | (df["Close"] < df["exit_ma_line"])).fillna(False)
+
+    elif family == "sector_momentum":
+        rotation_window = _coerce_int(merged.get("rotation_window"), defaults["rotation_window"])
+        rs_percentile = _coerce_float(merged.get("rs_percentile"), defaults["rs_percentile"])
+        df["period_high"] = df["Close"].rolling(rotation_window).max()
+        df["period_low"] = df["Close"].rolling(rotation_window).min()
+        rng = (df["period_high"] - df["period_low"]).replace(0.0, np.nan)
+        df["rs_score"] = (df["Close"] - df["period_low"]) / rng
+        df["entry_signal"] = (df["rs_score"] >= rs_percentile).fillna(False)
+        df["exit_signal"] = (df["rs_score"] < (1.0 - rs_percentile)).fillna(False)
+
+    elif family == "extreme_reversal":
+        peak_lookback = _coerce_int(merged.get("peak_lookback"), defaults["peak_lookback"])
+        drop_pct = _coerce_float(merged.get("drop_pct"), defaults["drop_pct"])
+        recovery_pct = _coerce_float(merged.get("recovery_pct"), defaults["recovery_pct"])
+        df["rolling_peak"] = df["Close"].rolling(peak_lookback).max()
+        df["drawdown_from_peak"] = (df["Close"] - df["rolling_peak"]) / df["rolling_peak"].replace(0.0, np.nan)
+        df["entry_signal"] = (df["drawdown_from_peak"] <= -drop_pct).fillna(False)
+        df["exit_signal"] = (df["drawdown_from_peak"] >= -recovery_pct).fillna(False)
+
+    elif family == "gap_fill":
+        gap_threshold = _coerce_float(merged.get("gap_threshold"), defaults["gap_threshold"])
+        fill_ratio = _coerce_float(merged.get("fill_ratio"), defaults["fill_ratio"])
+        prior_close = df["Close"].shift(1)
+        df["overnight_gap"] = (df["Open"] - prior_close) / prior_close.replace(0.0, np.nan)
+        gap_target = prior_close + (df["Open"] - prior_close) * (1.0 - fill_ratio)
+        df["entry_signal"] = (df["overnight_gap"] <= -gap_threshold).fillna(False)
+        df["exit_signal"] = (df["Close"] >= gap_target).fillna(False)
+
+    elif family == "momentum_filter":
+        momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
+        trend_window = _coerce_int(merged.get("trend_window"), defaults["trend_window"])
+        df["returns_nm"] = df["Close"].pct_change(momentum_window)
+        df["trend_ma_line"] = SMAIndicator(df["Close"], window=trend_window).sma_indicator()
+        df["entry_signal"] = ((df["returns_nm"] > 0) & (df["Close"] > df["trend_ma_line"])).fillna(False)
+        df["exit_signal"] = ((df["returns_nm"] <= 0) | (df["Close"] < df["trend_ma_line"])).fillna(False)
+
+    elif family == "volatility_regime":
+        vix_entry = _coerce_float(merged.get("vix_entry"), defaults["vix_entry"])
+        vix_exit = _coerce_float(merged.get("vix_exit"), defaults["vix_exit"])
+        trend_ma = _coerce_int(merged.get("trend_ma"), defaults["trend_ma"])
+        start_str = str(df.index.min().date())
+        end_str = str(df.index.max().date())
+        try:
+            vix_raw = yf.download("^VIX", start=start_str, end=end_str, progress=False, auto_adjust=True)
+            vix_close = vix_raw["Close"] if isinstance(vix_raw.columns, pd.Index) and "Close" in vix_raw.columns else vix_raw.iloc[:, 0]
+            if isinstance(vix_close.columns if hasattr(vix_close, "columns") else None, pd.MultiIndex):
+                vix_close = vix_close.iloc[:, 0]
+            vix_close = pd.Series(vix_close.values, index=pd.to_datetime(vix_close.index))
+            df["vix"] = vix_close.reindex(df.index, method="ffill").ffill().bfill()
+        except Exception:
+            df["vix"] = 15.0
+        df["trend_ma_line"] = SMAIndicator(df["Close"], window=trend_ma).sma_indicator()
+        df["entry_signal"] = ((df["Close"] > df["trend_ma_line"]) & (df["vix"] < vix_entry)).fillna(False)
+        df["exit_signal"] = (df["vix"] > vix_exit).fillna(False)
+
+    elif family == "overnight_edge":
+        lookback = _coerce_int(merged.get("lookback"), defaults["lookback"])
+        df["overnight_ret"] = (df["Open"] / df["Close"].shift(1)) - 1.0
+        df["intraday_ret"] = (df["Close"] / df["Open"].replace(0.0, np.nan)) - 1.0
+        df["overnight_avg"] = df["overnight_ret"].rolling(lookback).mean()
+        df["intraday_avg"] = df["intraday_ret"].rolling(lookback).mean()
+        df["entry_signal"] = ((df["overnight_avg"] > df["intraday_avg"]) & (df["overnight_avg"] > 0.0)).fillna(False)
+        df["exit_signal"] = ((df["overnight_avg"] <= 0.0) | (df["overnight_avg"] < df["intraday_avg"])).fillna(False)
+
+    elif family == "relative_strength":
+        lookback = _coerce_int(merged.get("lookback"), defaults["lookback"])
+        rs_threshold = _coerce_float(merged.get("rs_threshold"), defaults["rs_threshold"])
+        start_str = str(df.index.min().date())
+        end_str = str(df.index.max().date())
+        try:
+            spy_raw = yf.download("SPY", start=start_str, end=end_str, progress=False, auto_adjust=True)
+            spy_close = spy_raw["Close"] if "Close" in spy_raw.columns else spy_raw.iloc[:, 0]
+            if hasattr(spy_close, "columns"):
+                spy_close = spy_close.iloc[:, 0]
+            spy_close = pd.Series(spy_close.values, index=pd.to_datetime(spy_close.index))
+            spy_ret = spy_close.pct_change(lookback).reindex(df.index, method="ffill")
+        except Exception:
+            spy_ret = pd.Series(0.0, index=df.index)
+        df["stock_return"] = df["Close"].pct_change(lookback)
+        df["spy_return"] = spy_ret
+        df["rs"] = df["stock_return"] - df["spy_return"]
+        df["entry_signal"] = (df["rs"] > rs_threshold).fillna(False)
+        df["exit_signal"] = (df["rs"] < -rs_threshold).fillna(False)
 
     else:
         raise ValueError(f"Unsupported strategy family '{family}'.")

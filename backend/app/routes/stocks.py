@@ -244,6 +244,10 @@ def _run_backtest_request(
             raise ValueError("No historical data was available for any ticker in the selected universe.")
 
         available_tickers = [symbol for symbol in tickers if symbol in market_data]
+        if resolved_universe in DB_ONLY_BACKTEST_UNIVERSES:
+            warnings.append(
+                f"{resolved_universe} DB-only run used {len(available_tickers)} of {len(tickers)} resolved symbols."
+            )
         if request.generate_plots and generate_plots and len(available_tickers) > LARGE_UNIVERSE_PLOT_SYMBOL_LIMIT:
             generate_plots = False
             warnings.append("Server-side plot image disabled for large universe run; frontend chart uses equity curve data.")

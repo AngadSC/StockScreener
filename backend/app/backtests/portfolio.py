@@ -341,7 +341,7 @@ def _select_ranked_tickers(
             momentum_score = float(score) if not pd.isna(score) else 0.0
             score = market_cap_score + (momentum_weight * momentum_score)
         rows.append((ticker, float(score)))
-    return [ticker for ticker, _ in sorted(rows, key=lambda item: item[1], reverse=True)[:top_n]]
+    return [ticker for ticker, _ in sorted(rows, key=lambda item: (-item[1], item[0]))[:top_n]]
 
 
 def _position_snapshot(

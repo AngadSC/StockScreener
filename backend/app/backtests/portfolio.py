@@ -17,6 +17,46 @@ from app.backtests.plots import generate_equity_curve_plot
 
 
 STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
+    "leaders_carry_everything": {
+        "momentum_window": 252,
+        "top_n": 5,
+        "rebalance_days": 21,
+        "dominance_weight": 0.25,
+        "min_momentum": 0.0,
+    },
+    "sector_rotation_momentum": {
+        "rotation_window": 126,
+        "top_n": 3,
+        "rebalance_days": 21,
+        "min_momentum": 0.0,
+    },
+    "earnings_momentum": {
+        "momentum_window": 63,
+        "volume_window": 20,
+        "top_n": 10,
+        "rebalance_days": 21,
+        "min_score": 0.0,
+    },
+    "mean_reversion_extremes": {"peak_lookback": 20, "drop_pct": 0.10, "recovery_pct": 0.03},
+    "gap_fill_reflex": {"gap_threshold": 0.03, "fill_ratio": 0.5},
+    "losers_keep_losing": {
+        "momentum_window": 126,
+        "trend_window": 20,
+        "top_n": 10,
+        "rebalance_days": 21,
+        "min_momentum": 0.0,
+    },
+    "volatility_regimes": {"vix_entry": 20.0, "vix_exit": 25.0, "trend_ma": 50},
+    "overnight_intraday_edge": {"lookback": 20},
+    "index_drag_problem": {"lookback": 63, "rs_threshold": 0.0, "top_n": 10, "rebalance_days": 21},
+    "crowding_risk": {
+        "momentum_window": 63,
+        "volume_window": 20,
+        "volatility_window": 20,
+        "crowding_threshold": 3.0,
+        "top_n": 10,
+        "rebalance_days": 21,
+    },
     "trend_following": {"fast_ema": 50, "slow_ema": 200},
     "mean_reversion": {"window": 20, "std_dev": 2.0},
     "momentum_breakout": {"breakout_lookback": 50, "exit_lookback": 20},
@@ -43,6 +83,18 @@ STRATEGY_DEFAULTS: Dict[str, Dict[str, Any]] = {
 
 PERIODS_PER_YEAR = {"1d": 252, "1wk": 52, "1mo": 12}
 RESAMPLE_RULES = {"1d": None, "1wk": "W-FRI", "1mo": "M"}
+CROSS_SECTIONAL_STRATEGIES = {
+    "leaders_carry_everything",
+    "sector_rotation_momentum",
+    "earnings_momentum",
+    "losers_keep_losing",
+    "index_drag_problem",
+    "crowding_risk",
+    "price_momentum",
+    "sector_momentum",
+    "momentum_filter",
+    "relative_strength",
+}
 
 
 @dataclass
@@ -193,6 +245,47 @@ def _mark_to_market(
     return market_value
 
 
+def _rolling_zscore(series: pd.Series, window: int) -> pd.Series:
+    rolling_mean = series.rolling(window).mean()
+    rolling_std = series.rolling(window).std(ddof=0).replace(0.0, np.nan)
+    return (series - rolling_mean) / rolling_std
+
+
+def _is_rebalance_bar(bar_number: int, rebalance_days: int) -> bool:
+    return bar_number == 0 or (rebalance_days > 0 and bar_number % rebalance_days == 0)
+
+
+def _select_ranked_tickers(
+    prepared_frames: Dict[str, pd.DataFrame],
+    current_date: pd.Timestamp,
+    params: Dict[str, Any],
+) -> List[str]:
+    top_n = max(1, _coerce_int(params.get("top_n"), 10))
+    rows: List[Tuple[str, float]] = []
+    for ticker, frame in prepared_frames.items():
+        if current_date not in frame.index:
+            continue
+        row = frame.loc[current_date]
+        if not bool(row.get("entry_signal", False)):
+            continue
+        score = row.get("rank_score")
+        if score is None or pd.isna(score):
+            continue
+        rows.append((ticker, float(score)))
+    return [ticker for ticker, _ in sorted(rows, key=lambda item: item[1], reverse=True)[:top_n]]
+
+
+def _target_weight_for_entry(
+    ticker: str,
+    allocation_weights: Dict[str, float],
+    selected_tickers: List[str] | None,
+) -> float:
+    if selected_tickers:
+        deployable_pct = sum(allocation_weights.get(symbol, 0.0) for symbol in allocation_weights)
+        return deployable_pct / len(selected_tickers)
+    return allocation_weights.get(ticker, 0.0)
+
+
 def _prepare_strategy_frame(
     market_data: pd.DataFrame,
     family: str,
@@ -296,25 +389,41 @@ def _prepare_strategy_frame(
             (df["Close"] < df["trend_ma"]) | _cross_value_below(df["rsi"], exit_rsi)
         ).fillna(False)
 
-    elif family == "price_momentum":
+    elif family in ("leaders_carry_everything", "price_momentum"):
         momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
-        exit_ma = _coerce_int(merged.get("exit_ma"), defaults["exit_ma"])
+        exit_ma = _coerce_int(merged.get("exit_ma"), 50)
+        dominance_weight = _coerce_float(merged.get("dominance_weight"), 0.0)
+        min_momentum = _coerce_float(merged.get("min_momentum"), 0.0)
         df["returns_nm"] = df["Close"].pct_change(momentum_window)
         df["exit_ma_line"] = SMAIndicator(df["Close"], window=exit_ma).sma_indicator()
-        df["entry_signal"] = ((df["returns_nm"] > 0) & (df["Close"] > df["exit_ma_line"])).fillna(False)
-        df["exit_signal"] = ((df["returns_nm"] <= 0) | (df["Close"] < df["exit_ma_line"])).fillna(False)
+        df["dominance_proxy"] = np.log((df["Close"] * df["Volume"]).replace(0.0, np.nan))
+        df["rank_score"] = df["returns_nm"] + (dominance_weight * df["dominance_proxy"].rank(pct=True))
+        df["entry_signal"] = ((df["returns_nm"] > min_momentum) & (df["Close"] > df["exit_ma_line"])).fillna(False)
+        df["exit_signal"] = ((df["returns_nm"] <= min_momentum) | (df["Close"] < df["exit_ma_line"])).fillna(False)
 
-    elif family == "sector_momentum":
+    elif family in ("sector_rotation_momentum", "sector_momentum"):
         rotation_window = _coerce_int(merged.get("rotation_window"), defaults["rotation_window"])
-        rs_percentile = _coerce_float(merged.get("rs_percentile"), defaults["rs_percentile"])
+        rs_percentile = _coerce_float(merged.get("rs_percentile"), 0.8)
+        min_momentum = _coerce_float(merged.get("min_momentum"), 0.0)
         df["period_high"] = df["Close"].rolling(rotation_window).max()
         df["period_low"] = df["Close"].rolling(rotation_window).min()
         rng = (df["period_high"] - df["period_low"]).replace(0.0, np.nan)
         df["rs_score"] = (df["Close"] - df["period_low"]) / rng
-        df["entry_signal"] = (df["rs_score"] >= rs_percentile).fillna(False)
+        df["rank_score"] = df["Close"].pct_change(rotation_window)
+        df["entry_signal"] = ((df["rs_score"] >= rs_percentile) & (df["rank_score"] > min_momentum)).fillna(False)
         df["exit_signal"] = (df["rs_score"] < (1.0 - rs_percentile)).fillna(False)
 
-    elif family == "extreme_reversal":
+    elif family == "earnings_momentum":
+        momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
+        volume_window = _coerce_int(merged.get("volume_window"), defaults["volume_window"])
+        min_score = _coerce_float(merged.get("min_score"), defaults["min_score"])
+        df["price_revision_proxy"] = df["Close"].pct_change(momentum_window)
+        df["volume_confirmation"] = (df["Volume"] / df["Volume"].rolling(volume_window).mean().replace(0.0, np.nan)) - 1.0
+        df["rank_score"] = df["price_revision_proxy"] + (0.25 * df["volume_confirmation"])
+        df["entry_signal"] = (df["rank_score"] > min_score).fillna(False)
+        df["exit_signal"] = (df["rank_score"] <= min_score).fillna(False)
+
+    elif family in ("extreme_reversal", "mean_reversion_extremes"):
         peak_lookback = _coerce_int(merged.get("peak_lookback"), defaults["peak_lookback"])
         drop_pct = _coerce_float(merged.get("drop_pct"), defaults["drop_pct"])
         recovery_pct = _coerce_float(merged.get("recovery_pct"), defaults["recovery_pct"])
@@ -323,7 +432,7 @@ def _prepare_strategy_frame(
         df["entry_signal"] = (df["drawdown_from_peak"] <= -drop_pct).fillna(False)
         df["exit_signal"] = (df["drawdown_from_peak"] >= -recovery_pct).fillna(False)
 
-    elif family == "gap_fill":
+    elif family in ("gap_fill", "gap_fill_reflex"):
         gap_threshold = _coerce_float(merged.get("gap_threshold"), defaults["gap_threshold"])
         fill_ratio = _coerce_float(merged.get("fill_ratio"), defaults["fill_ratio"])
         prior_close = df["Close"].shift(1)
@@ -332,15 +441,17 @@ def _prepare_strategy_frame(
         df["entry_signal"] = (df["overnight_gap"] <= -gap_threshold).fillna(False)
         df["exit_signal"] = (df["Close"] >= gap_target).fillna(False)
 
-    elif family == "momentum_filter":
+    elif family in ("losers_keep_losing", "momentum_filter"):
         momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
         trend_window = _coerce_int(merged.get("trend_window"), defaults["trend_window"])
+        min_momentum = _coerce_float(merged.get("min_momentum"), 0.0)
         df["returns_nm"] = df["Close"].pct_change(momentum_window)
         df["trend_ma_line"] = SMAIndicator(df["Close"], window=trend_window).sma_indicator()
-        df["entry_signal"] = ((df["returns_nm"] > 0) & (df["Close"] > df["trend_ma_line"])).fillna(False)
-        df["exit_signal"] = ((df["returns_nm"] <= 0) | (df["Close"] < df["trend_ma_line"])).fillna(False)
+        df["rank_score"] = df["returns_nm"]
+        df["entry_signal"] = ((df["returns_nm"] > min_momentum) & (df["Close"] > df["trend_ma_line"])).fillna(False)
+        df["exit_signal"] = ((df["returns_nm"] <= min_momentum) | (df["Close"] < df["trend_ma_line"])).fillna(False)
 
-    elif family == "volatility_regime":
+    elif family in ("volatility_regime", "volatility_regimes"):
         vix_entry = _coerce_float(merged.get("vix_entry"), defaults["vix_entry"])
         vix_exit = _coerce_float(merged.get("vix_exit"), defaults["vix_exit"])
         trend_ma = _coerce_int(merged.get("trend_ma"), defaults["trend_ma"])
@@ -359,7 +470,7 @@ def _prepare_strategy_frame(
         df["entry_signal"] = ((df["Close"] > df["trend_ma_line"]) & (df["vix"] < vix_entry)).fillna(False)
         df["exit_signal"] = (df["vix"] > vix_exit).fillna(False)
 
-    elif family == "overnight_edge":
+    elif family in ("overnight_edge", "overnight_intraday_edge"):
         lookback = _coerce_int(merged.get("lookback"), defaults["lookback"])
         df["overnight_ret"] = (df["Open"] / df["Close"].shift(1)) - 1.0
         df["intraday_ret"] = (df["Close"] / df["Open"].replace(0.0, np.nan)) - 1.0
@@ -368,7 +479,7 @@ def _prepare_strategy_frame(
         df["entry_signal"] = ((df["overnight_avg"] > df["intraday_avg"]) & (df["overnight_avg"] > 0.0)).fillna(False)
         df["exit_signal"] = ((df["overnight_avg"] <= 0.0) | (df["overnight_avg"] < df["intraday_avg"])).fillna(False)
 
-    elif family == "relative_strength":
+    elif family in ("index_drag_problem", "relative_strength"):
         lookback = _coerce_int(merged.get("lookback"), defaults["lookback"])
         rs_threshold = _coerce_float(merged.get("rs_threshold"), defaults["rs_threshold"])
         start_str = str(df.index.min().date())
@@ -385,8 +496,24 @@ def _prepare_strategy_frame(
         df["stock_return"] = df["Close"].pct_change(lookback)
         df["spy_return"] = spy_ret
         df["rs"] = df["stock_return"] - df["spy_return"]
+        df["rank_score"] = df["rs"]
         df["entry_signal"] = (df["rs"] > rs_threshold).fillna(False)
         df["exit_signal"] = (df["rs"] < -rs_threshold).fillna(False)
+
+    elif family == "crowding_risk":
+        momentum_window = _coerce_int(merged.get("momentum_window"), defaults["momentum_window"])
+        volume_window = _coerce_int(merged.get("volume_window"), defaults["volume_window"])
+        volatility_window = _coerce_int(merged.get("volatility_window"), defaults["volatility_window"])
+        crowding_threshold = _coerce_float(merged.get("crowding_threshold"), defaults["crowding_threshold"])
+        returns = df["Close"].pct_change()
+        df["momentum"] = df["Close"].pct_change(momentum_window)
+        df["volume_z"] = _rolling_zscore(df["Volume"].astype(float), volume_window).abs()
+        df["volatility"] = returns.rolling(volatility_window).std(ddof=0)
+        df["volatility_z"] = _rolling_zscore(df["volatility"], volatility_window).abs()
+        df["crowding_proxy"] = df[["volume_z", "volatility_z"]].max(axis=1)
+        df["rank_score"] = df["momentum"] - (0.1 * df["crowding_proxy"])
+        df["entry_signal"] = ((df["momentum"] > 0.0) & (df["crowding_proxy"] < crowding_threshold)).fillna(False)
+        df["exit_signal"] = ((df["momentum"] <= 0.0) | (df["crowding_proxy"] >= crowding_threshold)).fillna(False)
 
     else:
         raise ValueError(f"Unsupported strategy family '{family}'.")
@@ -618,6 +745,13 @@ def _run_single_backtest(
             if current_date in frame.index:
                 last_prices[ticker] = float(frame.loc[current_date, "Close"])
 
+        selected_tickers = None
+        if family in CROSS_SECTIONAL_STRATEGIES:
+            rebalance_days = _coerce_int(strategy_params.get("rebalance_days"), 21)
+            if _is_rebalance_bar(bar_number, rebalance_days):
+                selected_tickers = _select_ranked_tickers(prepared_frames, current_date, strategy_params)
+        allow_new_entries = family not in CROSS_SECTIONAL_STRATEGIES or selected_tickers is not None
+
         exit_tickers: List[str] = []
         for ticker, position in list(active_positions.items()):
             frame = prepared_frames[ticker]
@@ -625,7 +759,13 @@ def _run_single_backtest(
                 continue
 
             row = frame.loc[current_date]
-            exit_price, exit_reason, highest_price = _compute_exit_signal(position, row, risk)
+            if selected_tickers is not None and ticker not in selected_tickers:
+                exit_price, exit_reason, highest_price = float(row["Close"]), "rebalance_exit", max(
+                    position.highest_price,
+                    float(row["High"]),
+                )
+            else:
+                exit_price, exit_reason, highest_price = _compute_exit_signal(position, row, risk)
             position.highest_price = highest_price
             if exit_price is None or exit_reason is None:
                 continue
@@ -664,6 +804,10 @@ def _run_single_backtest(
             if ticker in active_positions or current_date not in frame.index:
                 continue
             row = frame.loc[current_date]
+            if not allow_new_entries:
+                continue
+            if selected_tickers is not None and ticker not in selected_tickers:
+                continue
             if bool(row.get("entry_signal", False)):
                 entry_candidates.append((ticker, row))
 
@@ -672,7 +816,7 @@ def _run_single_backtest(
             if cash <= 0:
                 break
 
-            target_weight_pct = allocation_weights.get(ticker, 0.0)
+            target_weight_pct = _target_weight_for_entry(ticker, allocation_weights, selected_tickers)
             target_allocation = equity_before_entries * (target_weight_pct / 100.0)
             if target_allocation <= 0:
                 continue

@@ -125,6 +125,16 @@ class BacktestDataResponse(BaseModel):
 
 
 BacktestStrategyFamily = Literal[
+    "leaders_carry_everything",
+    "sector_rotation_momentum",
+    "earnings_momentum",
+    "mean_reversion_extremes",
+    "gap_fill_reflex",
+    "losers_keep_losing",
+    "volatility_regimes",
+    "overnight_intraday_edge",
+    "index_drag_problem",
+    "crowding_risk",
     "trend_following",
     "mean_reversion",
     "momentum_breakout",
@@ -134,6 +144,14 @@ BacktestStrategyFamily = Literal[
     "golden_cross",
     "macd_trend",
     "rsi_trend_filter",
+    "price_momentum",
+    "sector_momentum",
+    "extreme_reversal",
+    "gap_fill",
+    "momentum_filter",
+    "volatility_regime",
+    "overnight_edge",
+    "relative_strength",
 ]
 
 

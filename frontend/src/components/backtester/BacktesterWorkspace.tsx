@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, Check, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Loader2 } from 'lucide-react';
 
 import { EquityCurveChart, type EquityPoint } from '@/components/backtester/BacktesterChart';
 import {
@@ -15,14 +15,13 @@ import {
   StepMarker,
   StrategyInfoDrawer,
   ToggleSwitch,
-  captionStyle,
   headingLgStyle,
   headingMdStyle,
   headingSmStyle,
 } from '@/components/backtester/BacktesterPrimitives';
 import {
-  EXAMPLE_PRESETS,
   OBJECTIVES,
+  PORTFOLIO_STRATEGIES,
   STRATEGIES,
   SUMMARY_METRICS,
   TIMEFRAME_OPTIONS,
@@ -76,7 +75,6 @@ export default function BacktesterWorkspace({
   const [basketInput, setBasketInput] = useState(normalizedInitialTickers.join(', '));
   const [activeStep, setActiveStep] = useState<WizardStepId>('portfolio');
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [hoveredStrategy, setHoveredStrategy] = useState<BacktestStrategyFamily | null>(null);
   const [tradeSort, setTradeSort] = useState<{ field: TradeSortField; order: 'asc' | 'desc' }>({ field: 'index', order: 'asc' });
   const [runVersion, setRunVersion] = useState(0);
   const [runSuccessPulse, setRunSuccessPulse] = useState(false);
@@ -99,8 +97,7 @@ export default function BacktesterWorkspace({
     });
   }, [resolvedTickers]);
 
-  const strategy = useMemo(() => STRATEGIES.find((item) => item.family === request.strategy.family) ?? STRATEGIES[0], [request.strategy.family]);
-  const previewStrategy = useMemo(() => STRATEGIES.find((item) => item.family === (hoveredStrategy ?? request.strategy.family)) ?? strategy, [hoveredStrategy, request.strategy.family, strategy]);
+  const strategy = useMemo(() => STRATEGIES.find((item) => item.family === request.strategy.family) ?? PORTFOLIO_STRATEGIES[0], [request.strategy.family]);
   const mutation = useMutation({ mutationFn: (payload: BacktestRunRequest) => stocksAPI.runGlobalBacktest(payload) });
   const result = mutation.data;
 
@@ -188,7 +185,11 @@ export default function BacktesterWorkspace({
 
   const portfolioStep = (
     <div className="space-y-6">
-      <h2 style={headingLgStyle}>Portfolio Setup</h2>
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Portfolio Test Lab</div>
+        <h2 className="mt-2" style={headingLgStyle}>Basket Setup</h2>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">Build the universe once, then choose a portfolio strategy in the next step.</p>
+      </div>
       <FieldShell label="Basket Tickers" helper="Separate tickers with commas or spaces.">
         <textarea value={basketInput} onChange={(event) => setBasketInput(event.target.value.toUpperCase())} placeholder="e.g. AAPL, MSFT, NVDA" className="min-h-[110px] resize-y" />
       </FieldShell>
@@ -220,10 +221,31 @@ export default function BacktesterWorkspace({
 
   const strategyStep = (
     <div className="space-y-6">
-      <h2 style={headingLgStyle}>Strategy</h2>
-      <div className="grid gap-3 sm:grid-cols-2">{STRATEGIES.map((item) => <button key={item.family} type="button" onClick={() => setStrategyFamily(item.family)} onMouseEnter={() => setHoveredStrategy(item.family)} onMouseLeave={() => setHoveredStrategy(null)} className={cn('relative rounded-[var(--radius-lg)] border bg-[var(--bg-surface-1)] p-4 text-left transition-all', item.family === request.strategy.family ? 'border-[var(--accent)] bg-[var(--accent-subtle)]' : 'border-[var(--border-default)] hover:border-[var(--border-strong)]')}>{item.family === request.strategy.family ? <span className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[var(--positive-bg)] text-[var(--positive)]"><Check className="h-3.5 w-3.5" /></span> : null}<div style={headingSmStyle}>{item.label}</div><p className="mt-2 text-[11px] leading-5 text-[var(--text-secondary)]" style={captionStyle}>{item.description}</p></button>)}</div>
-      <StrategyInfoDrawer strategy={previewStrategy} />
-      <div key={request.strategy.family} className="parameter-section-enter"><div style={headingSmStyle}>{strategy.label} Parameters</div><div className="mt-4 flex flex-wrap gap-2">{EXAMPLE_PRESETS.map((preset) => <button key={preset.label} type="button" title={preset.description} onClick={() => setRequest((prev) => ({ ...prev, strategy: { family: preset.family, params: { ...preset.params } }, tuning: { ...(prev.tuning ?? { enabled: false, objective: 'sharpe_ratio', max_combinations: 100, parameter_ranges: {} }), parameter_ranges: {} } }))} className={cn('rounded-full border px-3 py-1.5 text-xs transition-colors', preset.family === request.strategy.family && JSON.stringify(preset.params) === JSON.stringify(request.strategy.params) ? 'border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--text-primary)]' : 'border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]')}>{preset.label}</button>)}</div><div className="mt-4 grid gap-4 sm:grid-cols-2">{strategy.fields.map((field) => <FieldShell key={field.key} label={field.label} helper={field.help}><Input type="number" step={field.step} value={Number(request.strategy.params[field.key] ?? 0)} onChange={(event) => setRequest((prev) => ({ ...prev, strategy: { ...prev.strategy, params: { ...prev.strategy.params, [field.key]: parseNumber(event.target.value, Number(prev.strategy.params[field.key] ?? 0)) } } }))} /></FieldShell>)}</div></div>
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-[var(--text-tertiary)]">Portfolio Strategy</div>
+        <h2 className="mt-2" style={headingLgStyle}>Research Mode</h2>
+      </div>
+      <FieldShell label="Strategy">
+        <select value={request.strategy.family} onChange={(event) => setStrategyFamily(event.target.value as BacktestStrategyFamily)}>
+          {PORTFOLIO_STRATEGIES.map((item) => (
+            <option key={item.family} value={item.family}>{item.label}</option>
+          ))}
+        </select>
+      </FieldShell>
+      <StrategyInfoDrawer strategy={strategy} />
+      <div key={request.strategy.family} className="parameter-section-enter">
+        <div style={headingSmStyle}>{strategy.label} Parameters</div>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {strategy.fields.map((field) => (
+            <FieldShell key={field.key} label={field.label} helper={field.help}>
+              <Input type="number" step={field.step} value={Number(request.strategy.params[field.key] ?? 0)} onChange={(event) => setRequest((prev) => ({ ...prev, strategy: { ...prev.strategy, params: { ...prev.strategy.params, [field.key]: parseNumber(event.target.value, Number(prev.strategy.params[field.key] ?? 0)) } } }))} />
+            </FieldShell>
+          ))}
+        </div>
+        <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-4 py-3 text-xs leading-5 text-[var(--text-secondary)]">
+          Ranking modes select the top symbols from your basket on rebalance bars. Non-ranking modes apply their signal to each symbol independently.
+        </div>
+      </div>
     </div>
   );
 

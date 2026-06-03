@@ -30,8 +30,8 @@ export type ExamplePreset = {
 };
 
 export const WIZARD_STEPS: Array<{ id: WizardStepId; label: string; shortLabel: string }> = [
-  { id: 'portfolio', label: 'Portfolio Setup', shortLabel: 'Portfolio' },
-  { id: 'strategy', label: 'Strategy', shortLabel: 'Strategy' },
+  { id: 'portfolio', label: 'Portfolio Test', shortLabel: 'Portfolio' },
+  { id: 'strategy', label: 'Research Mode', shortLabel: 'Mode' },
   { id: 'risk', label: 'Risk & Advanced', shortLabel: 'Risk' },
 ];
 
@@ -61,6 +61,154 @@ export const SUMMARY_METRICS = [
 ] as const;
 
 export const STRATEGIES: StrategyDef[] = [
+  {
+    family: 'leaders_carry_everything',
+    label: 'Leaders Carry Everything',
+    description: 'Ranks the basket by 6 to 12 month momentum with a dollar-volume dominance proxy, then holds the top names.',
+    bestFor: 'Large-cap leaders, index heavyweights, and winner-take-most baskets.',
+    watchFor: 'Crowded leadership can reverse hard when flows unwind.',
+    starterValues: 'Momentum 252, Top 5, Monthly rebalance.',
+    defaults: { momentum_window: 252, top_n: 5, rebalance_days: 21, dominance_weight: 0.25, min_momentum: 0 },
+    fields: [
+      { key: 'momentum_window', label: 'Momentum Window', step: 1, help: 'Bars used to rank medium-term winners. 126 = roughly 6 months, 252 = roughly 12 months.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Maximum number of ranked leaders to hold at each rebalance.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between rank refreshes. 21 is roughly monthly on daily data.' },
+      { key: 'dominance_weight', label: 'Dominance Weight', step: 0.05, help: 'Adds weight to the dollar-volume dominance proxy.' },
+      { key: 'min_momentum', label: 'Minimum Momentum', step: 0.01, help: 'Required return over the momentum window before a stock can be selected.' },
+    ],
+  },
+  {
+    family: 'sector_rotation_momentum',
+    label: 'Sector Rotation Momentum',
+    description: 'Ranks sector ETFs or basket members by relative momentum and rotates into the top performers.',
+    bestFor: 'SPDR sectors like XLK, XLE, XLF, XLP, XLV, and macro rotation baskets.',
+    watchFor: 'Macro shocks can snap leadership quickly.',
+    starterValues: 'Rotation 126, Top 3, Monthly rebalance.',
+    defaults: { rotation_window: 126, top_n: 3, rebalance_days: 21, min_momentum: 0 },
+    fields: [
+      { key: 'rotation_window', label: 'Rotation Window', step: 1, help: 'Bars used to measure relative sector strength.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Number of sectors or names to hold after ranking.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between ranking refreshes.' },
+      { key: 'min_momentum', label: 'Minimum Momentum', step: 0.01, help: 'Minimum return required before a symbol can be selected.' },
+    ],
+  },
+  {
+    family: 'earnings_momentum',
+    label: 'Earnings Momentum',
+    description: 'Uses price momentum plus volume confirmation as a yfinance-friendly proxy for earnings revisions and post-earnings drift.',
+    bestFor: 'Stocks with steady follow-through after catalysts.',
+    watchFor: 'Without analyst revision data this is a proxy, not a true EPS revision model.',
+    starterValues: 'Momentum 63, Volume 20, Top 10.',
+    defaults: { momentum_window: 63, volume_window: 20, top_n: 10, rebalance_days: 21, min_score: 0 },
+    fields: [
+      { key: 'momentum_window', label: 'Momentum Window', step: 1, help: 'Bars used to measure post-catalyst follow-through.' },
+      { key: 'volume_window', label: 'Volume Window', step: 1, help: 'Average volume period used for confirmation.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Maximum number of high-score names to hold.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between score refreshes.' },
+      { key: 'min_score', label: 'Minimum Score', step: 0.01, help: 'Minimum combined momentum and volume score required for selection.' },
+    ],
+  },
+  {
+    family: 'mean_reversion_extremes',
+    label: 'Mean Reversion After Extremes',
+    description: 'Buys sharp drawdowns from recent peaks and exits after a partial recovery.',
+    bestFor: 'Liquid names after emotional selloffs in otherwise stable conditions.',
+    watchFor: 'Strong downtrends can keep falling after the first oversold signal.',
+    starterValues: 'Peak 20, Drop 10%, Recovery 3%.',
+    defaults: { peak_lookback: 20, drop_pct: 0.1, recovery_pct: 0.03 },
+    fields: [
+      { key: 'peak_lookback', label: 'Peak Lookback', step: 1, help: 'Bars used to find the recent peak.' },
+      { key: 'drop_pct', label: 'Drop %', step: 0.01, help: 'Required drawdown from peak. 0.10 = 10%.' },
+      { key: 'recovery_pct', label: 'Recovery %', step: 0.01, help: 'Exit when drawdown recovers to this distance from the peak.' },
+    ],
+  },
+  {
+    family: 'gap_fill_reflex',
+    label: 'Gap Fill Reflex',
+    description: 'Buys large gap-down opens and exits when price fills part of the overnight gap.',
+    bestFor: 'Liquid stocks where emotional gap-down moves often mean-revert.',
+    watchFor: 'Real fundamental news can keep the gap moving in the same direction.',
+    starterValues: 'Gap 3%, Fill 50%.',
+    defaults: { gap_threshold: 0.03, fill_ratio: 0.5 },
+    fields: [
+      { key: 'gap_threshold', label: 'Gap Threshold', step: 0.005, help: 'Minimum gap-down size. 0.03 = 3%.' },
+      { key: 'fill_ratio', label: 'Fill Ratio', step: 0.05, help: 'Portion of the gap that must be recovered before exit.' },
+    ],
+  },
+  {
+    family: 'losers_keep_losing',
+    label: 'Losers Keep Losing',
+    description: 'Ranks by medium-term momentum and avoids weak names, holding only symbols that regain positive trend.',
+    bestFor: 'Filtering structural losers out of a broader long-only basket.',
+    watchFor: 'Short squeezes are avoided here because the implementation goes flat, not short.',
+    starterValues: 'Momentum 126, Trend 20, Top 10.',
+    defaults: { momentum_window: 126, trend_window: 20, top_n: 10, rebalance_days: 21, min_momentum: 0 },
+    fields: [
+      { key: 'momentum_window', label: 'Momentum Window', step: 1, help: 'Bars used to measure medium-term loser or winner status.' },
+      { key: 'trend_window', label: 'Trend Window', step: 1, help: 'Short moving average used as a local trend confirmation.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Maximum number of eligible names to hold.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between ranking refreshes.' },
+      { key: 'min_momentum', label: 'Minimum Momentum', step: 0.01, help: 'Minimum return required before a name can be held.' },
+    ],
+  },
+  {
+    family: 'volatility_regimes',
+    label: 'Volatility Regimes',
+    description: 'Uses VIX as a market regime filter, allowing entries in calmer volatility and exiting during spikes.',
+    bestFor: 'De-risking baskets during broad market stress.',
+    watchFor: 'Can miss sharp rebounds after volatility shocks.',
+    starterValues: 'VIX Entry 20, VIX Exit 25, Trend MA 50.',
+    defaults: { vix_entry: 20, vix_exit: 25, trend_ma: 50 },
+    fields: [
+      { key: 'vix_entry', label: 'VIX Entry', step: 0.5, help: 'VIX must be below this level to allow entries.' },
+      { key: 'vix_exit', label: 'VIX Exit', step: 0.5, help: 'Exit when VIX rises above this level.' },
+      { key: 'trend_ma', label: 'Trend MA', step: 1, help: 'Price must also be above this moving average for entry.' },
+    ],
+  },
+  {
+    family: 'overnight_intraday_edge',
+    label: 'Overnight vs Intraday Edge',
+    description: 'Compares rolling close-to-open returns against open-to-close returns and holds only when the overnight edge dominates.',
+    bestFor: 'Studying where a stock earns its returns across the trading day.',
+    watchFor: 'Overnight edge signals are noisy and rely on clean open prices.',
+    starterValues: 'Lookback 20.',
+    defaults: { lookback: 20 },
+    fields: [
+      { key: 'lookback', label: 'Lookback', step: 1, help: 'Bars used to compare overnight and intraday average returns.' },
+    ],
+  },
+  {
+    family: 'index_drag_problem',
+    label: 'Index Drag Problem',
+    description: 'Ranks stocks by relative strength versus SPY and holds only names beating the index.',
+    bestFor: 'Avoiding dead capital in stocks lagging the market benchmark.',
+    watchFor: 'Often overlaps with ordinary momentum filters.',
+    starterValues: 'Lookback 63, Top 10, Threshold 0.',
+    defaults: { lookback: 63, rs_threshold: 0, top_n: 10, rebalance_days: 21 },
+    fields: [
+      { key: 'lookback', label: 'Lookback', step: 1, help: 'Bars used to compare stock return versus SPY.' },
+      { key: 'rs_threshold', label: 'RS Threshold', step: 0.01, help: 'Minimum outperformance versus SPY required for selection.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Maximum number of outperformers to hold.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between ranking refreshes.' },
+    ],
+  },
+  {
+    family: 'crowding_risk',
+    label: 'Crowding Risk',
+    description: 'Avoids otherwise strong momentum names when volume and volatility spikes suggest crowded positioning risk.',
+    bestFor: 'Momentum baskets where crowded exits can dominate normal trend behavior.',
+    watchFor: 'Crowding is proxied from OHLCV because fund-flow and positioning feeds are not available here.',
+    starterValues: 'Momentum 63, Volume 20, Volatility 20, Threshold 3.',
+    defaults: { momentum_window: 63, volume_window: 20, volatility_window: 20, crowding_threshold: 3, top_n: 10, rebalance_days: 21 },
+    fields: [
+      { key: 'momentum_window', label: 'Momentum Window', step: 1, help: 'Bars used to measure the underlying trend.' },
+      { key: 'volume_window', label: 'Volume Window', step: 1, help: 'Window for volume z-score crowding proxy.' },
+      { key: 'volatility_window', label: 'Volatility Window', step: 1, help: 'Window for realized volatility z-score proxy.' },
+      { key: 'crowding_threshold', label: 'Crowding Threshold', step: 0.1, help: 'Higher values tolerate more volume or volatility stress before exiting.' },
+      { key: 'top_n', label: 'Hold Top N', step: 1, help: 'Maximum number of eligible momentum names to hold.' },
+      { key: 'rebalance_days', label: 'Rebalance Days', step: 1, help: 'Bars between ranking refreshes.' },
+    ],
+  },
   {
     family: 'trend_following',
     label: 'Trend Following',
@@ -292,6 +440,23 @@ export const STRATEGIES: StrategyDef[] = [
   },
 ];
 
+export const PORTFOLIO_STRATEGY_FAMILIES: BacktestStrategyFamily[] = [
+  'leaders_carry_everything',
+  'sector_rotation_momentum',
+  'earnings_momentum',
+  'mean_reversion_extremes',
+  'gap_fill_reflex',
+  'losers_keep_losing',
+  'volatility_regimes',
+  'overnight_intraday_edge',
+  'index_drag_problem',
+  'crowding_risk',
+];
+
+export const PORTFOLIO_STRATEGIES = STRATEGIES.filter((strategy) =>
+  PORTFOLIO_STRATEGY_FAMILIES.includes(strategy.family),
+);
+
 export const EXAMPLE_PRESETS: ExamplePreset[] = [
   {
     label: 'Beginner Trend',
@@ -397,7 +562,7 @@ export function createDefaultRequest(tickers: string[]): BacktestRunRequest {
     initial_capital: 10000,
     tc_bps: 5,
     allow_fractional_shares: true,
-    strategy: { family: 'trend_following', params: { fast_ema: 50, slow_ema: 200 } },
+    strategy: { family: 'leaders_carry_everything', params: { momentum_window: 252, top_n: 5, rebalance_days: 21, dominance_weight: 0.25, min_momentum: 0 } },
     risk_controls: { stop_loss_pct: null, trailing_stop_pct: null, take_profit_pct: null },
     tuning: { enabled: false, objective: 'sharpe_ratio', max_combinations: 100, parameter_ranges: {} },
     include_buy_and_hold: true,

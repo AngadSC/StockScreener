@@ -93,3 +93,46 @@ def test_new_strategy_families_execute():
 
         assert result["stats"]["initial_capital"] == 10_000
         assert result["equity_curve"]
+
+
+def test_public_portfolio_strategy_modes_execute(monkeypatch):
+    monkeypatch.setattr("app.backtests.portfolio.yf.download", lambda *args, **kwargs: pd.DataFrame())
+    market_data = {
+        "AAPL": _sample_market_data(21),
+        "MSFT": _sample_market_data(22),
+        "NVDA": _sample_market_data(23),
+        "XLE": _sample_market_data(24),
+    }
+    families = [
+        ("leaders_carry_everything", {"momentum_window": 40, "top_n": 2, "rebalance_days": 10}),
+        ("sector_rotation_momentum", {"rotation_window": 40, "top_n": 2, "rebalance_days": 10}),
+        ("earnings_momentum", {"momentum_window": 20, "volume_window": 10, "top_n": 2, "rebalance_days": 10}),
+        ("mean_reversion_extremes", {"peak_lookback": 10, "drop_pct": 0.02, "recovery_pct": 0.01}),
+        ("gap_fill_reflex", {"gap_threshold": 0.001, "fill_ratio": 0.25}),
+        ("losers_keep_losing", {"momentum_window": 30, "trend_window": 10, "top_n": 2, "rebalance_days": 10}),
+        ("volatility_regimes", {"vix_entry": 20, "vix_exit": 25, "trend_ma": 20}),
+        ("overnight_intraday_edge", {"lookback": 10}),
+        ("index_drag_problem", {"lookback": 20, "rs_threshold": -1.0, "top_n": 2, "rebalance_days": 10}),
+        ("crowding_risk", {"momentum_window": 20, "volume_window": 10, "volatility_window": 10, "top_n": 2, "rebalance_days": 10}),
+    ]
+
+    for family, strategy_params in families:
+        result = run_portfolio_backtest(
+            market_data,
+            tickers=list(market_data.keys()),
+            allocation_weights={},
+            timeframe="1d",
+            initial_capital=10_000,
+            tc_bps=5,
+            allow_fractional_shares=True,
+            family=family,
+            strategy_params=strategy_params,
+            risk_controls=None,
+            tuning=None,
+            include_buy_and_hold=False,
+            generate_plots=False,
+        )
+
+        assert result["stats"]["initial_capital"] == 10_000
+        assert result["equity_curve"]
+        assert result["strategy_params"]

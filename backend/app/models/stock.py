@@ -197,6 +197,8 @@ class BacktestTuningConfig(BaseModel):
 class BacktestRunRequest(BaseModel):
     start_date: str
     end_date: str
+    mode: Literal["automated", "indicator"] = "automated"
+    universe: Literal["sp500", "custom", "sector_etfs"] = "custom"
     tickers: List[str] = Field(default_factory=list)
     allocation_weights: Dict[str, float] = Field(default_factory=dict)
     timeframe: Literal["1d", "1wk", "1mo"] = "1d"
@@ -213,6 +215,8 @@ class BacktestRunRequest(BaseModel):
 class BacktestRunResponse(BaseModel):
     ticker: str
     tickers: List[str]
+    mode: Literal["automated", "indicator"] = "automated"
+    universe: Literal["sp500", "custom", "sector_etfs"] = "custom"
     allocation_weights: Dict[str, float] = Field(default_factory=dict)
     cash_reserve_pct: float = 0.0
     source: Literal["database", "yfinance", "mixed"]
@@ -229,8 +233,44 @@ class BacktestRunResponse(BaseModel):
     equity_curve: List[Dict[str, Any]]
     buy_and_hold: Optional[Dict[str, Any]] = None
     trade_log: List[Dict[str, Any]]
+    selected_holdings: List[Dict[str, Any]] = Field(default_factory=list)
+    current_holdings: List[Dict[str, Any]] = Field(default_factory=list)
     tuning_summary: Optional[Dict[str, Any]] = None
     equity_curve_image: Optional[str] = None
+
+
+class IndicatorBacktestRunRequest(BaseModel):
+    ticker: str
+    start_date: str
+    end_date: str
+    timeframe: Literal["1d", "1wk", "1mo"] = "1d"
+    indicators: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    atr_gate: Optional[Dict[str, Any]] = None
+    long_threshold: float = Field(default=0.5, ge=-1.0, le=1.0)
+    short_threshold: float = Field(default=-0.5, ge=-1.0, le=1.0)
+    exec_lag: int = Field(default=1, ge=0, le=5)
+    tc_bps: float = Field(default=5.0, ge=0.0, le=500.0)
+    allow_position_hold: bool = True
+    generate_plots: bool = True
+    generate_roc: bool = False
+
+
+class IndicatorBacktestRunResponse(BaseModel):
+    ticker: str
+    mode: Literal["indicator"] = "indicator"
+    source: Literal["database", "yfinance", "mixed"]
+    cached: bool = False
+    start_date: str
+    end_date: str
+    timeframe: Literal["1d", "1wk", "1mo"]
+    warnings: List[str] = Field(default_factory=list)
+    stats: Dict[str, Any]
+    selected_indicators: List[str]
+    equity_curve: List[Dict[str, Any]]
+    results: List[Dict[str, Any]]
+    equity_curve_image: Optional[str] = None
+    roc_auc: Optional[float] = None
+    roc_curve_image: Optional[str] = None
 
 class MLFeaturesResponse(BaseModel):
     ticker: str

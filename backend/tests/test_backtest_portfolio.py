@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 
 from app.backtests.portfolio import run_portfolio_backtest
+from app.models.stock import BacktestRunRequest
+from app.routes import stocks as stocks_route
 
 
 def _sample_market_data(seed: int = 7) -> pd.DataFrame:
@@ -136,3 +138,128 @@ def test_public_portfolio_strategy_modes_execute(monkeypatch):
         assert result["stats"]["initial_capital"] == 10_000
         assert result["equity_curve"]
         assert result["strategy_params"]
+
+
+def test_automated_sp500_universe_expands_server_side_and_does_not_buy_spy_only(monkeypatch):
+    universe = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "JPM", "XOM", "LLY", "AVGO", "UNH", "HD"]
+    market_data = {symbol: _sample_market_data(index + 40) for index, symbol in enumerate(universe)}
+
+    monkeypatch.setattr(stocks_route.cache_service, "get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route.cache_service, "set", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route, "get_sp500_tickers", lambda: universe)
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data",
+        lambda _db, symbol, _start, _end: (market_data[symbol], "database", []),
+    )
+    monkeypatch.setattr(
+        stocks_route,
+        "_load_rank_metadata",
+        lambda _db, tickers, _warnings: {
+            symbol: {"market_cap": (len(tickers) - index) * 1_000_000_000, "avg_volume": None, "volume": None}
+            for index, symbol in enumerate(tickers)
+        },
+    )
+
+    result = stocks_route._run_backtest_request(
+        None,
+        BacktestRunRequest(
+            start_date="2021-01-01",
+            end_date="2021-12-31",
+            universe="sp500",
+            tickers=["SPY"],
+            strategy={
+                "family": "leaders_carry_everything",
+                "params": {"momentum_window": 20, "top_n": 10, "rebalance_days": 10, "min_momentum": -1.0},
+            },
+            include_buy_and_hold=False,
+            generate_plots=False,
+        ),
+        db=None,
+    )
+
+    assert result["universe"] == "sp500"
+    assert result["tickers"] == universe
+    assert result["tickers"] != ["SPY"]
+    assert result["current_holdings"]
+    assert {holding["ticker"] for holding in result["current_holdings"]} <= set(universe)
+
+
+def test_leaders_strategy_top_n_caps_active_holdings_per_rebalance():
+    tickers = [f"T{i:02d}" for i in range(15)]
+    market_data = {symbol: _sample_market_data(index + 70) for index, symbol in enumerate(tickers)}
+
+    result = run_portfolio_backtest(
+        market_data,
+        tickers=tickers,
+        allocation_weights={},
+        timeframe="1d",
+        initial_capital=10_000,
+        tc_bps=5,
+        allow_fractional_shares=True,
+        family="leaders_carry_everything",
+        strategy_params={"momentum_window": 20, "top_n": 10, "rebalance_days": 10, "min_momentum": -1.0},
+        risk_controls=None,
+        tuning=None,
+        include_buy_and_hold=False,
+        generate_plots=False,
+    )
+
+    active_counts = [int(row["ActivePositions"]) for row in result["equity_curve"]]
+    assert max(active_counts) <= 10
+    assert all(len(snapshot["holdings"]) <= 10 for snapshot in result["selected_holdings"])
+
+
+def test_custom_basket_request_still_uses_user_supplied_tickers(monkeypatch):
+    market_data = {symbol: _sample_market_data(index + 90) for index, symbol in enumerate(["AAPL", "MSFT"])}
+
+    monkeypatch.setattr(stocks_route.cache_service, "get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route.cache_service, "set", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data",
+        lambda _db, symbol, _start, _end: (market_data[symbol], "database", []),
+    )
+
+    result = stocks_route._run_backtest_request(
+        None,
+        BacktestRunRequest(
+            start_date="2021-01-01",
+            end_date="2021-12-31",
+            universe="custom",
+            tickers=["AAPL", "MSFT"],
+            strategy={"family": "trend_following", "params": {"fast_ema": 20, "slow_ema": 50}},
+            include_buy_and_hold=False,
+            generate_plots=False,
+        ),
+        db=None,
+    )
+
+    assert result["universe"] == "custom"
+    assert result["tickers"] == ["AAPL", "MSFT"]
+
+
+def test_indicator_strategy_endpoint_executes(monkeypatch):
+    monkeypatch.setattr(stocks_route.cache_service, "get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route.cache_service, "set", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data",
+        lambda _db, _symbol, _start, _end: (_sample_market_data(120), "database", []),
+    )
+
+    result = stocks_route.run_global_indicator_backtest(
+        stocks_route.IndicatorBacktestRunRequest(
+            ticker="AAPL",
+            start_date="2021-01-01",
+            end_date="2021-12-31",
+            indicators={"rsi": {"enabled": True, "weight": 1.0, "params": {"period": 14}}},
+            generate_plots=False,
+        ),
+        db=None,
+    )
+
+    assert result["mode"] == "indicator"
+    assert result["ticker"] == "AAPL"
+    assert "RSI" in result["selected_indicators"]
+    assert result["equity_curve"]

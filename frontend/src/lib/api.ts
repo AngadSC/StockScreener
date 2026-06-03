@@ -5,6 +5,8 @@ import type {
   ScreenerResponse,
   PriceHistoryResponse,
   BacktestDataResponse,
+  IndicatorBacktestRunRequest,
+  IndicatorBacktestRunResponse,
   BacktestRunRequest,
   BacktestRunResponse,
   StockSuggestion
@@ -187,6 +189,16 @@ export const stocksAPI = {
   ): Promise<BacktestRunResponse> => {
     const response = await api.post<BacktestRunResponse>(
       '/backtests/run',
+      config
+    );
+    return response.data;
+  },
+
+  runIndicatorBacktest: async (
+    config: IndicatorBacktestRunRequest
+  ): Promise<IndicatorBacktestRunResponse> => {
+    const response = await api.post<IndicatorBacktestRunResponse>(
+      '/backtests/indicator/run',
       config
     );
     return response.data;

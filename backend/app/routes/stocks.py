@@ -7,11 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.backtests.data import load_backtest_market_data
-from app.backtests.portfolio import run_portfolio_backtest
+from app.backtests.indicator_lab import run_indicator_backtest
+from app.backtests.portfolio import _resample_market_data, run_portfolio_backtest
 from app.database.connection import get_db
-from app.database.models import Ticker
+from app.database.models import StockFundamental, Ticker
 from app.models.stock import (
     BacktestDataResponse,
+    IndicatorBacktestRunRequest,
+    IndicatorBacktestRunResponse,
     BacktestRunRequest,
     BacktestRunResponse,
     MLFeaturesResponse,
@@ -21,10 +24,25 @@ from app.providers.factory import ProviderFactory
 from app.services.cache import cache_service
 from app.services.stock_service import get_price_history, get_stock_with_fundamentals
 from app.utils.data_fetcher import add_technical_indicators
+from app.utils.ticker_list import get_sp500_tickers
 
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 backtests_router = APIRouter(prefix="/backtests", tags=["backtests"])
+
+SECTOR_ETF_UNIVERSE = [
+    "XLB",
+    "XLC",
+    "XLE",
+    "XLF",
+    "XLI",
+    "XLK",
+    "XLP",
+    "XLRE",
+    "XLU",
+    "XLV",
+    "XLY",
+]
 
 
 def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int) -> tuple:
@@ -50,7 +68,12 @@ def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int
     return start, end
 
 
-def _normalize_backtest_tickers(primary_ticker: str | None, extra_tickers: list[str]) -> list[str]:
+def _normalize_backtest_tickers(
+    primary_ticker: str | None,
+    extra_tickers: list[str],
+    *,
+    enforce_limit: bool = True,
+) -> list[str]:
     ordered: list[str] = []
     seen: set[str] = set()
     for raw in ([primary_ticker] if primary_ticker else []) + list(extra_tickers or []):
@@ -63,10 +86,54 @@ def _normalize_backtest_tickers(primary_ticker: str | None, extra_tickers: list[
     if not ordered:
         raise HTTPException(status_code=400, detail="Provide at least one ticker for the backtest.")
 
-    if len(ordered) > 25:
+    if enforce_limit and len(ordered) > 25:
         raise HTTPException(status_code=400, detail="Backtest basket is limited to 25 tickers per run.")
 
     return ordered
+
+
+def _resolve_automated_universe(primary_ticker: str | None, request: BacktestRunRequest) -> tuple[str, list[str], list[str]]:
+    warnings: list[str] = []
+    universe = request.universe
+    if request.strategy.family == "sector_rotation_momentum" and universe == "custom" and not request.tickers:
+        universe = "sector_etfs"
+
+    if universe == "sp500":
+        cached = cache_service.get("backtest_universe:sp500:v1")
+        tickers = cached if isinstance(cached, list) else None
+        if not tickers:
+            tickers = get_sp500_tickers()
+            if tickers:
+                cache_service.set("backtest_universe:sp500:v1", tickers, ttl=24 * 3600)
+        tickers = _normalize_backtest_tickers(None, tickers or [], enforce_limit=False)
+        if "SPY" in tickers and len(tickers) == 1:
+            raise HTTPException(status_code=400, detail="S&P 500 universe resolved only to SPY, which is not valid.")
+        return "sp500", tickers, warnings
+
+    if universe == "sector_etfs":
+        return "sector_etfs", _normalize_backtest_tickers(None, SECTOR_ETF_UNIVERSE, enforce_limit=False), warnings
+
+    return "custom", _normalize_backtest_tickers(primary_ticker, request.tickers, enforce_limit=True), warnings
+
+
+def _load_rank_metadata(db: Session, tickers: list[str], warnings: list[str]) -> dict[str, dict[str, float | None]]:
+    rows = (
+        db.query(Ticker.symbol, StockFundamental.market_cap, StockFundamental.avg_volume, StockFundamental.volume)
+        .join(StockFundamental, Ticker.id == StockFundamental.ticker_id)
+        .filter(Ticker.symbol.in_(tickers))
+        .all()
+    )
+    metadata = {
+        symbol.upper(): {
+            "market_cap": market_cap,
+            "avg_volume": avg_volume,
+            "volume": volume,
+        }
+        for symbol, market_cap, avg_volume, volume in rows
+    }
+    if tickers and not any((item.get("market_cap") or 0) > 0 for item in metadata.values()):
+        warnings.append("Leaders ranking used dollar volume fallback because market-cap fundamentals were unavailable.")
+    return metadata
 
 
 def _normalize_backtest_weights(tickers: list[str], allocation_weights: dict[str, float]) -> dict[str, float]:
@@ -92,12 +159,16 @@ def _run_backtest_request(
     request: BacktestRunRequest,
     db: Session,
 ):
-    tickers = _normalize_backtest_tickers(primary_ticker, request.tickers)
+    if request.mode != "automated":
+        raise HTTPException(status_code=400, detail="Use /backtests/indicator/run for indicator strategy backtests.")
+
+    resolved_universe, tickers, warnings = _resolve_automated_universe(primary_ticker, request)
     anchor_ticker = (primary_ticker or tickers[0]).upper()
-    allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights)
+    allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights if resolved_universe == "custom" else {})
 
     start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
     request_dump = request.model_dump(mode="json")
+    request_dump["universe"] = resolved_universe
     request_dump["tickers"] = tickers
     request_dump["allocation_weights"] = allocation_weights
     cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
@@ -113,16 +184,30 @@ def _run_backtest_request(
     try:
         market_data: dict[str, pd.DataFrame] = {}
         data_sources: dict[str, str] = {}
-        warnings: list[str] = []
         for symbol in tickers:
-            symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
-            market_data[symbol] = symbol_data
-            data_sources[symbol] = source
-            warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
+            try:
+                symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
+                market_data[symbol] = symbol_data
+                data_sources[symbol] = source
+                warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
+            except ValueError as exc:
+                if resolved_universe == "custom":
+                    raise
+                warnings.append(f"{symbol}: {exc}")
+
+        if not market_data:
+            raise ValueError("No historical data was available for any ticker in the selected universe.")
+
+        available_tickers = [symbol for symbol in tickers if symbol in market_data]
+        rank_metadata = (
+            _load_rank_metadata(db, available_tickers, warnings)
+            if request.strategy.family == "leaders_carry_everything"
+            else None
+        )
 
         result = run_portfolio_backtest(
             market_data,
-            tickers=tickers,
+            tickers=available_tickers,
             allocation_weights=allocation_weights,
             timeframe=request.timeframe,
             initial_capital=request.initial_capital,
@@ -134,11 +219,14 @@ def _run_backtest_request(
             tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
             include_buy_and_hold=request.include_buy_and_hold,
             generate_plots=request.generate_plots,
+            rank_metadata=rank_metadata,
         )
         overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"
         response = {
             "ticker": anchor_ticker,
-            "tickers": tickers,
+            "tickers": available_tickers,
+            "mode": "automated",
+            "universe": resolved_universe,
             "allocation_weights": result["allocation_weights"],
             "cash_reserve_pct": result["cash_reserve_pct"],
             "source": overall_source,
@@ -155,6 +243,8 @@ def _run_backtest_request(
             "equity_curve": result["equity_curve"],
             "buy_and_hold": result["buy_and_hold"],
             "trade_log": result["trade_log"],
+            "selected_holdings": result["selected_holdings"],
+            "current_holdings": result["current_holdings"],
             "tuning_summary": result["tuning_summary"],
             "equity_curve_image": result["equity_curve_image"],
         }
@@ -305,6 +395,63 @@ def run_global_backtest(
 ):
     """Run a ticker-agnostic portfolio backtest."""
     return _run_backtest_request(None, request, db)
+
+
+@backtests_router.post("/indicator/run", response_model=IndicatorBacktestRunResponse)
+def run_global_indicator_backtest(
+    request: IndicatorBacktestRunRequest,
+    db: Session = Depends(get_db),
+):
+    """Run a single-symbol indicator-lab backtest."""
+    ticker = request.ticker.strip().upper()
+    if not ticker:
+        raise HTTPException(status_code=400, detail="Provide one ticker for the indicator backtest.")
+
+    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
+    request_dump = request.model_dump(mode="json")
+    request_dump["ticker"] = ticker
+    cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
+    cache_key = f"backtest_indicator:v1:{ticker}:{cache_suffix}"
+
+    cached = cache_service.get(cache_key)
+    if cached:
+        return {**cached, "cached": True}
+
+    try:
+        market_data, source, warnings = load_backtest_market_data(db, ticker, start, end)
+        market_data = _resample_market_data(market_data, request.timeframe)
+        result = run_indicator_backtest(
+            market_data,
+            request.indicators,
+            request.atr_gate,
+            long_threshold=request.long_threshold,
+            short_threshold=request.short_threshold,
+            exec_lag=request.exec_lag,
+            tc_bps=request.tc_bps,
+            allow_position_hold=request.allow_position_hold,
+            generate_plots=request.generate_plots,
+            generate_roc=request.generate_roc,
+        )
+        response = {
+            "ticker": ticker,
+            "mode": "indicator",
+            "source": source,
+            "cached": False,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "timeframe": request.timeframe,
+            "warnings": warnings,
+            **result,
+        }
+        cache_service.set(cache_key, response, ttl=3600)
+        return response
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"Indicator backtest run error for {ticker}: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to run indicator backtest")
 
 
 @router.post("/{ticker}/ml-features")

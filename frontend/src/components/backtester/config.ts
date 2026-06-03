@@ -457,6 +457,27 @@ export const PORTFOLIO_STRATEGIES = STRATEGIES.filter((strategy) =>
   PORTFOLIO_STRATEGY_FAMILIES.includes(strategy.family),
 );
 
+export const INDICATOR_STRATEGY_FAMILIES: BacktestStrategyFamily[] = [
+  'trend_following',
+  'mean_reversion',
+  'momentum_breakout',
+  'oversold_reversal',
+  'golden_cross',
+  'macd_trend',
+  'rsi_trend_filter',
+  'volume_breakout',
+];
+
+export const INDICATOR_STRATEGIES = STRATEGIES.filter((strategy) =>
+  INDICATOR_STRATEGY_FAMILIES.includes(strategy.family),
+);
+
+export const UNIVERSE_OPTIONS: Array<{ value: NonNullable<BacktestRunRequest['universe']>; label: string; helper: string }> = [
+  { value: 'sp500', label: 'S&P 500', helper: 'Ranks and buys constituent stocks, not SPY.' },
+  { value: 'custom', label: 'Custom Basket', helper: 'Ranks only the tickers you enter.' },
+  { value: 'sector_etfs', label: 'Sector ETFs', helper: 'Uses liquid SPDR sector ETFs for rotation strategies.' },
+];
+
 export const EXAMPLE_PRESETS: ExamplePreset[] = [
   {
     label: 'Beginner Trend',
@@ -549,13 +570,15 @@ export const getHoldingDaysMultiplier = (timeframe: BacktestRunRequest['timefram
 };
 
 export function createDefaultRequest(tickers: string[]): BacktestRunRequest {
-  const normalizedTickers = tickers.length ? tickers : ['SPY'];
+  const normalizedTickers = tickers;
   const end = new Date();
   const start = new Date(end);
   start.setFullYear(end.getFullYear() - 5);
   return {
     start_date: toInputDate(start),
     end_date: toInputDate(end),
+    mode: 'automated',
+    universe: normalizedTickers.length ? 'custom' : 'sp500',
     tickers: normalizedTickers,
     allocation_weights: buildEqualWeights(normalizedTickers),
     timeframe: '1d',

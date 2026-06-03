@@ -5,7 +5,6 @@ from typing import Dict, Iterable, Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score, roc_curve
 from ta.momentum import (
     AwesomeOscillatorIndicator,
     ROCIndicator,
@@ -24,6 +23,12 @@ from ta.volume import (
 
 from app.backtests.core import apply_signals, find_close_col, prepare_returns, summarize
 from app.backtests.plots import generate_equity_curve_plot, generate_roc_curve_plot
+
+try:
+    from sklearn.metrics import roc_auc_score, roc_curve
+except ImportError:
+    roc_auc_score = None
+    roc_curve = None
 
 
 INDICATOR_DEFAULTS: Dict[str, Dict[str, object]] = {
@@ -156,6 +161,9 @@ def score_to_signal(score: pd.Series, *, long_thr: float = 0.5, short_thr: float
 
 
 def _compute_roc_auc(df: pd.DataFrame, score: pd.Series) -> Tuple[float | None, str | None]:
+    if roc_auc_score is None or roc_curve is None:
+        return None, None
+
     if "Forward_Return_1d" not in df.columns:
         return None, None
 

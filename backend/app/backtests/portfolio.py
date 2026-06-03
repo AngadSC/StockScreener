@@ -259,9 +259,17 @@ def _select_ranked_tickers(
     prepared_frames: Dict[str, pd.DataFrame],
     current_date: pd.Timestamp,
     params: Dict[str, Any],
+    *,
+    family: str,
+    rank_metadata: Dict[str, Dict[str, Any]] | None = None,
 ) -> List[str]:
     top_n = max(1, _coerce_int(params.get("top_n"), 10))
     rows: List[Tuple[str, float]] = []
+    market_caps = {
+        ticker: float(data["market_cap"])
+        for ticker, data in (rank_metadata or {}).items()
+        if data.get("market_cap") is not None and float(data.get("market_cap") or 0) > 0
+    }
     for ticker, frame in prepared_frames.items():
         if current_date not in frame.index:
             continue
@@ -271,8 +279,39 @@ def _select_ranked_tickers(
         score = row.get("rank_score")
         if score is None or pd.isna(score):
             continue
+        if family == "leaders_carry_everything" and market_caps:
+            max_market_cap = max(market_caps.values()) or 1.0
+            market_cap_score = market_caps.get(ticker, 0.0) / max_market_cap
+            momentum_weight = _coerce_float(params.get("momentum_weight"), 0.25)
+            momentum_score = float(score) if not pd.isna(score) else 0.0
+            score = market_cap_score + (momentum_weight * momentum_score)
         rows.append((ticker, float(score)))
     return [ticker for ticker, _ in sorted(rows, key=lambda item: item[1], reverse=True)[:top_n]]
+
+
+def _position_snapshot(
+    active_positions: Dict[str, Position],
+    last_prices: Dict[str, float],
+    equity: float,
+) -> List[Dict[str, Any]]:
+    if equity <= 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for ticker, position in sorted(active_positions.items()):
+        price = last_prices.get(ticker, position.entry_price)
+        market_value = position.shares * price
+        rows.append(
+            {
+                "ticker": ticker,
+                "shares": _clean_numeric(position.shares),
+                "price": _clean_numeric(price),
+                "market_value": _clean_numeric(market_value),
+                "weight_pct": _clean_numeric((market_value / equity) * 100.0),
+                "entry_date": position.entry_date.strftime("%Y-%m-%d"),
+                "entry_price": _clean_numeric(position.entry_price),
+            }
+        )
+    return rows
 
 
 def _target_weight_for_entry(
@@ -699,6 +738,7 @@ def _run_single_backtest(
     family: str,
     strategy_params: Dict[str, Any],
     risk_controls: Dict[str, Any] | None,
+    rank_metadata: Dict[str, Dict[str, Any]] | None,
     include_buy_and_hold: bool,
     generate_plots: bool,
 ) -> Dict[str, Any]:
@@ -722,6 +762,8 @@ def _run_single_backtest(
     active_positions: Dict[str, Position] = {}
     trade_log: List[Dict[str, Any]] = []
     equity_rows: List[Dict[str, Any]] = []
+    selected_holdings: List[Dict[str, Any]] = []
+    current_holdings: List[Dict[str, Any]] = []
     cash = float(initial_capital)
     risk = risk_controls or {}
     buy_and_hold = (
@@ -746,10 +788,18 @@ def _run_single_backtest(
                 last_prices[ticker] = float(frame.loc[current_date, "Close"])
 
         selected_tickers = None
+        is_rebalance = False
         if family in CROSS_SECTIONAL_STRATEGIES:
             rebalance_days = _coerce_int(strategy_params.get("rebalance_days"), 21)
             if _is_rebalance_bar(bar_number, rebalance_days):
-                selected_tickers = _select_ranked_tickers(prepared_frames, current_date, strategy_params)
+                is_rebalance = True
+                selected_tickers = _select_ranked_tickers(
+                    prepared_frames,
+                    current_date,
+                    strategy_params,
+                    family=family,
+                    rank_metadata=rank_metadata,
+                )
         allow_new_entries = family not in CROSS_SECTIONAL_STRATEGIES or selected_tickers is not None
 
         exit_tickers: List[str] = []
@@ -866,6 +916,15 @@ def _run_single_backtest(
 
         market_value = _mark_to_market(active_positions, last_prices)
         equity = cash + market_value
+        current_holdings = _position_snapshot(active_positions, last_prices, equity)
+        if is_rebalance:
+            selected_holdings.append(
+                {
+                    "date": pd.to_datetime(current_date).strftime("%Y-%m-%d"),
+                    "selected": selected_tickers or [],
+                    "holdings": current_holdings,
+                }
+            )
         benchmark_equity = None
         benchmark_drawdown_pct = None
         if buy_and_hold and bar_number < len(buy_and_hold["equity_curve"]):
@@ -951,6 +1010,8 @@ def _run_single_backtest(
         ),
         "buy_and_hold": buy_and_hold,
         "trade_log": [{key: _clean_numeric(value) for key, value in trade.items()} for trade in trade_log],
+        "selected_holdings": selected_holdings,
+        "current_holdings": current_holdings,
         "equity_curve_image": plot,
     }
 
@@ -1046,6 +1107,7 @@ def run_portfolio_backtest(
     tuning: Dict[str, Any] | None,
     include_buy_and_hold: bool,
     generate_plots: bool,
+    rank_metadata: Dict[str, Dict[str, Any]] | None = None,
 ) -> Dict[str, Any]:
     selected_params = dict(strategy_params)
     tuning_summary = None
@@ -1073,6 +1135,7 @@ def run_portfolio_backtest(
                 family=family,
                 strategy_params=params,
                 risk_controls=risk_controls,
+                rank_metadata=rank_metadata,
                 include_buy_and_hold=False,
                 generate_plots=False,
             )
@@ -1117,6 +1180,7 @@ def run_portfolio_backtest(
         family=family,
         strategy_params=selected_params,
         risk_controls=risk_controls,
+        rank_metadata=rank_metadata,
         include_buy_and_hold=include_buy_and_hold,
         generate_plots=generate_plots,
     )

@@ -175,6 +175,8 @@ export interface BacktestTuningConfig {
 export interface BacktestRunRequest {
   start_date: string;
   end_date: string;
+  mode?: 'automated' | 'indicator';
+  universe?: 'sp500' | 'custom' | 'sector_etfs';
   tickers: string[];
   allocation_weights: Record<string, number>;
   timeframe: '1d' | '1wk' | '1mo';
@@ -191,6 +193,8 @@ export interface BacktestRunRequest {
 export interface BacktestRunResponse {
   ticker: string;
   tickers: string[];
+  mode: 'automated' | 'indicator';
+  universe: 'sp500' | 'custom' | 'sector_etfs';
   allocation_weights: Record<string, number>;
   cash_reserve_pct: number;
   source: 'database' | 'yfinance' | 'mixed';
@@ -211,6 +215,12 @@ export interface BacktestRunResponse {
     equity_curve_image?: string | null;
   } | null;
   trade_log: Array<Record<string, string | number | null>>;
+  selected_holdings: Array<{
+    date: string;
+    selected: string[];
+    holdings: Array<Record<string, string | number | null>>;
+  }>;
+  current_holdings: Array<Record<string, string | number | null>>;
   tuning_summary?: {
     enabled: boolean;
     objective: BacktestObjective;
@@ -223,6 +233,40 @@ export interface BacktestRunResponse {
     }>;
   } | null;
   equity_curve_image?: string | null;
+}
+
+export interface IndicatorBacktestRunRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  timeframe: '1d' | '1wk' | '1mo';
+  indicators: Record<string, Record<string, unknown>>;
+  atr_gate?: Record<string, unknown> | null;
+  long_threshold: number;
+  short_threshold: number;
+  exec_lag: number;
+  tc_bps: number;
+  allow_position_hold: boolean;
+  generate_plots: boolean;
+  generate_roc: boolean;
+}
+
+export interface IndicatorBacktestRunResponse {
+  ticker: string;
+  mode: 'indicator';
+  source: 'database' | 'yfinance' | 'mixed';
+  cached: boolean;
+  start_date: string;
+  end_date: string;
+  timeframe: '1d' | '1wk' | '1mo';
+  warnings: string[];
+  stats: Record<string, number>;
+  selected_indicators: string[];
+  equity_curve: Array<Record<string, string | number | null>>;
+  results: Array<Record<string, string | number | null>>;
+  equity_curve_image?: string | null;
+  roc_auc?: number | null;
+  roc_curve_image?: string | null;
 }
 
 export interface ScreenerFilters {

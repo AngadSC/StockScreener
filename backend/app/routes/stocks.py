@@ -6,9 +6,9 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.backtests.data import load_backtest_market_data
+from app.backtests.data import load_backtest_market_data, load_backtest_market_data_batch_db_only
 from app.backtests.indicator_lab import run_indicator_backtest
-from app.backtests.portfolio import _resample_market_data, run_portfolio_backtest
+from app.backtests.portfolio import _resample_market_data, estimate_strategy_min_bars, run_portfolio_backtest
 from app.database.connection import get_db
 from app.database.models import StockFundamental, Ticker
 from app.models.stock import (
@@ -43,6 +43,10 @@ SECTOR_ETF_UNIVERSE = [
     "XLV",
     "XLY",
 ]
+
+DB_ONLY_BACKTEST_UNIVERSES = {"sp500", "sector_etfs"}
+LARGE_UNIVERSE_PLOT_SYMBOL_LIMIT = 50
+SP500_MAX_BACKTEST_DAYS = 1830
 
 
 def _parse_and_validate_date_range(start_date: str, end_date: str, max_days: int) -> tuple:
@@ -154,6 +158,20 @@ def _normalize_backtest_weights(tickers: list[str], allocation_weights: dict[str
     return normalized
 
 
+def _params_for_min_history(request: BacktestRunRequest) -> dict[str, object]:
+    params: dict[str, object] = dict(request.strategy.params or {})
+    if not request.tuning or not request.tuning.enabled:
+        return params
+
+    for key, config in request.tuning.parameter_ranges.items():
+        candidates = list(config.values or [])
+        if config.max is not None:
+            candidates.append(config.max)
+        if candidates:
+            params[key] = max(candidates)
+    return params
+
+
 def _run_backtest_request(
     primary_ticker: str | None,
     request: BacktestRunRequest,
@@ -166,13 +184,26 @@ def _run_backtest_request(
     anchor_ticker = (primary_ticker or tickers[0]).upper()
     allocation_weights = _normalize_backtest_weights(tickers, request.allocation_weights if resolved_universe == "custom" else {})
 
-    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=3650)
+    max_days = SP500_MAX_BACKTEST_DAYS if resolved_universe == "sp500" else 3650
+    start, end = _parse_and_validate_date_range(request.start_date, request.end_date, max_days=max_days)
+    min_required_bars = estimate_strategy_min_bars(
+        request.strategy.family,
+        _params_for_min_history(request),
+        request.timeframe,
+    )
+    generate_plots = request.generate_plots
+    if generate_plots and (resolved_universe == "sp500" or len(tickers) > LARGE_UNIVERSE_PLOT_SYMBOL_LIMIT):
+        generate_plots = False
+        warnings.append("Server-side plot image disabled for large universe run; frontend chart uses equity curve data.")
+
     request_dump = request.model_dump(mode="json")
     request_dump["universe"] = resolved_universe
     request_dump["tickers"] = tickers
     request_dump["allocation_weights"] = allocation_weights
+    request_dump["effective_generate_plots"] = generate_plots
+    request_dump["min_required_bars"] = min_required_bars
     cache_suffix = hashlib.sha256(json.dumps(request_dump, sort_keys=True).encode("utf-8")).hexdigest()
-    cache_key = f"backtest_run:v4:{anchor_ticker}:{cache_suffix}"
+    cache_key = f"backtest_run:v5:{anchor_ticker}:{cache_suffix}"
 
     cached = cache_service.get(cache_key)
     if cached:
@@ -184,21 +215,38 @@ def _run_backtest_request(
     try:
         market_data: dict[str, pd.DataFrame] = {}
         data_sources: dict[str, str] = {}
-        for symbol in tickers:
-            try:
-                symbol_data, source, symbol_warnings = load_backtest_market_data(db, symbol, start, end)
-                market_data[symbol] = symbol_data
-                data_sources[symbol] = source
-                warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
-            except ValueError as exc:
-                if resolved_universe == "custom":
+        if resolved_universe in DB_ONLY_BACKTEST_UNIVERSES:
+            market_data, data_sources, loader_warnings = load_backtest_market_data_batch_db_only(
+                db,
+                tickers,
+                start,
+                end,
+                min_required_bars=min_required_bars,
+            )
+            warnings.extend(loader_warnings)
+        else:
+            for symbol in tickers:
+                try:
+                    symbol_data, source, symbol_warnings = load_backtest_market_data(
+                        db,
+                        symbol,
+                        start,
+                        end,
+                        min_required_bars=min_required_bars,
+                    )
+                    market_data[symbol] = symbol_data
+                    data_sources[symbol] = source
+                    warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
+                except ValueError:
                     raise
-                warnings.append(f"{symbol}: {exc}")
 
         if not market_data:
             raise ValueError("No historical data was available for any ticker in the selected universe.")
 
         available_tickers = [symbol for symbol in tickers if symbol in market_data]
+        if request.generate_plots and generate_plots and len(available_tickers) > LARGE_UNIVERSE_PLOT_SYMBOL_LIMIT:
+            generate_plots = False
+            warnings.append("Server-side plot image disabled for large universe run; frontend chart uses equity curve data.")
         rank_metadata = (
             _load_rank_metadata(db, available_tickers, warnings)
             if request.strategy.family == "leaders_carry_everything"
@@ -218,7 +266,7 @@ def _run_backtest_request(
             risk_controls=request.risk_controls.model_dump(exclude_none=True) if request.risk_controls else None,
             tuning=request.tuning.model_dump(mode="json") if request.tuning else None,
             include_buy_and_hold=request.include_buy_and_hold,
-            generate_plots=request.generate_plots,
+            generate_plots=generate_plots,
             rank_metadata=rank_metadata,
         )
         overall_source = next(iter(data_sources.values())) if len(set(data_sources.values())) == 1 else "mixed"

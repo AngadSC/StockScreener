@@ -96,6 +96,36 @@ CROSS_SECTIONAL_STRATEGIES = {
     "relative_strength",
 }
 
+LOOKBACK_PARAM_KEYS: Dict[str, Tuple[str, ...]] = {
+    "trend_following": ("fast_ema", "slow_ema"),
+    "mean_reversion": ("window",),
+    "momentum_breakout": ("breakout_lookback", "exit_lookback"),
+    "oversold_reversal": ("rsi_period",),
+    "moving_average_pullback": ("trend_ma", "pullback_ma"),
+    "volume_breakout": ("breakout_lookback", "exit_lookback", "volume_window"),
+    "golden_cross": ("fast_sma", "slow_sma"),
+    "macd_trend": ("fast_ema", "slow_ema", "signal_period"),
+    "rsi_trend_filter": ("trend_ma", "rsi_period"),
+    "leaders_carry_everything": ("momentum_window", "exit_ma"),
+    "price_momentum": ("momentum_window", "exit_ma"),
+    "sector_rotation_momentum": ("rotation_window",),
+    "sector_momentum": ("rotation_window",),
+    "earnings_momentum": ("momentum_window", "volume_window"),
+    "mean_reversion_extremes": ("peak_lookback",),
+    "extreme_reversal": ("peak_lookback",),
+    "gap_fill_reflex": (),
+    "gap_fill": (),
+    "losers_keep_losing": ("momentum_window", "trend_window"),
+    "momentum_filter": ("momentum_window", "trend_window"),
+    "volatility_regimes": ("trend_ma",),
+    "volatility_regime": ("trend_ma",),
+    "overnight_intraday_edge": ("lookback",),
+    "overnight_edge": ("lookback",),
+    "index_drag_problem": ("lookback",),
+    "relative_strength": ("lookback",),
+    "crowding_risk": ("momentum_window", "volume_window", "volatility_window"),
+}
+
 
 @dataclass
 class Position:
@@ -120,6 +150,31 @@ def _coerce_float(value: Any, default: float) -> float:
         return float(value)
     except (TypeError, ValueError):
         return float(default)
+
+
+def estimate_strategy_min_bars(
+    family: str,
+    params: Dict[str, Any] | None,
+    timeframe: str = "1d",
+    *,
+    buffer: int = 20,
+) -> int:
+    defaults = STRATEGY_DEFAULTS.get(family, {})
+    merged = {**defaults, **(params or {})}
+    lookbacks: list[int] = []
+    for key in LOOKBACK_PARAM_KEYS.get(family, ()):
+        default = defaults.get(key, 1)
+        value = _coerce_int(merged.get(key), default)
+        if family == "crowding_risk" and key == "volatility_window":
+            value *= 2
+        lookbacks.append(max(1, value))
+
+    required = (max(lookbacks) if lookbacks else 2) + buffer
+    if timeframe == "1wk":
+        return required * 5
+    if timeframe == "1mo":
+        return required * 21
+    return required
 
 
 def _clean_numeric(value: Any) -> Any:

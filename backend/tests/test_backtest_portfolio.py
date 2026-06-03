@@ -1,13 +1,20 @@
 from __future__ import annotations
 
 import math
+from datetime import date
 
 import numpy as np
 import pandas as pd
+import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
+from app.backtests.data import load_backtest_market_data_batch_db_only
 from app.backtests.portfolio import run_portfolio_backtest
+from app.database.models import DailyOHLCV, Ticker
 from app.models.stock import BacktestRunRequest
 from app.routes import stocks as stocks_route
+from app.utils.market_calendar import get_trading_days_between
 
 
 def _sample_market_data(seed: int = 7) -> pd.DataFrame:
@@ -32,6 +39,45 @@ def _sample_market_data(seed: int = 7) -> pd.DataFrame:
         },
         index=dates,
     )
+
+
+@pytest.fixture
+def sqlite_db() -> Session:
+    engine = create_engine("sqlite:///:memory:")
+    Ticker.__table__.create(engine)
+    DailyOHLCV.__table__.create(engine)
+    TestingSessionLocal = sessionmaker(bind=engine)
+
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+        engine.dispose()
+
+
+def _seed_ticker(db: Session, symbol: str, ticker_id: int) -> Ticker:
+    ticker = Ticker(id=ticker_id, symbol=symbol, name=symbol, exchange="NASDAQ")
+    db.add(ticker)
+    db.commit()
+    return ticker
+
+
+def _seed_candles(db: Session, ticker: Ticker, days: list[date]) -> None:
+    for index, candle_date in enumerate(days):
+        close = 100.0 + index
+        db.add(
+            DailyOHLCV(
+                ticker_id=ticker.id,
+                date=candle_date,
+                open=close - 1.0,
+                high=close + 1.0,
+                low=close - 2.0,
+                close=close,
+                volume=1_000_000 + index,
+            )
+        )
+    db.commit()
 
 
 def test_allocation_weights_fill_missing_and_add_benchmark_curve():
@@ -147,10 +193,22 @@ def test_automated_sp500_universe_expands_server_side_and_does_not_buy_spy_only(
     monkeypatch.setattr(stocks_route.cache_service, "get", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(stocks_route.cache_service, "set", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(stocks_route, "get_sp500_tickers", lambda: universe)
+
+    batch_calls = []
+
+    def fake_batch_loader(_db, symbols, _start, _end, *, min_required_bars):
+        batch_calls.append((symbols, min_required_bars))
+        return market_data, {symbol: "database" for symbol in symbols}, []
+
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data_batch_db_only",
+        fake_batch_loader,
+    )
     monkeypatch.setattr(
         stocks_route,
         "load_backtest_market_data",
-        lambda _db, symbol, _start, _end: (market_data[symbol], "database", []),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("single-symbol fallback should not run")),
     )
     monkeypatch.setattr(
         stocks_route,
@@ -183,6 +241,7 @@ def test_automated_sp500_universe_expands_server_side_and_does_not_buy_spy_only(
     assert result["tickers"] != ["SPY"]
     assert result["current_holdings"]
     assert {holding["ticker"] for holding in result["current_holdings"]} <= set(universe)
+    assert batch_calls and batch_calls[0][0] == universe
 
 
 def test_leaders_strategy_top_n_caps_active_holdings_per_rebalance():
@@ -218,7 +277,12 @@ def test_custom_basket_request_still_uses_user_supplied_tickers(monkeypatch):
     monkeypatch.setattr(
         stocks_route,
         "load_backtest_market_data",
-        lambda _db, symbol, _start, _end: (market_data[symbol], "database", []),
+        lambda _db, symbol, _start, _end, **_kwargs: (market_data[symbol], "database", []),
+    )
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data_batch_db_only",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("custom baskets should use DB-first fallback loader")),
     )
 
     result = stocks_route._run_backtest_request(
@@ -237,6 +301,82 @@ def test_custom_basket_request_still_uses_user_supplied_tickers(monkeypatch):
 
     assert result["universe"] == "custom"
     assert result["tickers"] == ["AAPL", "MSFT"]
+
+
+def test_large_sp500_run_disables_plot_image_but_keeps_equity_curve(monkeypatch):
+    universe = [f"T{i:02d}" for i in range(51)]
+    market_data = {symbol: _sample_market_data(index + 130) for index, symbol in enumerate(universe)}
+
+    monkeypatch.setattr(stocks_route.cache_service, "get", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route.cache_service, "set", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(stocks_route, "get_sp500_tickers", lambda: universe)
+    monkeypatch.setattr(
+        stocks_route,
+        "load_backtest_market_data_batch_db_only",
+        lambda _db, symbols, _start, _end, **_kwargs: (
+            {symbol: market_data[symbol] for symbol in symbols},
+            {symbol: "database" for symbol in symbols},
+            [],
+        ),
+    )
+
+    result = stocks_route._run_backtest_request(
+        None,
+        BacktestRunRequest(
+            start_date="2021-01-01",
+            end_date="2021-12-31",
+            universe="sp500",
+            strategy={"family": "trend_following", "params": {"fast_ema": 5, "slow_ema": 10}},
+            include_buy_and_hold=False,
+            generate_plots=True,
+        ),
+        db=None,
+    )
+
+    assert result["equity_curve"]
+    assert result["equity_curve_image"] is None
+    assert "Server-side plot image disabled for large universe run; frontend chart uses equity curve data." in result["warnings"]
+
+
+def test_batch_db_loader_includes_ticker_with_small_missing_day_count(sqlite_db: Session):
+    ticker = _seed_ticker(sqlite_db, "AAPL", 1)
+    days = get_trading_days_between(date(2021, 1, 4), date(2021, 12, 31))
+    missing_days = set(days[20:25])
+    _seed_candles(sqlite_db, ticker, [day for day in days if day not in missing_days])
+
+    market_data, data_sources, warnings = load_backtest_market_data_batch_db_only(
+        sqlite_db,
+        ["AAPL"],
+        date(2021, 1, 4),
+        date(2021, 12, 31),
+        min_required_bars=50,
+    )
+
+    assert "AAPL" in market_data
+    assert data_sources["AAPL"] == "database"
+    assert len(market_data["AAPL"]) == len(days) - len(missing_days)
+    assert warnings == []
+
+
+def test_batch_db_loader_skips_ticker_with_too_little_history(sqlite_db: Session):
+    good = _seed_ticker(sqlite_db, "GOOD", 1)
+    short = _seed_ticker(sqlite_db, "SHORT", 2)
+    days = get_trading_days_between(date(2021, 1, 4), date(2021, 12, 31))
+    _seed_candles(sqlite_db, good, days)
+    _seed_candles(sqlite_db, short, days[:10])
+
+    market_data, data_sources, warnings = load_backtest_market_data_batch_db_only(
+        sqlite_db,
+        ["GOOD", "SHORT"],
+        date(2021, 1, 4),
+        date(2021, 12, 31),
+        min_required_bars=50,
+    )
+
+    assert set(market_data) == {"GOOD"}
+    assert data_sources == {"GOOD": "database"}
+    assert "Skipped 1 symbols with insufficient DB history." in warnings
+    assert any("SHORT" in warning for warning in warnings)
 
 
 def test_indicator_strategy_endpoint_executes(monkeypatch):

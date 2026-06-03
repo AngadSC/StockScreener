@@ -7,7 +7,7 @@ export default function PageTransition({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div key={pathname} className="page-transition">
+    <div key={pathname} className="page-enter">
       {children}
     </div>
   );

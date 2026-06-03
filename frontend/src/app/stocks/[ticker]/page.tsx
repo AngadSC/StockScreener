@@ -262,13 +262,20 @@ export default function StockDetailPage({ params }: PageProps) {
 
   const companyName = getCompanyName(stock);
   const changePercent = getChangePercent(stock);
-  const changeAccent = getChangeAccent(changePercent);
   const heroStats = [
     { label: 'Market Cap', value: formatMarketCap(stock.market_cap) },
     { label: 'Volume', value: formatVolume(stock.volume) },
+    { label: 'P/E', value: stock.pe_ratio != null ? stock.pe_ratio.toFixed(1) : 'N/A' },
     { label: 'Beta', value: stock.beta != null ? stock.beta.toFixed(2) : 'N/A' },
+    { label: 'Dividend', value: stock.dividend_yield != null ? formatPercent(stock.dividend_yield, { mode: 'auto' }) : 'N/A' },
     { label: '52W Range', value: get52WeekRange(stock) },
   ];
+  const rangeLow = stock.fifty_two_week_low ?? null;
+  const rangeHigh = stock.fifty_two_week_high ?? null;
+  const rangePosition =
+    rangeLow != null && rangeHigh != null && stock.current_price != null && rangeHigh > rangeLow
+      ? Math.min(100, Math.max(0, ((stock.current_price - rangeLow) / (rangeHigh - rangeLow)) * 100))
+      : 50;
 
   return (
     <div className="container-custom py-8 md:py-10">
@@ -289,61 +296,69 @@ export default function StockDetailPage({ params }: PageProps) {
         </nav>
 
         <div className="space-y-4">
-          <section className="relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-6 shadow-[var(--shadow-sm)] md:p-8">
+          <section className="hud relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[var(--shadow-2)] md:p-8">
+            <span className="hud-c1" />
+            <span className="hud-c2" />
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-y-0 left-0 w-[40%]"
               style={{
                 background:
-                  'linear-gradient(90deg, rgb(var(--accent-rgb) / 0.08) 0%, rgb(var(--accent-rgb) / 0.03) 22%, rgb(var(--accent-rgb) / 0) 40%)',
+                  'linear-gradient(90deg, rgba(91,156,214,0.08) 0%, rgba(174,185,199,0.04) 24%, transparent 48%)',
               }}
             />
 
             <div className="relative z-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.92fr)] xl:items-center">
               <div className="min-w-0">
-                <div className="eyebrow text-[var(--text-tertiary)]">Equity</div>
-                <h1 className="heading-xl mt-3 text-[var(--text-primary)]">{ticker}</h1>
-                <div className="heading-sm mt-2 text-[var(--text-secondary)]">{companyName}</div>
+                <div className="smallcap">
+                  Markets / {stock.sector || 'Sector'} / {ticker}
+                </div>
+                <h1 className="mt-3 text-[clamp(64px,8vw,96px)] leading-[0.9]">{ticker}</h1>
+                <div className="serif mt-3 text-2xl italic text-[var(--ink-2)]">{companyName}</div>
+                <div className="smallcap-low mt-2">{stock.industry || 'Equity research profile'}</div>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Button asChild size="lg">
-                    <Link href={`/backtester?tickers=${ticker}`}>Backtest This Stock</Link>
+                    <Link href="/ai-analyzer">AI analysis</Link>
                   </Button>
                   <Button asChild size="lg" variant="ghost">
-                    <Link href={`/screener?search=${ticker}`}>Compare</Link>
+                    <Link href={`/backtester?tickers=${ticker}`}>Backtest</Link>
                   </Button>
                 </div>
               </div>
 
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="heading-xl tabular-nums text-[var(--text-primary)]">
+                  <div className="readout text-5xl text-[var(--text-primary)]">
                     {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
                   </div>
                   {changePercent !== null ? (
                     <div
-                      className={cn(
-                        'inline-flex rounded-[var(--radius-pill)] px-3 py-1 text-sm font-medium',
-                        changeAccent.pillClass
-                      )}
+                      className={cn('chip text-sm', changePercent >= 0 ? 'chip-up' : 'chip-dn')}
                     >
                       {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                     </div>
                   ) : null}
                 </div>
 
-                <div className="flex flex-col divide-y divide-[var(--border-subtle)] overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.01)] md:flex-row md:divide-x md:divide-y-0">
+                <div>
+                  <div className="mb-2 flex justify-between smallcap-low">
+                    <span>{rangeLow != null ? formatCurrency(rangeLow) : '52W low'}</span>
+                    <span>{get52WeekRange(stock)}</span>
+                    <span>{rangeHigh != null ? formatCurrency(rangeHigh) : '52W high'}</span>
+                  </div>
+                  <div className="relative h-2 rounded-full bg-[linear-gradient(90deg,var(--dn),var(--forest),var(--up))]">
+                    <span
+                      className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-[var(--surface)] bg-[var(--ink)] shadow-[var(--shadow-2)]"
+                      style={{ left: `${rangePosition}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[rgba(216,210,192,0.015)] md:grid-cols-3">
                   {heroStats.map((stat) => (
-                    <div key={stat.label} className="flex-1 px-4 py-4">
-                      <div
-                        className="uppercase tracking-[0.1em] text-[var(--text-tertiary)]"
-                        style={{ font: 'var(--caption)' }}
-                      >
-                        {stat.label}
-                      </div>
-                      <div
-                        className="mt-2 tabular-nums text-[var(--text-primary)]"
-                        style={{ font: 'var(--heading-sm)' }}
-                      >
+                    <div key={stat.label} className="border-b border-r border-[var(--line)] px-4 py-4 last:border-r-0">
+                      <div className="smallcap-low">{stat.label}</div>
+                      <div className="serif-num mt-2 text-lg text-[var(--text-primary)]">
                         {stat.value}
                       </div>
                     </div>
@@ -356,7 +371,9 @@ export default function StockDetailPage({ params }: PageProps) {
           <TradingViewChart ticker={ticker} />
         </div>
 
-        <section className="deco-panel p-6 md:p-7">
+        <section className="deco-panel hud p-6 md:p-7">
+          <span className="hud-c1" />
+          <span className="hud-c2" />
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="eyebrow">Fundamentals</div>

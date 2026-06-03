@@ -75,23 +75,25 @@ export default function AiAnalyzerPage() {
 
   return (
     <div className="container-custom py-8 md:py-10">
-      <div className="mx-auto max-w-4xl space-y-6">
-        <section className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+      <div className="mx-auto max-w-5xl space-y-7">
+        <section className="flex flex-col gap-4 border-b border-t border-[var(--line)] py-7 md:flex-row md:items-start md:justify-between">
           <div className="space-y-4">
-            <div className="eyebrow">Pro Research</div>
-            <h1 className="heading-xl text-[var(--text-primary)]">AI Swing Analyzer</h1>
+            <div className="live-dot">AI research desk</div>
+            <h1 className="heading-xl text-[var(--text-primary)]">AI Analyst</h1>
             <p className="max-w-[56ch] text-sm leading-6 text-[var(--text-secondary)]">
-              Generate a setup-focused swing report for a ticker using market context, news, and
-              technical structure.
+              Ask for a setup-focused thesis using market context, news, fundamentals, and technical
+              structure.
             </p>
           </div>
           <ManageSubscriptionButton userTier={userTier} />
         </section>
 
-        <section className="deco-panel p-5 md:p-6">
+        <section className="glass hud hud-blue p-5 md:p-6">
+          <span className="hud-c1" />
+          <span className="hud-c2" />
           <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
-              <div className="flex h-12 items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-4 text-sm transition-[border-color,box-shadow] duration-300 ease-out focus-within:border-[var(--accent)] focus-within:shadow-[0_0_0_3px_rgba(108,92,231,0.14)]">
+              <div className="flex h-12 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 text-sm shadow-[var(--shadow-1)] transition-[border-color,box-shadow] duration-300 ease-out focus-within:border-[var(--sapphire)] focus-within:shadow-[0_0_0_3px_var(--sapphire-soft),var(--shadow-1)]">
                 <Search className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" aria-hidden="true" />
                 <input
                   aria-label="Ticker symbol"
@@ -106,7 +108,7 @@ export default function AiAnalyzerPage() {
                   onFocus={() => {
                     if (suggestions.length > 0) setSuggestOpen(true);
                   }}
-                  placeholder="Search ticker or company"
+                  placeholder="Ask for a ticker thesis or company brief"
                   type="text"
                   value={tickerInput}
                 />
@@ -158,6 +160,13 @@ export default function AiAnalyzerPage() {
               Analyze
             </Button>
           </form>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {['Find a bullish thesis', 'Compare semiconductors', 'Screen resilient dividends'].map((suggestion) => (
+              <button key={suggestion} type="button" className="chip suggest-chip italic">
+                {suggestion}
+              </button>
+            ))}
+          </div>
         </section>
 
         {isLoading ? (
@@ -211,7 +220,11 @@ export default function AiAnalyzerPage() {
         ) : null}
 
         {canAnalyze && submittedTicker ? (
-          <AIReportCard key={submittedTicker} ticker={submittedTicker} userTier={userTier} />
+          <div className="card-ivory hud p-1">
+            <span className="hud-c1" />
+            <span className="hud-c2" />
+            <AIReportCard key={submittedTicker} ticker={submittedTicker} userTier={userTier} />
+          </div>
         ) : null}
       </div>
     </div>

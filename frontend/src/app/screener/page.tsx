@@ -2,12 +2,13 @@
 
 import { Suspense, useDeferredValue, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, Columns3 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
 import { screenerAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import type { ScreenerFilters } from '@/types/stock';
 
 function getDefaultFilters(search?: string): ScreenerFilters {
@@ -42,6 +43,7 @@ function ScreenerPageContent() {
   });
 
   const currentPage = Math.floor((filters.skip ?? 0) / (filters.limit ?? 50)) + 1;
+  const savedViews = ['Quality', 'Deep value', 'Growth', 'Dividend', 'Mega tech'];
 
   const handleFilterChange = (nextFilters: ScreenerFilters) => {
     setFilters(nextFilters);
@@ -70,18 +72,35 @@ function ScreenerPageContent() {
 
   return (
     <div className="container-custom py-8">
-      <section className="deco-panel mb-6 p-6 sm:p-8">
+      <section className="mb-7 border-b border-t border-[var(--line)] py-7">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">
-            <div className="deco-kicker">Workspace</div>
+            <div className="live-dot">Screening desk</div>
             <h1 className="mt-3">Screener</h1>
             <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
-              Filter the market from the left rail and review the live table without leaving the
-              page context.
+              Build a live market cut with valuation, quality, liquidity, and sector controls.
             </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {savedViews.map((view, index) => (
+                <button
+                  key={view}
+                  type="button"
+                  className={cn(
+                    'chip transition-[background,border-color,color]',
+                    index === 0
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--ivory)]'
+                      : 'hover:border-[var(--forest-line)] hover:text-[var(--ink)]'
+                  )}
+                >
+                  {view}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex min-w-[220px] items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] px-4 py-4">
+          <div className="hud flex min-w-[240px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <span className="hud-c1" />
+            <span className="hud-c2" />
             <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
               <BarChart3 className="h-5 w-5" />
             </div>
@@ -97,9 +116,11 @@ function ScreenerPageContent() {
         </div>
       </section>
 
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-        <aside className="lg:w-[280px] lg:flex-none">
-          <div className="deco-scroll flex flex-col border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] lg:sticky lg:top-24 lg:h-[calc(100vh-8.5rem)] lg:overflow-hidden">
+      <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+        <aside>
+          <div className="deco-scroll hud flex flex-col overflow-hidden border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+            <span className="hud-c1" />
+            <span className="hud-c2" />
             <FilterPanel
               filters={filters}
               isFetching={isFetching}
@@ -110,6 +131,12 @@ function ScreenerPageContent() {
         </aside>
 
         <div className="min-w-0 flex-1">
+          <div className="mb-3 flex justify-end">
+            <button type="button" className="btn btn-quiet btn-sm inline-flex items-center">
+              <Columns3 className="h-4 w-4" />
+              Columns
+            </button>
+          </div>
           <StockTable
             stocks={data?.results ?? []}
             isLoading={isLoading || isFetching}

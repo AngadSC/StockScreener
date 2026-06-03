@@ -27,10 +27,10 @@ const config = {
   	},
   		extend: {
   			fontFamily: {
-				display: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-				body: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
-  				mono: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
-  				terminal: ['"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+				display: ['Spectral', '"Times New Roman"', 'serif'],
+				body: ['Geist', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+  				mono: ['"Geist Mono"', '"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
+  				terminal: ['"Geist Mono"', '"IBM Plex Mono"', '"JetBrains Mono"', '"Fira Code"', '"Courier New"', 'monospace'],
   			},
   		colors: {
 			border: 'rgb(var(--border-default-rgb) / <alpha-value>)',

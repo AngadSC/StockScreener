@@ -42,11 +42,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         </noscript>
         <ReactQueryProvider>
           <AuthProvider>
-            <div className="flex min-h-screen flex-col">
+            <div className="flex min-h-screen flex-col lg:pl-[248px]">
               <Suspense fallback={<div className="h-20 border-b border-border bg-card" />}>
                 <Header />
               </Suspense>
-              <div className="flex-1">
+              <div className="flex-1 lg:border-l lg:border-[var(--line)]">
                 <PageTransition>
                   <main className="min-h-full">{children}</main>
                 </PageTransition>

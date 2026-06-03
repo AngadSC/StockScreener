@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Search,
+  Settings,
   Sparkles,
   Star,
   TrendingUp,
@@ -34,16 +35,20 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { href: '/', label: 'Market', icon: TrendingUp },
+  { href: '/', label: 'Markets', icon: TrendingUp },
   { href: '/screener', label: 'Screener', icon: Search },
-  { href: '/ai-analyzer', label: 'AI Analyzer', icon: Sparkles, proBadge: true },
-  { href: '/backtester', label: 'Backtester', icon: BarChart3 },
   { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
-  { href: '/blog', label: 'Blog', icon: BookOpen },
+  { href: '/ai-analyzer', label: 'AI Analyst', icon: Sparkles, proBadge: true },
+  { href: '/backtester', label: 'Backtester', icon: BarChart3 },
+  { href: '/blog', label: 'Research Log', icon: BookOpen },
 ];
 
 function isNavItemActive(pathname: string, href: string) {
   return pathname === href || (href !== '/' && pathname.startsWith(href));
+}
+
+function openCommandPalette() {
+  window.dispatchEvent(new CustomEvent('qs-open-command-palette'));
 }
 
 export default function Header() {
@@ -85,8 +90,7 @@ export default function Header() {
   }, [pathname]);
 
   useEffect(() => {
-    const query = searchParams.get('search') || '';
-    setSearchQuery(query);
+    setSearchQuery(searchParams.get('search') || '');
   }, [searchParams]);
 
   useEffect(() => {
@@ -154,29 +158,61 @@ export default function Header() {
     }
   };
 
-  const renderNavAffordance = (item: NavItem, mobile = false) => {
-    const showLock = Boolean(item.requiresAuth && !isLoggedIn);
+  const renderSearchForm = (mobile = false) => (
+    <div className={cn('relative', mobile ? 'w-full' : 'w-full')}>
+      <form
+        onSubmit={handleSearchSubmit}
+        className="flex h-10 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm shadow-[var(--shadow-1)] transition-[border-color,box-shadow] duration-300 focus-within:border-[var(--forest)] focus-within:shadow-[0_0_0_3px_var(--forest-soft),var(--shadow-1)]"
+      >
+        <Search className="h-4 w-4 shrink-0 text-[var(--mute)]" aria-hidden="true" />
+        <input
+          aria-label="Search stocks"
+          className="w-full border-none bg-transparent p-0 text-sm text-[var(--ink)] shadow-none outline-none placeholder:text-[var(--whisper)] focus:border-none focus:shadow-none"
+          onBlur={() => {
+            setTimeout(() => setSuggestOpen(false), 150);
+          }}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          onFocus={() => {
+            if (suggestions.length > 0) setSuggestOpen(true);
+          }}
+          placeholder="Ticker or company"
+          type="text"
+          value={searchQuery}
+        />
+      </form>
 
-    return (
-      <>
-        <span>{item.label}</span>
-        {item.proBadge ? (
-          <span className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent-subtle)] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-[var(--accent)]">
-            Pro
-          </span>
-        ) : null}
-        {showLock ? <Lock className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
-        {showLock && !mobile ? (
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute left-1/2 top-[calc(100%+0.75rem)] z-20 w-max max-w-[220px] -translate-x-1/2 translate-y-1 rounded-full border border-[var(--border-default)] bg-[rgba(8,8,14,0.96)] px-3 py-1.5 text-[11px] font-medium text-[var(--text-primary)] opacity-0 shadow-[var(--shadow-md)] transition-[opacity,transform] duration-180 group-hover/watchlist:translate-y-0 group-hover/watchlist:opacity-100"
-          >
-            Sign in to access your Watchlist
-          </span>
-        ) : null}
-      </>
-    );
-  };
+      {suggestOpen ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-[120] overflow-hidden rounded-[16px] border border-[var(--line-2)] bg-[var(--surface)] shadow-[var(--shadow-3)]">
+          <div className="border-b border-[var(--line)] px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--mute)]">
+            {isSuggestLoading ? 'Searching' : 'Quick matches'}
+          </div>
+          <div className="deco-scroll max-h-64 overflow-auto py-1">
+            {!isSuggestLoading && suggestions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-[var(--ink-2)]">No matches found.</div>
+            ) : null}
+            {suggestions.map((item) => (
+              <div
+                key={item.ticker}
+                className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--surface-2)]"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  handleSuggestionSelect(item.ticker);
+                }}
+              >
+                <div className="min-w-0">
+                  <div className="serif-num text-base text-[var(--ink)]">{item.ticker}</div>
+                  <div className="truncate text-sm text-[var(--ink-2)]">
+                    {item.name || 'Company profile'}
+                  </div>
+                </div>
+                <div className="status">Open</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 
   const renderNavLink = (item: NavItem, mobile = false) => {
     const Icon = item.icon;
@@ -189,225 +225,142 @@ export default function Header() {
       <Link
         key={`${mobile ? 'mobile' : 'desktop'}-${item.href}`}
         href={href}
-        data-active={mobile ? undefined : String(isActive)}
-        title={showLock ? 'Sign in to access your Watchlist' : undefined}
         onClick={() => setIsMobileMenuOpen(false)}
         className={cn(
-          mobile
-            ? 'flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-sm font-medium transition-[background,border-color,color] duration-[180ms]'
-            : 'qs-nav-link relative inline-flex h-full items-center gap-2 px-4 text-sm font-medium',
-          mobile &&
-            (isActive
-              ? 'border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]'
-              : 'border-[var(--border-default)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]'),
-          showLock && !mobile && 'group/watchlist'
+          'group relative flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-[13.5px] transition-[background,color] duration-200',
+          isActive
+            ? 'bg-[rgba(216,210,192,0.06)] font-medium text-[var(--ink)]'
+            : 'text-[var(--mute)] hover:bg-[rgba(216,210,192,0.04)] hover:text-[var(--ink)]',
+          !mobile && isActive && 'before:absolute before:left-[-16px] before:top-1/2 before:h-[18px] before:w-[3px] before:-translate-y-1/2 before:rounded-r-[3px] before:bg-[var(--forest)]'
         )}
+        title={showLock ? 'Sign in to access your Watchlist' : undefined}
       >
-        <span className="inline-flex items-center gap-2">
-          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="relative inline-flex items-center gap-1.5">
-            {renderNavAffordance(item, mobile)}
-          </span>
-        </span>
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.5} />
+        <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        {item.proBadge ? <span className="status">Pro</span> : null}
+        {showLock ? <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> : null}
       </Link>
     );
   };
 
-  const renderSearchForm = (mobile = false) => (
-    <div
-      className={cn(
-        'relative',
-        mobile
-          ? 'w-full'
-          : 'hidden w-[160px] shrink-0 transition-[width] duration-300 ease-out focus-within:w-[280px] lg:block'
+  const accountControls = (
+    <div className="grid gap-2">
+      {isLoggedIn ? (
+        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </Button>
+      ) : (
+        <>
+          <Button asChild variant="ghost" className="w-full justify-start">
+            <Link href="/auth/login">
+              <LogIn className="h-4 w-4" />
+              Login
+            </Link>
+          </Button>
+          <Button asChild className="w-full">
+            <Link href="/auth/register">Join Free</Link>
+          </Button>
+        </>
       )}
-    >
-      <form
-        onSubmit={handleSearchSubmit}
-        className="flex h-10 items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-3.5 text-sm transition-[border-color,width] duration-300 ease-out focus-within:border-[var(--accent)]"
-      >
-        <Search className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" aria-hidden="true" />
-        <input
-          type="text"
-          placeholder="Search"
-          className="w-full border-none bg-transparent p-0 text-sm text-[var(--text-primary)] shadow-none outline-none placeholder:text-[var(--text-secondary)] focus:border-none focus:shadow-none"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          onFocus={() => {
-            if (suggestions.length > 0) setSuggestOpen(true);
-          }}
-          onBlur={() => {
-            setTimeout(() => setSuggestOpen(false), 150);
-          }}
-          aria-label="Search stocks"
-        />
-      </form>
-
-      {suggestOpen ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-[110] overflow-hidden rounded-[20px] border border-[var(--border-default)] bg-[var(--bg-surface-1)] shadow-[var(--shadow-lg)]">
-          <div className="border-b border-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--text-secondary)]">
-            {isSuggestLoading ? 'Searching' : 'Quick matches'}
-          </div>
-          <div className="deco-scroll max-h-64 overflow-auto py-1">
-            {!isSuggestLoading && suggestions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">No matches found.</div>
-            ) : null}
-            {suggestions.map((item) => (
-              <div
-                key={item.ticker}
-                className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--accent-subtle)]"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  handleSuggestionSelect(item.ticker);
-                }}
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[var(--text-primary)]">
-                    {item.ticker}
-                  </div>
-                  <div className="truncate text-sm text-[var(--text-secondary)]">
-                    {item.name || 'Company profile'}
-                  </div>
-                </div>
-                <div className="text-xs font-medium text-[var(--accent)]">Open</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 
   return (
-    <header className="sticky top-0 z-[100] border-b border-[var(--border-subtle)] bg-[rgba(8,8,14,0.85)] backdrop-blur-[12px]">
-      <div className="container-custom">
-        <div className="flex min-h-[76px] items-center gap-4">
-          <Link href="/" className="group flex shrink-0 items-center gap-3 py-3">
-            <BrandMark className="transition-transform duration-300 group-hover:scale-[1.03]" />
-            <div className="text-lg font-semibold tracking-[-0.01em] text-[var(--text-primary)] md:text-xl">
-              QuantorSignal
-            </div>
-          </Link>
-
-          <nav className="hidden flex-1 items-stretch justify-center lg:flex">
-            {navItems.map((item) => renderNavLink(item))}
-          </nav>
-
-          <div className="ml-auto hidden items-center gap-4 border-l border-[var(--border-subtle)] pl-5 lg:flex">
-            {renderSearchForm()}
-
-            <div className="flex items-center gap-2 border-l border-[var(--border-subtle)] pl-4">
-              {isLoggedIn ? (
-                <Button variant="ghost" className="h-10 rounded-full px-4" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              ) : (
-                <>
-                  <Button asChild variant="ghost" className="h-10 rounded-full px-4">
-                    <Link href="/auth/login">
-                      <LogIn className="h-4 w-4" />
-                      Login
-                    </Link>
-                  </Button>
-                  <Button asChild className="h-10 rounded-full px-4">
-                    <Link href="/auth/register">Join Free</Link>
-                  </Button>
-                </>
-              )}
-            </div>
+    <>
+      <aside className="fixed inset-y-0 left-0 z-[90] hidden w-[248px] flex-col border-r border-[var(--line)] bg-[rgba(5,4,5,0.88)] px-4 py-5 backdrop-blur-xl lg:flex">
+        <Link href="/" className="group flex items-center gap-3 px-1 py-1">
+          <BrandMark className="transition-transform duration-300 group-hover:scale-[1.03]" />
+          <div className="leading-tight">
+            <div className="serif-tight text-[20px] text-[var(--ink)]">Quantor<span className="italic text-[var(--forest)]">signal</span></div>
+            <div className="smallcap-low mt-0.5">Research terminal</div>
           </div>
+        </Link>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            className="ml-auto rounded-full lg:hidden"
-            aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
-            aria-expanded={isMobileMenuOpen}
-            aria-controls="mobile-navigation"
-            onClick={() => setIsMobileMenuOpen((open) => !open)}
-          >
-            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        <button
+          type="button"
+          onClick={openCommandPalette}
+          className="mt-7 flex w-full items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--ink-2)] shadow-[var(--shadow-1)] transition-[border-color,background,color] hover:border-[var(--line-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+        >
+          <Search className="h-4 w-4" strokeWidth={1.5} />
+          <span className="flex-1">Search</span>
+          <kbd className="kbd">Ctrl K</kbd>
+        </button>
+
+        <nav className="mt-7 grid gap-1.5">{navItems.map((item) => renderNavLink(item))}</nav>
+
+        <div className="flex-1" />
+
+        <div className="hud hud-blue mb-4 rounded-[14px] border border-[var(--line)] bg-[var(--ivory)] p-4 shadow-[var(--shadow-1)]">
+          <span className="hud-c1" />
+          <span className="hud-c2" />
+          <div className="smallcap text-[var(--sapphire)]">Quantor Pro</div>
+          <p className="mt-2 text-sm leading-5 text-[var(--ink-2)]">
+            Unlock AI briefs and faster research workflows.
+          </p>
+          <Button asChild size="sm" className="mt-4 w-full">
+            <Link href="/pricing">View tiers</Link>
           </Button>
         </div>
 
-        {isMobileMenuOpen ? (
-          <div
-            id="mobile-navigation"
-            className="grid gap-4 border-t border-[var(--border-subtle)] py-4 lg:hidden"
-          >
-            {renderSearchForm(true)}
-
-            <nav className="grid gap-2">{navItems.map((item) => renderNavLink(item, true))}</nav>
-
-            <div className="grid gap-2 pt-1">
-              {isLoggedIn ? (
-                <Button variant="ghost" className="w-full justify-center rounded-full" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4" />
-                  Sign Out
-                </Button>
-              ) : (
-                <>
-                  <Button asChild variant="ghost" className="w-full justify-center rounded-full">
-                    <Link href="/auth/login">
-                      <LogIn className="h-4 w-4" />
-                      Login
-                    </Link>
-                  </Button>
-                  <Button asChild className="w-full justify-center rounded-full">
-                    <Link href="/auth/register">Join Free</Link>
-                  </Button>
-                </>
-              )}
+        <div className="border-t border-[var(--line)] pt-4">
+          <div className="mb-3 flex items-center gap-3 rounded-[12px] bg-[rgba(216,210,192,0.03)] px-3 py-2.5">
+            <div className="grid h-8 w-8 place-items-center rounded-full border border-[var(--line-2)] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--ink)]">
+              QS
             </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm text-[var(--ink)]">{isLoggedIn ? 'Workspace' : 'Guest'}</div>
+              <div className="smallcap-low truncate">{userTier ?? 'free'} tier</div>
+            </div>
+            <Settings className="h-4 w-4 text-[var(--mute)]" aria-hidden="true" strokeWidth={1.5} />
           </div>
-        ) : null}
-      </div>
+          {accountControls}
+        </div>
+      </aside>
 
-      <style jsx>{`
-        .qs-nav-link {
-          color: var(--text-secondary);
-          transition: color 180ms ease;
-        }
+      <header className="sticky top-0 z-[100] border-b border-[var(--line)] bg-[rgba(5,4,5,0.88)] backdrop-blur-xl lg:hidden">
+        <div className="container-custom">
+          <div className="flex min-h-[68px] items-center gap-4">
+            <Link href="/" className="flex shrink-0 items-center gap-3">
+              <BrandMark size="sm" />
+              <div className="serif-tight text-[19px] text-[var(--ink)]">
+                Quantor<span className="italic text-[var(--forest)]">signal</span>
+              </div>
+            </Link>
 
-        .qs-nav-link::after {
-          content: '';
-          position: absolute;
-          left: 0;
-          bottom: 0;
-          height: 2px;
-          width: 0;
-          background: var(--accent);
-          transition: width 200ms ease;
-        }
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto"
+              aria-label={isMobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={isMobileMenuOpen}
+              aria-controls="mobile-navigation"
+              onClick={() => setIsMobileMenuOpen((open) => !open)}
+            >
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
 
-        .qs-nav-link:hover {
-          color: var(--text-primary);
-        }
-
-        .qs-nav-link:hover::after {
-          width: 100%;
-        }
-
-        .qs-nav-link[data-active='true'] {
-          color: var(--accent);
-        }
-
-        .qs-nav-link[data-active='true']::after {
-          width: 100%;
-          animation: qs-nav-sweep 300ms ease forwards;
-        }
-
-        @keyframes qs-nav-sweep {
-          from {
-            width: 0;
-          }
-
-          to {
-            width: 100%;
-          }
-        }
-      `}</style>
-    </header>
+          {isMobileMenuOpen ? (
+            <div id="mobile-navigation" className="grid gap-4 border-t border-[var(--line)] py-4">
+              {renderSearchForm(true)}
+              <button
+                type="button"
+                onClick={openCommandPalette}
+                className="flex items-center justify-between rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-sm text-[var(--ink-2)]"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Search className="h-4 w-4" />
+                  Command palette
+                </span>
+                <kbd className="kbd">Ctrl K</kbd>
+              </button>
+              <nav className="grid gap-2">{navItems.map((item) => renderNavLink(item, true))}</nav>
+              {accountControls}
+            </div>
+          ) : null}
+        </div>
+      </header>
+    </>
   );
 }

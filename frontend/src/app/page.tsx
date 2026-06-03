@@ -193,14 +193,16 @@ function FeatureCard({
   return (
     <Link href={href} className="group block">
       <Card
-        className="flex h-full flex-col gap-4 p-5 hover:-translate-y-[2px] hover:border-[var(--accent)] hover:shadow-[0_0_0_1px_var(--accent),0_16px_32px_rgba(91,91,214,0.14)]"
+        className="hud flex h-full flex-col gap-4 p-5 hover:-translate-y-px hover:border-[var(--line-2)] hover:shadow-[var(--shadow-2)]"
         style={{ transition: 'all 200ms ease' }}
       >
+        <span className="hud-c1" />
+        <span className="hud-c2" />
         <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--accent)]">
           <Icon className="h-4 w-4" />
         </div>
         <div className="space-y-2">
-          <h2 className="heading-sm text-[var(--text-primary)]">{title}</h2>
+          <h2 className="heading-md text-[var(--text-primary)]">{title}</h2>
           <p
             className="text-[var(--text-secondary)]"
             style={{ fontSize: '11px', lineHeight: '1.4' }}
@@ -208,7 +210,7 @@ function FeatureCard({
             {description}
           </p>
         </div>
-        <div className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)]">
+        <div className="mt-auto inline-flex items-center gap-2 text-sm font-medium text-[var(--forest)]">
           {cta}
           <ArrowRight className="h-4 w-4 transition-transform duration-[200ms] group-hover:translate-x-1" />
         </div>
@@ -229,7 +231,9 @@ function MarketSection({
   historyByTicker: Map<string, StockPrice[]>;
 }) {
   return (
-    <Card className="p-5 md:p-6">
+    <Card className="hud p-5 md:p-6">
+      <span className="hud-c1" />
+      <span className="hud-c2" />
       <div>
         <div className="eyebrow">{eyebrow}</div>
         <h2 className="heading-md mt-2 text-[var(--text-primary)]">{title}</h2>
@@ -250,7 +254,7 @@ function MarketSection({
             <Link
               key={`${title}-${stock.ticker}`}
               href={`/stocks/${stock.ticker}`}
-              className="group flex items-center justify-between gap-4 rounded-[10px] px-3 py-[10px] hover:bg-[var(--bg-surface-2)]"
+                className="group row-hover flex items-center justify-between gap-4 rounded-[10px] px-3 py-[10px]"
               style={{ transition: 'background 120ms ease' }}
             >
               <div className="min-w-0">
@@ -285,7 +289,7 @@ function MarketSection({
                   {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                 </div>
                 <ChevronRight
-                  className="h-4 w-4 shrink-0 text-[var(--text-tertiary)] group-hover:translate-x-1"
+                  className="row-arrow h-4 w-4 shrink-0"
                   style={{ transition: 'transform 150ms ease' }}
                 />
               </div>
@@ -390,17 +394,43 @@ export default function HomePage() {
       <div className="container-custom py-10 md:py-12">
         <div className="grid gap-8">
           <section>
-            <Card className="p-6 md:p-8 lg:p-10">
-              <div className="grid gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+            <div className="flex flex-col gap-5 border-b border-t border-[var(--line)] py-8 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="live-dot">Live market desk</div>
+                <h1 className="mt-4">Markets</h1>
+                <p className="mt-3 max-w-[58ch] text-base leading-7 text-[var(--ink-2)]">
+                  Screen equities, monitor movers, and move from market signal to research brief in
+                  one terminal.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button asChild>
+                  <Link href="/screener">
+                    <Search className="h-4 w-4" />
+                    Open screener
+                  </Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link href="/ai-analyzer">
+                    <Sparkles className="h-4 w-4" />
+                    View today&apos;s brief
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <Card className="hud p-6 md:p-8 lg:p-10">
+              <span className="hud-c1" />
+              <span className="hud-c2" />
+              <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
                 <div className="flex flex-col justify-center">
-                  <div className="eyebrow">Market Intelligence</div>
-                  <h1 className="heading-xl mt-3 text-[var(--text-primary)]">QuantorSignal</h1>
-                  <p
-                    className="heading-sm max-w-[480px] text-[var(--text-secondary)]"
-                    style={{ marginTop: 'var(--space-3)' }}
-                  >
-                    Screen stocks, analyze fundamentals, and backtest strategies &mdash; in one
-                    workspace.
+                  <div className="eyebrow">Research workspace</div>
+                  <h2 className="heading-xl mt-3 text-[var(--text-primary)]">QuantorSignal</h2>
+                  <p className="mt-3 max-w-[520px] text-base leading-7 text-[var(--text-secondary)]">
+                    An obsidian research desk for screening, fundamentals, AI analysis, and strategy
+                    testing.
                   </p>
                   <div
                     className="flex flex-wrap items-center"
@@ -415,7 +445,7 @@ export default function HomePage() {
                     <Button asChild variant="outline">
                       <Link href="/ai-analyzer">
                         <Sparkles className="h-4 w-4" />
-                        Try AI Swing Analyzer
+                        Open AI Analyst
                         <ArrowRight className="h-4 w-4" />
                       </Link>
                     </Button>
@@ -457,13 +487,15 @@ export default function HomePage() {
 
           {spotlight ? (
             <section>
-              <Card className="p-6 md:p-8">
+              <Card className="hud scan-host p-6 md:p-8">
+                <span className="hud-c1" />
+                <span className="hud-c2" />
                 <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
                   <div className="min-w-0">
                     <div className="eyebrow">Featured Instrument</div>
                     <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <div className="text-4xl font-semibold tracking-[-0.02em] text-[var(--text-primary)]">
+                        <div className="serif-tight text-6xl leading-none text-[var(--text-primary)]">
                           {spotlight.ticker}
                         </div>
                         <div
@@ -474,7 +506,7 @@ export default function HomePage() {
                         </div>
                       </div>
                       <div className="text-left tabular-nums sm:text-right">
-                        <div className="text-3xl font-semibold text-[var(--text-primary)]">
+                        <div className="readout text-4xl text-[var(--text-primary)]">
                           {spotlight.current_price != null
                             ? `$${spotlight.current_price.toFixed(2)}`
                             : 'N/A'}
@@ -494,26 +526,26 @@ export default function HomePage() {
                     </div>
                     <div className="mt-6 grid gap-4 sm:grid-cols-3">
                       <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
-                        <div className="text-xs font-medium text-[var(--text-secondary)]">
+                        <div className="smallcap-low">
                           Market Cap
                         </div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                        <div className="serif-num mt-2 text-2xl text-[var(--text-primary)]">
                           {formatMarketCap(spotlight.market_cap)}
                         </div>
                       </div>
                       <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
-                        <div className="text-xs font-medium text-[var(--text-secondary)]">
+                        <div className="smallcap-low">
                           Volume
                         </div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                        <div className="serif-num mt-2 text-2xl text-[var(--text-primary)]">
                           {formatVolume(spotlight.volume)}
                         </div>
                       </div>
                       <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4">
-                        <div className="text-xs font-medium text-[var(--text-secondary)]">
+                        <div className="smallcap-low">
                           Sector
                         </div>
-                        <div className="mt-2 text-xl font-semibold text-[var(--text-primary)]">
+                        <div className="serif-num mt-2 text-2xl text-[var(--text-primary)]">
                           {spotlight.sector || 'N/A'}
                         </div>
                       </div>
@@ -530,7 +562,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-5">
-                    <div className="text-xs font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
+                    <div className="smallcap">
                       5 Day Trend
                     </div>
                     <div className="mt-5 flex h-[112px] items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(8,8,14,0.36)]">

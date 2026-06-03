@@ -203,25 +203,21 @@ export default function StockTable({
   }
 
   return (
-    <div className="deco-panel overflow-hidden bg-[var(--bg-surface-1)]">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-default)] bg-[var(--bg-surface-1)] px-4 py-4">
+    <div className="deco-panel hud overflow-hidden bg-[var(--bg-surface-1)]">
+      <span className="hud-c1" />
+      <span className="hud-c2" />
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--bg-surface-1)] px-5 py-4">
         <div>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Results</h2>
-          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+          <h2 className="heading-md text-[var(--text-primary)]">Results</h2>
+          <p className="smallcap-low mt-1">
             {total > 0 ? `Showing ${startIndex}-${endIndex} of ${total.toLocaleString()}` : 'Scanning the market'}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+        <div className="live-dot">
           {isLoading ? (
-            <>
-              <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[var(--accent)]" />
-              Updating
-            </>
+            'Updating'
           ) : (
-            <>
-              <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[var(--positive)]" />
-              Live
-            </>
+            'Live'
           )}
         </div>
       </div>
@@ -289,9 +285,9 @@ export default function StockTable({
                         router.push(`/stocks/${stock.ticker}`);
                       }
                     }}
-                    className="group cursor-pointer border-b border-[var(--border-subtle)] text-sm transition-colors duration-[120ms] hover:bg-[var(--bg-surface-2)] focus-visible:bg-[var(--bg-surface-2)] focus-visible:outline-none"
+                    className="group row-hover cursor-pointer border-b border-[var(--border-subtle)] text-sm focus-visible:bg-[var(--bg-surface-2)] focus-visible:outline-none"
                   >
-                    <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
+                    <td className="serif-num px-4 py-3 text-base text-[var(--text-primary)]">
                       {stock.ticker}
                     </td>
                     <td
@@ -300,7 +296,7 @@ export default function StockTable({
                     >
                       {companyName}
                     </td>
-                    <td className="px-4 py-3 text-right font-medium tabular-nums text-[var(--text-primary)]">
+                    <td className="serif-num px-4 py-3 text-right text-[17px] text-[var(--text-primary)]">
                       {stock.current_price !== null && stock.current_price !== undefined
                         ? `$${stock.current_price.toFixed(2)}`
                         : 'N/A'}
@@ -308,10 +304,10 @@ export default function StockTable({
                     <td className="px-4 py-3 text-right">
                       {changePercent !== null && changePercent !== undefined ? (
                         <span
-                          className={`inline-flex rounded-[var(--radius-sm)] px-2 py-0.5 font-medium tabular-nums ${
+                          className={`chip tabular-nums ${
                             isPositive
-                              ? 'bg-[var(--positive-bg)] text-[var(--positive)]'
-                              : 'bg-[var(--negative-bg)] text-[var(--negative)]'
+                              ? 'chip-up'
+                              : 'chip-dn'
                           }`}
                         >
                           {formatPercent(changePercent, { mode: 'auto', withSign: true })}

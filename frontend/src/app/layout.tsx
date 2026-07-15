@@ -9,6 +9,7 @@ import Footer from "@/components/layout/Footer";
 import CommandPalette from "@/components/ui/command-palette";
 import KeyboardShortcuts from "@/components/ui/keyboard-shortcuts";
 import PageTransition from "@/components/layout/PageTransition";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "QuantorSignal",
@@ -57,6 +58,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             <KeyboardShortcuts />
           </AuthProvider>
         </ReactQueryProvider>
+        <Analytics />
       </body>
     </html>
   );

@@ -7,6 +7,8 @@ from app.providers.factory import ProviderFactory
 from app.utils.market_calendar import is_trading_day, get_last_trading_day, get_previous_trading_day
 from app.services.cache import cache_service
 from app.config import settings
+from app.jobs.earnings_sync import sync_earnings_events
+from app.jobs.macro_sync import sync_macro_observations
 from datetime import datetime, timedelta, date as date_type
 import time
 from typing import List
@@ -317,6 +319,19 @@ def scheduled_insider_sync():
     # Lazy import keeps job logic isolated in its own module.
     from app.jobs.insider_sync import run_insider_sync
     run_insider_sync()
+
+@scheduler.scheduled_job('cron', hour=23, minute=15, timezone='America/New_York')
+def scheduled_earnings_sync():
+    """Runs at 11:15 PM ET every night"""
+    print("⏰ Triggering nightly earnings calendar sync...")
+    sync_earnings_events(manual_trigger=False)
+
+
+@scheduler.scheduled_job('cron', hour=6, minute=0, timezone='America/New_York')
+def scheduled_macro_sync():
+    """Runs at 6:00 AM ET every day"""
+    print("⏰ Triggering daily FRED macro sync...")
+    sync_macro_observations(manual_trigger=False)
 
 
 def start_scheduler():

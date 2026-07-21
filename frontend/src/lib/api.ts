@@ -21,6 +21,8 @@ import type {
   InsiderActivityResponse,
   InsiderTickerResponse,
 } from '@/types/insiders';
+import type { EarningsCalendarResponse } from '@/types/earnings';
+import type { MacroDashboardResponse } from '@/types/macro';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -280,7 +282,6 @@ export const screenerAPI = {
 };
 
 // ====================================
-<<<<<<< HEAD
 // MARKET SCANNERS API (free, public -- no auth)
 // ====================================
 
@@ -292,7 +293,23 @@ export const marketAPI = {
 
   getSectors: async (): Promise<MarketSectorsResponse> => {
     const response = await api.get<MarketSectorsResponse>('/market/sectors');
-=======
+    return response.data;
+  },
+
+  getEarningsCalendar: async (days: number = 14): Promise<EarningsCalendarResponse> => {
+    const response = await api.get<EarningsCalendarResponse>('/market/earnings', {
+      params: { days },
+    });
+    return response.data;
+  },
+
+  getMacroDashboard: async (): Promise<MacroDashboardResponse> => {
+    const response = await api.get<MacroDashboardResponse>('/market/macro');
+    return response.data;
+  },
+};
+
+// ====================================
 // INSIDER ACTIVITY API (SEC EDGAR Form 4 - free/public)
 // ====================================
 
@@ -314,7 +331,6 @@ export const insidersAPI = {
       `/market/insider-activity/${encodeURIComponent(ticker.trim().toUpperCase())}`,
       { params: { days } }
     );
->>>>>>> feat/insider-tracker
     return response.data;
   },
 };

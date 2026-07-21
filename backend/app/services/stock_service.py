@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from app.database.models import Ticker, DailyOHLCV, StockFundamental, StockSplit, Dividend
 from app.providers.factory import ProviderFactory
 from app.utils.market_calendar import get_last_trading_day, detect_missing_days
@@ -201,7 +201,7 @@ def get_price_history(
         start_date = end_date - timedelta(days=365)  # Default 1 year
     
     # Check cache (for detailed stock views)
-    cache_key = f"prices:{ticker}:detailed"
+    cache_key = f"prices:{ticker}:detailed:{start_date}:{end_date}"
     if use_cache:
         cached = cache_service.get(cache_key)
         if cached:

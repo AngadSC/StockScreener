@@ -237,8 +237,9 @@ def _run_backtest_request(
                     market_data[symbol] = symbol_data
                     data_sources[symbol] = source
                     warnings.extend([f"{symbol}: {warning}" for warning in symbol_warnings])
-                except ValueError:
-                    raise
+                except ValueError as exc:
+                    warnings.append(f"{symbol}: {exc}")
+                    continue
 
         if not market_data:
             raise ValueError("No historical data was available for any ticker in the selected universe.")
@@ -580,6 +581,8 @@ def get_ml_features(
         ]
 
         df_reset = df_clean[feature_columns].reset_index()
+        if "Date" not in df_reset.columns:
+            df_reset = df_reset.rename(columns={df_reset.columns[0]: "Date"})
         df_reset["Date"] = df_reset["Date"].astype(str)
         data = df_reset.to_dict(orient="records")
 
@@ -643,6 +646,8 @@ def get_intraday_data(
             raise HTTPException(status_code=404, detail=f"No intraday data available for {ticker}")
 
         df_reset = df.reset_index()
+        if "Date" not in df_reset.columns:
+            df_reset = df_reset.rename(columns={df_reset.columns[0]: "Date"})
         df_reset["Date"] = df_reset["Date"].astype(str)
         result = {
             "interval": interval,

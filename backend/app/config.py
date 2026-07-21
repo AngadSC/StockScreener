@@ -125,6 +125,19 @@ class Settings(BaseSettings):
     # When False, the scheduled job exits early (no LLM call, no sends).
     DAILY_BRIEF_ENABLED: bool = True
 
+    # ===== ELITE DAILY WATCHLIST AI DIGEST =====
+    # Feature flag for the morning "Daily Watchlist AI Digest" email sent to
+    # Elite users. When False, the scheduled job logs and exits (an admin can
+    # still force a run for testing). EMAIL_ENABLED is a separate hard gate.
+    WATCHLIST_DIGEST_ENABLED: bool = True
+    # Max number of watchlist tickers analyzed per user's digest (oldest first).
+    # Caps per-user LLM cost; extra tickers are noted as "showing N of M".
+    ELITE_DIGEST_MAX_STOCKS: int = 10
+    # Global safety cap on fresh LLM report generations across a single digest
+    # run. Once exceeded, remaining users get digests built from cached reports
+    # only (no new LLM calls). Cached (already-generated-today) reports are free.
+    DIGEST_MAX_LLM_CALLS_PER_RUN: int = 300
+
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors(cls, v):

@@ -16,6 +16,11 @@ import type { WatchlistResponse } from '@/types/watchlist';
 import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
 import type { EmailPreferences, EmailPreferencesUpdate } from '@/types/email';
 import type { MarketScansResponse, MarketSectorsResponse } from '@/types/market';
+import type {
+  InsiderActivityFilters,
+  InsiderActivityResponse,
+  InsiderTickerResponse,
+} from '@/types/insiders';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -275,6 +280,7 @@ export const screenerAPI = {
 };
 
 // ====================================
+<<<<<<< HEAD
 // MARKET SCANNERS API (free, public -- no auth)
 // ====================================
 
@@ -286,6 +292,29 @@ export const marketAPI = {
 
   getSectors: async (): Promise<MarketSectorsResponse> => {
     const response = await api.get<MarketSectorsResponse>('/market/sectors');
+=======
+// INSIDER ACTIVITY API (SEC EDGAR Form 4 - free/public)
+// ====================================
+
+export const insidersAPI = {
+  getActivity: async (
+    filters: InsiderActivityFilters
+  ): Promise<InsiderActivityResponse> => {
+    const response = await api.get<InsiderActivityResponse>('/market/insider-activity', {
+      params: filters,
+    });
+    return response.data;
+  },
+
+  getForTicker: async (
+    ticker: string,
+    days: number = 90
+  ): Promise<InsiderTickerResponse> => {
+    const response = await api.get<InsiderTickerResponse>(
+      `/market/insider-activity/${encodeURIComponent(ticker.trim().toUpperCase())}`,
+      { params: { days } }
+    );
+>>>>>>> feat/insider-tracker
     return response.data;
   },
 };

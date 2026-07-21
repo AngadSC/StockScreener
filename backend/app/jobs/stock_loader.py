@@ -310,6 +310,14 @@ def scheduled_market_scans_warm():
     from app.jobs.market_scans_job import warm_market_scans_cache
     warm_market_scans_cache()
 
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=18, minute=45, timezone='America/New_York')
+def scheduled_insider_sync():
+    """Runs weekdays at 6:45 PM ET: pull that day's SEC Form 4 insider filings."""
+    print("⏰ Triggering insider (Form 4) sync...")
+    # Lazy import keeps job logic isolated in its own module.
+    from app.jobs.insider_sync import run_insider_sync
+    run_insider_sync()
+
 
 def start_scheduler():
     """Start the APScheduler"""

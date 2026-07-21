@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Loader2, Minus, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Landmark, Loader2, Minus, TrendingUp } from 'lucide-react';
 
 import MacroSparkline from '@/components/macro/MacroSparkline';
 import { marketAPI } from '@/lib/api';
@@ -19,11 +19,11 @@ function formatMacroValue(value: number | null | undefined, unit: string): strin
 
 function ChangeIndicator({ value, unit }: { value: number | null | undefined; unit: string }) {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return <span className="text-xs text-muted-foreground">No 1M change data</span>;
+    return <span className="text-xs text-[var(--text-tertiary)]">No 1M change data</span>;
   }
   if (Math.abs(value) < 0.005) {
     return (
-      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+      <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)]">
         <Minus className="h-3 w-3" />
         Flat vs 1M ago
       </span>
@@ -48,20 +48,22 @@ function ChangeIndicator({ value, unit }: { value: number | null | undefined; un
 
 function StatTile({ series }: { series: MacroSeriesData }) {
   return (
-    <div className="deco-panel flex flex-col gap-3 bg-card p-5">
+    <div className="deco-panel flex flex-col gap-3 p-5">
       <div>
-        <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+        <div className="text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
           {series.label}
         </div>
         <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-2xl font-semibold tabular-nums">
+          <span className="serif-num text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
             {formatMacroValue(series.latest_value, series.unit)}
           </span>
         </div>
         <div className="mt-1 flex items-center justify-between">
           <ChangeIndicator value={series.change_1m} unit={series.unit} />
           {series.latest_date ? (
-            <span className="text-[11px] text-muted-foreground">{formatDate(series.latest_date)}</span>
+            <span className="text-[11px] text-[var(--text-tertiary)]">
+              {formatDate(series.latest_date)}
+            </span>
           ) : null}
         </div>
       </div>
@@ -78,17 +80,17 @@ function YieldCurveCallout({ series }: { series: MacroSeriesData | undefined }) 
   const isInverted = series.latest_value < 0;
 
   return (
-    <div className="deco-panel bg-card p-6">
+    <div className="deco-panel p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.1em] text-muted-foreground">
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
             <TrendingUp className="h-3.5 w-3.5" />
-            Yield Curve — 10Y minus 2Y
+            Yield curve — 10Y minus 2Y
           </div>
           <div className="mt-2 flex items-baseline gap-3">
             <span
               className={cn(
-                'text-3xl font-semibold tabular-nums',
+                'serif-num text-3xl font-semibold tabular-nums',
                 isInverted ? 'text-negative' : 'text-positive'
               )}
             >
@@ -99,13 +101,13 @@ function YieldCurveCallout({ series }: { series: MacroSeriesData | undefined }) 
               {isInverted ? 'Inverted' : 'Normal'}
             </span>
           </div>
-          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
             {isInverted
               ? 'Short-term (2Y) yields are trading above long-term (10Y) yields — an inverted curve that has historically preceded recessions.'
               : 'Long-term (10Y) yields are trading above short-term (2Y) yields — a normal, upward-sloping curve.'}
           </p>
           {series.latest_date ? (
-            <p className="mt-1 text-[11px] text-muted-foreground">
+            <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
               As of {formatDate(series.latest_date)}
             </p>
           ) : null}
@@ -127,13 +129,17 @@ function YieldCurveCallout({ series }: { series: MacroSeriesData | undefined }) 
 function SetupNotice() {
   return (
     <div className="deco-panel p-10 text-center">
-      <div className="deco-kicker justify-center">Setup required</div>
-      <h2 className="mt-3 text-xl font-semibold">Macro dashboard isn&apos;t configured yet</h2>
-      <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-muted-foreground">
+      <div className="eyebrow justify-center">Setup required</div>
+      <h2 className="heading-md mt-3 text-[var(--text-primary)]">
+        Macro dashboard isn&apos;t configured yet
+      </h2>
+      <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-secondary)]">
         This dashboard runs on free data from the Federal Reserve (FRED). Grab a free API key at{' '}
-        <span className="font-medium text-foreground">fred.stlouisfed.org</span> and set{' '}
-        <code className="rounded bg-muted/40 px-1.5 py-0.5 text-xs">FRED_API_KEY</code> in the
-        backend environment to turn this on.
+        <span className="font-medium text-[var(--text-primary)]">fred.stlouisfed.org</span> and set{' '}
+        <code className="rounded bg-[var(--bg-surface-2)] px-1.5 py-0.5 text-xs text-[var(--text-primary)]">
+          FRED_API_KEY
+        </code>{' '}
+        in the backend environment to turn this on.
       </p>
     </div>
   );
@@ -153,28 +159,49 @@ export default function MacroPage() {
     () => (data?.series ?? []).filter((s) => s.id !== YIELD_CURVE_SERIES_ID),
     [data]
   );
+  const seriesCount = data?.configured ? data.series.length : 0;
 
   return (
-    <div className="container-custom space-y-6 py-8">
-      <section className="deco-panel p-8">
-        <div className="deco-kicker">Macro desk</div>
-        <h1 className="mt-3">Macro Dashboard</h1>
-        <p className="mt-3 max-w-3xl text-base leading-relaxed text-muted-foreground">
-          Rates, inflation, employment, and volatility — the macro backdrop for every trade,
-          sourced from the Federal Reserve.
-        </p>
+    <div className="container-custom py-8">
+      <section className="mb-7 border-b border-t border-[var(--line)] py-7">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div className="max-w-3xl">
+            <div className="live-dot">Macro desk</div>
+            <h1 className="mt-3">Macro dashboard</h1>
+            <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
+              Rates, inflation, employment, and volatility — the macro backdrop for every trade,
+              sourced from the Federal Reserve.
+            </p>
+          </div>
+
+          <div className="hud flex min-w-[220px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <span className="hud-c1" />
+            <span className="hud-c2" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
+              <Landmark className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
+                Series tracked
+              </div>
+              <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
+                {isLoading ? '—' : seriesCount}
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {isLoading ? (
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading macro data...</p>
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[var(--accent)]" />
+          <p className="text-sm text-[var(--text-secondary)]">Loading macro data...</p>
         </div>
       ) : null}
 
       {isError ? (
         <div className="deco-panel p-8 text-center">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[var(--text-secondary)]">
             Could not load the macro dashboard. Please try again shortly.
           </p>
         </div>
@@ -183,11 +210,11 @@ export default function MacroPage() {
       {!isLoading && !isError && data && !data.configured ? <SetupNotice /> : null}
 
       {!isLoading && !isError && data?.configured ? (
-        <>
+        <div className="space-y-6">
           <YieldCurveCallout series={yieldCurveSeries} />
 
           {gridSeries.length === 0 ? (
-            <div className="deco-panel p-10 text-center text-sm text-muted-foreground">
+            <div className="deco-panel p-10 text-center text-sm text-[var(--text-secondary)]">
               No macro observations yet. The nightly sync job populates this dashboard.
             </div>
           ) : (
@@ -197,7 +224,7 @@ export default function MacroPage() {
               ))}
             </div>
           )}
-        </>
+        </div>
       ) : null}
     </div>
   );

@@ -13,7 +13,8 @@ import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "QuantorSignal",
-  description: "Luxury market intelligence with stock screening and portfolio backtesting.",
+  description:
+    "Stock screening, market scanners, earnings, insider filings, macro data, and AI swing analysis for US equities.",
 };
 
 export default function RootLayout({

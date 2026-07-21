@@ -288,6 +288,15 @@ def scheduled_data_trimming():
     trim_old_price_data()
 
 
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=7, minute=45, timezone='America/New_York')
+def scheduled_daily_brief():
+    """Runs weekdays at 7:45 AM ET — sends the AI Daily Market Brief."""
+    print("⏰ Triggering daily market brief...")
+    # Imported lazily to avoid import cycles at scheduler module load.
+    from app.jobs.daily_brief_job import run_daily_brief
+    run_daily_brief()
+
+
 def start_scheduler():
     """Start the APScheduler"""
     scheduler.start()

@@ -304,6 +304,12 @@ def scheduled_watchlist_digest():
     from app.jobs.watchlist_digest_job import run_watchlist_digest
     run_watchlist_digest()
 
+@scheduler.scheduled_job('cron', hour=22, minute=30, timezone='America/New_York')
+def scheduled_market_scans_warm():
+    """Runs at 10:30 PM ET, after the nightly sync -- warms the market scanners cache"""
+    from app.jobs.market_scans_job import warm_market_scans_cache
+    warm_market_scans_cache()
+
 
 def start_scheduler():
     """Start the APScheduler"""

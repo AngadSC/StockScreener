@@ -15,6 +15,7 @@ import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types
 import type { WatchlistResponse } from '@/types/watchlist';
 import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
 import type { EmailPreferences, EmailPreferencesUpdate } from '@/types/email';
+import type { MarketScansResponse, MarketSectorsResponse } from '@/types/market';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -269,6 +270,22 @@ export const screenerAPI = {
 
   getIndustries: async (): Promise<{ industries: string[]; count: number }> => {
     const response = await api.get('/screener/industries');
+    return response.data;
+  },
+};
+
+// ====================================
+// MARKET SCANNERS API (free, public -- no auth)
+// ====================================
+
+export const marketAPI = {
+  getScans: async (): Promise<MarketScansResponse> => {
+    const response = await api.get<MarketScansResponse>('/market/scans');
+    return response.data;
+  },
+
+  getSectors: async (): Promise<MarketSectorsResponse> => {
+    const response = await api.get<MarketSectorsResponse>('/market/sectors');
     return response.data;
   },
 };

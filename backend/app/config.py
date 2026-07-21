@@ -120,6 +120,11 @@ class Settings(BaseSettings):
     # this backend). Falls back to the marketing domain.
     PUBLIC_APP_URL: str = "https://quantorsignal.com"
 
+    # ===== DAILY MARKET BRIEF =====
+    # Master switch for the once-per-day AI market brief email (Trader/Elite).
+    # When False, the scheduled job exits early (no LLM call, no sends).
+    DAILY_BRIEF_ENABLED: bool = True
+
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors(cls, v):

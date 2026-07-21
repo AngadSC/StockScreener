@@ -106,7 +106,20 @@ class Settings(BaseSettings):
     
     # Environment
     ENVIRONMENT: str = "development"
-    
+
+    # ===== EMAIL (Resend) =====
+    # Transactional / lifecycle email via the Resend HTTP API. The sending
+    # domain in EMAIL_FROM must be verified in the Resend dashboard (SPF/DKIM)
+    # before mail will deliver. Leave EMAIL_ENABLED False to make all sends
+    # no-op (logged as "skipped") until credentials/domain are ready.
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "QuantorSignal <alerts@quantorsignal.com>"
+    EMAIL_REPLY_TO: str = ""  # optional; empty means no Reply-To header
+    EMAIL_ENABLED: bool = False
+    # Public base URL used to build unsubscribe links (must route /api/v1/* to
+    # this backend). Falls back to the marketing domain.
+    PUBLIC_APP_URL: str = "https://quantorsignal.com"
+
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod
     def parse_cors(cls, v):

@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -19,6 +20,55 @@ webhook_router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ACTIVE_STATUSES = {"active", "trialing", "past_due"}
 
+# Paid subscription tiers that map to a Stripe Price.
+PAID_TIERS = {"pro", "trader", "elite"}
+DEFAULT_TIER = "pro"
+
+
+def _tier_price_id(tier: str) -> Optional[str]:
+    """Map a paid tier to its configured Stripe Price ID (empty string if unset)."""
+    return {
+        "pro": settings.STRIPE_PRO_PRICE_ID,
+        "trader": settings.STRIPE_TRADER_PRICE_ID,
+        "elite": settings.STRIPE_ELITE_PRICE_ID,
+    }.get(tier)
+
+
+def _price_to_tier(price_id: Optional[str]) -> Optional[str]:
+    """Reverse-map a Stripe Price ID to a tier, ignoring unconfigured (empty) prices."""
+    if not price_id:
+        return None
+    mapping: dict[str, str] = {}
+    if settings.STRIPE_PRO_PRICE_ID:
+        mapping[settings.STRIPE_PRO_PRICE_ID] = "pro"
+    if settings.STRIPE_TRADER_PRICE_ID:
+        mapping[settings.STRIPE_TRADER_PRICE_ID] = "trader"
+    if settings.STRIPE_ELITE_PRICE_ID:
+        mapping[settings.STRIPE_ELITE_PRICE_ID] = "elite"
+    return mapping.get(price_id)
+
+
+def _subscription_price_id(subscription: dict) -> Optional[str]:
+    """Extract the first line-item price ID from a Stripe Subscription object."""
+    items = subscription.get("items") or {}
+    data_list = items.get("data") or []
+    if not data_list:
+        return None
+    price = data_list[0].get("price") or {}
+    return price.get("id")
+
+
+def _tier_from_subscription_object(subscription: dict) -> Optional[str]:
+    """Derive a tier from a subscription's price, falling back to its metadata tier."""
+    tier = _price_to_tier(_subscription_price_id(subscription))
+    if tier:
+        return tier
+    metadata = subscription.get("metadata") or {}
+    meta_tier = str(metadata.get("tier") or "").strip().lower()
+    if meta_tier in PAID_TIERS:
+        return meta_tier
+    return None
+
 
 def _stripe_client() -> stripe:
     if not settings.STRIPE_SECRET_KEY:
@@ -36,32 +86,60 @@ def _epoch_to_dt(value: Optional[int]) -> Optional[datetime]:
     return datetime.fromtimestamp(int(value), tz=timezone.utc)
 
 
+async def _read_requested_tier(request: Request) -> str:
+    """Parse an optional {"tier": ...} JSON body. Defaults to "pro" (backward compatible)."""
+    try:
+        raw = await request.body()
+    except Exception:
+        return DEFAULT_TIER
+    if not raw:
+        return DEFAULT_TIER
+    try:
+        payload = json.loads(raw)
+    except (ValueError, json.JSONDecodeError):
+        return DEFAULT_TIER
+    if isinstance(payload, dict) and payload.get("tier"):
+        return str(payload["tier"]).strip().lower()
+    return DEFAULT_TIER
+
+
 @router.post("/create-checkout-session")
-def create_checkout_session(
+async def create_checkout_session(
+    request: Request,
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db),
 ):
     """
-    Create a Stripe Checkout Session for the Pro subscription and return its URL.
-    The frontend redirects the browser to the returned URL.
+    Create a Stripe Checkout Session for the requested subscription tier and return
+    its URL. Accepts an optional JSON body {"tier": "pro"|"trader"|"elite"} and
+    defaults to "pro" when the body is empty. The frontend redirects the browser to
+    the returned URL.
     """
     sdk = _stripe_client()
 
-    if not settings.STRIPE_PRO_PRICE_ID:
+    tier = await _read_requested_tier(request)
+    if tier not in PAID_TIERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown subscription tier '{tier}'.",
+        )
+
+    price_id = _tier_price_id(tier)
+    if not price_id:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Stripe Pro price is not configured on this server.",
+            detail=f"Stripe {tier.capitalize()} price is not configured on this server.",
         )
 
     session_args = {
         "mode": "subscription",
-        "line_items": [{"price": settings.STRIPE_PRO_PRICE_ID, "quantity": 1}],
+        "line_items": [{"price": price_id, "quantity": 1}],
         "success_url": settings.STRIPE_SUCCESS_URL,
         "cancel_url": settings.STRIPE_CANCEL_URL,
         "client_reference_id": str(current_user.id),
         "allow_promotion_codes": True,
-        "metadata": {"user_id": str(current_user.id)},
-        "subscription_data": {"metadata": {"user_id": str(current_user.id)}},
+        "metadata": {"user_id": str(current_user.id), "tier": tier},
+        "subscription_data": {"metadata": {"user_id": str(current_user.id), "tier": tier}},
     }
 
     if current_user.stripe_customer_id:
@@ -126,13 +204,20 @@ def _find_user_for_event(db: Session, *, user_id_meta: Optional[str], customer_i
     return None
 
 
-def _apply_subscription_state(user: User, *, status_value: Optional[str], subscription_id: Optional[str], period_end: Optional[int]) -> None:
+def _apply_subscription_state(
+    user: User,
+    *,
+    status_value: Optional[str],
+    subscription_id: Optional[str],
+    period_end: Optional[int],
+    tier: Optional[str],
+) -> None:
     if subscription_id:
         user.stripe_subscription_id = subscription_id
     user.subscription_status = status_value
     user.subscription_current_period_end = _epoch_to_dt(period_end)
     if status_value in ACTIVE_STATUSES:
-        user.tier = "pro"
+        user.tier = tier or DEFAULT_TIER
     elif status_value in {"canceled", "unpaid", "incomplete_expired"}:
         user.tier = "free"
 
@@ -183,12 +268,31 @@ async def stripe_webhook(
             print(f"[stripe-webhook] checkout.session.completed had no matching user. session={data.get('id')}")
             return {"received": True, "matched": False}
 
+        # Prefer the tier stamped into checkout metadata; otherwise retrieve the
+        # subscription from Stripe and derive the tier from its price. Fall back to
+        # the default tier only when nothing resolves.
+        tier = str(metadata.get("tier") or "").strip().lower()
+        if tier not in PAID_TIERS:
+            tier = ""
+        if not tier and subscription_id:
+            try:
+                subscription = _stripe_client().Subscription.retrieve(subscription_id)
+                tier = _tier_from_subscription_object(subscription) or ""
+            except Exception as exc:  # noqa: BLE001 - never fail the webhook on lookup
+                print(f"[stripe-webhook] could not retrieve subscription {subscription_id}: {exc!r}")
+        if not tier:
+            print(
+                f"[stripe-webhook] checkout.session.completed could not resolve tier; "
+                f"defaulting to {DEFAULT_TIER}. session={data.get('id')}"
+            )
+            tier = DEFAULT_TIER
+
         if customer_id:
             user.stripe_customer_id = customer_id
         if subscription_id:
             user.stripe_subscription_id = subscription_id
         user.subscription_status = "active"
-        user.tier = "pro"
+        user.tier = tier
         db.commit()
 
     elif event_type in {"customer.subscription.updated", "customer.subscription.created"}:
@@ -204,11 +308,22 @@ async def stripe_webhook(
             print(f"[stripe-webhook] {event_type} had no matching user. subscription={subscription_id}")
             return {"received": True, "matched": False}
 
+        # Derive the tier from the subscription's actual price so that plan changes
+        # made in the Customer Portal (e.g. Pro -> Trader) land on the right tier.
+        tier = _tier_from_subscription_object(data)
+        if status_value in ACTIVE_STATUSES and not tier:
+            print(
+                f"[stripe-webhook] {event_type} could not resolve tier for "
+                f"subscription={subscription_id}; defaulting to {DEFAULT_TIER}"
+            )
+            tier = DEFAULT_TIER
+
         _apply_subscription_state(
             user,
             status_value=status_value,
             subscription_id=subscription_id,
             period_end=period_end,
+            tier=tier,
         )
         db.commit()
 

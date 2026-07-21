@@ -27,10 +27,10 @@ import type { Stock, StockPrice } from '@/types/stock';
 
 function getChangePercent(stock: Stock): number | null {
   if (typeof stock.day_change_percent === 'number') {
-    return normalizePercentValue(stock.day_change_percent, 'auto');
+    return normalizePercentValue(stock.day_change_percent, 'percent');
   }
   if (typeof stock.change_percent === 'number') {
-    return normalizePercentValue(stock.change_percent, 'auto');
+    return normalizePercentValue(stock.change_percent, 'percent');
   }
   return null;
 }

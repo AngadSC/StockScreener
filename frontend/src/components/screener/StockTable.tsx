@@ -310,7 +310,7 @@ export default function StockTable({
                               : 'chip-dn'
                           }`}
                         >
-                          {formatPercent(changePercent, { mode: 'auto', withSign: true })}
+                          {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                         </span>
                       ) : (
                         <span className="tabular-nums text-[var(--text-secondary)]">N/A</span>

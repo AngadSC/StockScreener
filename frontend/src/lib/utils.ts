@@ -86,7 +86,9 @@ export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
   
   try {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -100,7 +102,9 @@ export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
   
   try {
-    return new Date(dateString).toLocaleString('en-US', {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

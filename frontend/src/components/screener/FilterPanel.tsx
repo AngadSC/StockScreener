@@ -48,7 +48,7 @@ const parseFloatInput = (rawValue: string): number | undefined => {
 
 const toPercentInputValue = (decimalValue: number | undefined): string => {
   if (decimalValue === undefined || Number.isNaN(decimalValue)) return '';
-  return (decimalValue * 100).toString();
+  return Number((decimalValue * 100).toFixed(2)).toString();
 };
 
 const fromPercentInput = (rawValue: string): number | undefined => {

@@ -103,9 +103,13 @@ class Settings(BaseSettings):
 
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []
-    
+
     # Environment
     ENVIRONMENT: str = "development"
+
+    # ===== FRED (Federal Reserve Economic Data) =====
+    # Free key from https://fred.stlouisfed.org/docs/api/api_key.html
+    FRED_API_KEY: str = Field(default="", validation_alias=AliasChoices("FRED_API_KEY", "fred_api_key"))
     
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod

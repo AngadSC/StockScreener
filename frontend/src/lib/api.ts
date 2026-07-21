@@ -14,6 +14,8 @@ import type {
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
 import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
+import type { EarningsCalendarResponse } from '@/types/earnings';
+import type { MacroDashboardResponse } from '@/types/macro';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -332,6 +334,24 @@ export const generateAIReport = async (ticker: string): Promise<AIReportResponse
 
     throw error;
   }
+};
+
+// ====================================
+// MARKET DATA API (earnings calendar + macro dashboard)
+// ====================================
+
+export const marketAPI = {
+  getEarningsCalendar: async (days: number = 14): Promise<EarningsCalendarResponse> => {
+    const response = await api.get<EarningsCalendarResponse>('/market/earnings', {
+      params: { days },
+    });
+    return response.data;
+  },
+
+  getMacroDashboard: async (): Promise<MacroDashboardResponse> => {
+    const response = await api.get<MacroDashboardResponse>('/market/macro');
+    return response.data;
+  },
 };
 
 export default api;

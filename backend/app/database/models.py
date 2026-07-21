@@ -272,3 +272,38 @@ class AIUsageEvent(Base):
     tokens_output = Column(Integer)
 
     user = relationship("User", back_populates="ai_usage_events")
+
+
+# ============================================
+# EARNINGS CALENDAR
+# ============================================
+
+class EarningsEvent(Base):
+    __tablename__ = "earnings_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker_id = Column(SmallInteger, ForeignKey("tickers.id", ondelete="CASCADE"), nullable=False, index=True)
+    earnings_date = Column(Date, nullable=False, index=True)
+    time_hint = Column(String(16), default="unknown")  # 'bmo', 'amc', 'unknown'
+    eps_estimate = Column(REAL, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # One-directional relationship only (Ticker model left untouched to avoid
+    # conflicting with parallel edits from other agents).
+    ticker = relationship("Ticker")
+
+    __table_args__ = (
+        Index('idx_earnings_events_ticker_date', 'ticker_id', 'earnings_date', unique=True),
+    )
+
+
+# ============================================
+# FRED MACRO OBSERVATIONS
+# ============================================
+
+class MacroObservation(Base):
+    __tablename__ = "macro_observations"
+
+    series_id = Column(String(20), primary_key=True)
+    date = Column(Date, primary_key=True)
+    value = Column(REAL, nullable=True)

@@ -1,11 +1,15 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
 from app.jobs.bulk_population import populate_all_stocks, retry_failed_tickers
 from app.jobs.daily_sync import daily_delta_sync
 from app.jobs.fundamentals_updater import update_fundamentals_daily, update_single_ticker_fundamentals
 from app.jobs.stock_loader import update_all_stocks_batch
+from app.database.connection import get_db
 from app.database.models import User
 from app.services.auth import get_current_admin_user
-from typing import Dict, Any
+from app.services import email as email_service
+from typing import Dict, Any, Optional
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -123,4 +127,38 @@ async def trigger_batch_update(
             "prices_provider": "yfinance",
             "prices_batch_size": 100
         }
+    }
+
+
+# ============================================
+# EMAIL DELIVERABILITY TEST
+# ============================================
+
+class EmailTestRequest(BaseModel):
+    to: Optional[EmailStr] = None       # defaults to the admin's own address
+    category: Optional[str] = "product_updates"
+
+
+@router.post("/email/test")
+def send_test_email(
+    body: Optional[EmailTestRequest] = None,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Send a sample email using the base template to verify deliverability
+    end-to-end (Resend + domain SPF/DKIM). Bypasses per-category preference
+    gating but still respects EMAIL_ENABLED. Sends to `to` or, by default, the
+    requesting admin's own email address.
+    """
+    payload = body or EmailTestRequest()
+    result = email_service.send_test_email(
+        db,
+        current_user,
+        to_email=payload.to,
+        category=payload.category or "product_updates",
+    )
+    return {
+        "recipient": payload.to or current_user.email,
+        "result": result,
     }

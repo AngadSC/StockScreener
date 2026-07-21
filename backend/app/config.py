@@ -101,6 +101,15 @@ class Settings(BaseSettings):
     STRIPE_CANCEL_URL: str = "http://localhost:3000/pricing?checkout=cancelled"
     STRIPE_PORTAL_RETURN_URL: str = "http://localhost:3000/ai-analyzer"
 
+    # ===== SEC EDGAR (Insider Activity / Form 4) =====
+    # Mandatory politeness: EDGAR requires a descriptive User-Agent on every request.
+    EDGAR_USER_AGENT: str = "QuantorSignal contact@quantorsignal.com"
+    # Throttle to stay under EDGAR's 10 req/sec fair-access ceiling (we target ~4.5/sec).
+    EDGAR_MIN_REQUEST_INTERVAL: float = 0.22
+    EDGAR_CIK_MAP_TTL: int = 86400            # Cache ticker->CIK map for a day
+    EDGAR_BACKFILL_DAYS: int = 7              # Days to backfill on first/empty run
+    EDGAR_ACTIVITY_CACHE_TTL: int = 300       # Public insider-activity endpoint cache
+
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []
     

@@ -272,3 +272,50 @@ class AIUsageEvent(Base):
     tokens_output = Column(Integer)
 
     user = relationship("User", back_populates="ai_usage_events")
+
+
+# ============================================
+# INSIDER TRANSACTIONS (SEC EDGAR Form 4)
+# ============================================
+
+class InsiderTransaction(Base):
+    """
+    A single non-derivative insider transaction (Form 4, transaction code P or S).
+
+    One Form 4 filing (accession_no) can contain multiple non-derivative
+    transactions; txn_index is the 0-based position of the transaction within the
+    filing's ownershipDocument. The (accession_no, txn_index) pair is unique and
+    is what makes ingestion idempotent.
+    """
+    __tablename__ = "insider_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker_id = Column(
+        SmallInteger,
+        ForeignKey("tickers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    accession_no = Column(String(25), nullable=False, index=True)
+    txn_index = Column(SmallInteger, nullable=False)
+    filed_date = Column(Date, nullable=False, index=True)
+    transaction_date = Column(Date)
+    owner_name = Column(String(255))
+    owner_title = Column(String(255))
+    is_officer = Column(Boolean, default=False)
+    is_director = Column(Boolean, default=False)
+    transaction_code = Column(String(2))
+    shares = Column(REAL)
+    price = Column(REAL)
+    value = Column(REAL)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # One-directional relationship (Ticker model intentionally left untouched)
+    ticker = relationship("Ticker")
+
+    __table_args__ = (
+        # Unique key that makes ingestion idempotent (one row per transaction
+        # within a filing). ticker_id / accession_no / filed_date are already
+        # indexed via their column-level index=True.
+        Index("uq_insider_accession_txn", "accession_no", "txn_index", unique=True),
+    )

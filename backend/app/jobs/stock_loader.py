@@ -288,6 +288,15 @@ def scheduled_data_trimming():
     trim_old_price_data()
 
 
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=7, minute=0, timezone='America/New_York')
+def scheduled_watchlist_digest():
+    """Runs weekday mornings at 7:00 AM ET: Elite watchlist AI digest email."""
+    print("⏰ Triggering Elite watchlist AI digest...")
+    # Imported lazily so a digest-side import error can never break the scheduler.
+    from app.jobs.watchlist_digest_job import run_watchlist_digest
+    run_watchlist_digest()
+
+
 def start_scheduler():
     """Start the APScheduler"""
     scheduler.start()

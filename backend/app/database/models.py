@@ -315,7 +315,10 @@ class EmailSendLog(Base):
 
     __table_args__ = (
         Index('idx_email_send_log_user_category_date', 'user_id', 'category', 'sent_date'),
+    )
 
+
+# ============================================
 # INSIDER TRANSACTIONS (SEC EDGAR Form 4)
 # ============================================
 
@@ -361,6 +364,8 @@ class InsiderTransaction(Base):
         Index("uq_insider_accession_txn", "accession_no", "txn_index", unique=True),
     )
 
+
+# ============================================
 # EARNINGS CALENDAR
 # ============================================
 

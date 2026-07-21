@@ -117,9 +117,14 @@ export const authAPI = {
 // ====================================
 
 export const billingAPI = {
-  createCheckoutSession: async (): Promise<{ url: string; id: string }> => {
+  // `tier` is optional and defaults to Pro on the backend when omitted, keeping
+  // older callers working. Pass 'trader' | 'elite' to check out those plans.
+  createCheckoutSession: async (
+    tier?: 'pro' | 'trader' | 'elite'
+  ): Promise<{ url: string; id: string }> => {
     const response = await api.post<{ url: string; id: string }>(
-      '/billing/create-checkout-session'
+      '/billing/create-checkout-session',
+      tier ? { tier } : {}
     );
     return response.data;
   },

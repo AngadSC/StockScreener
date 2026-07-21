@@ -1,3 +1,7 @@
+// All account tiers. `PaidTier` covers the tiers that map to a Stripe checkout.
+export type Tier = 'free' | 'pro' | 'trader' | 'elite';
+export type PaidTier = Exclude<Tier, 'free'>;
+
 export interface User {
   id: number;
   email: string;

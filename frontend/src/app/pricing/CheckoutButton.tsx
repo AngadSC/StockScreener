@@ -8,17 +8,24 @@ import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { billingAPI } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import type { PaidTier } from '@/types/user';
 
 interface Props {
-  fallbackUrl?: string;
+  tier: PaidTier;
   label: string;
+  // Fallback checkout URL used only for the Pro plan when the API call fails
+  // (e.g. a signed-out visitor hitting a Stripe Payment Link).
+  fallbackUrl?: string;
 }
 
-export function ProCheckoutButton({ fallbackUrl, label }: Props) {
+export function CheckoutButton({ tier, label, fallbackUrl }: Props) {
   const router = useRouter();
   const { isLoggedIn, isLoading } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const usePro = tier === 'pro';
+  const effectiveFallbackUrl = usePro ? fallbackUrl : undefined;
 
   const handleClick = async () => {
     setError(null);
@@ -30,7 +37,7 @@ export function ProCheckoutButton({ fallbackUrl, label }: Props) {
 
     setSubmitting(true);
     try {
-      const { url } = await billingAPI.createCheckoutSession();
+      const { url } = await billingAPI.createCheckoutSession(tier);
       window.location.href = url;
     } catch (err) {
       const detail =
@@ -40,8 +47,8 @@ export function ProCheckoutButton({ fallbackUrl, label }: Props) {
       setError(detail);
       setSubmitting(false);
 
-      if (fallbackUrl) {
-        window.location.href = fallbackUrl;
+      if (effectiveFallbackUrl) {
+        window.location.href = effectiveFallbackUrl;
       }
     }
   };

@@ -24,10 +24,15 @@ def _month_start() -> datetime:
 
 def _tier_limit(tier: str | None) -> int:
     normalized = (tier or "free").strip().lower()
-    if normalized in {"pro", "trader", "elite"}:
+    if normalized == "pro":
         return settings.ai_monthly_report_limit_pro
+    if normalized == "trader":
+        return settings.ai_monthly_report_limit_trader
+    if normalized == "elite":
+        return settings.ai_monthly_report_limit_elite
     if normalized == "admin":
-        return settings.ai_monthly_report_limit_pro
+        # Admins get the highest configured allowance.
+        return settings.ai_monthly_report_limit_elite
     return 0
 
 

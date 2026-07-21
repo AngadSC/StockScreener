@@ -92,11 +92,21 @@ class Settings(BaseSettings):
         default=150,
         validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_PRO", "ai_monthly_report_limit_pro"),
     )
+    ai_monthly_report_limit_trader: int = Field(
+        default=400,
+        validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_TRADER", "ai_monthly_report_limit_trader"),
+    )
+    ai_monthly_report_limit_elite: int = Field(
+        default=1000,
+        validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_ELITE", "ai_monthly_report_limit_elite"),
+    )
 
     # ===== STRIPE BILLING =====
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
+    STRIPE_TRADER_PRICE_ID: str = ""
+    STRIPE_ELITE_PRICE_ID: str = ""
     STRIPE_SUCCESS_URL: str = "http://localhost:3000/ai-analyzer?checkout=success"
     STRIPE_CANCEL_URL: str = "http://localhost:3000/pricing?checkout=cancelled"
     STRIPE_PORTAL_RETURN_URL: str = "http://localhost:3000/ai-analyzer"

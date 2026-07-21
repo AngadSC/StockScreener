@@ -4,17 +4,23 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
+  Activity,
   BarChart3,
   BookOpen,
+  CalendarDays,
+  GitCompareArrows,
+  Home,
+  Landmark,
   Lock,
   LogIn,
   LogOut,
+  Mail,
   Menu,
   Search,
-  Settings,
   Sparkles,
   Star,
-  TrendingUp,
+  Tag,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -34,13 +40,41 @@ type NavItem = {
   proBadge?: boolean;
 };
 
-const navItems: NavItem[] = [
-  { href: '/', label: 'Markets', icon: TrendingUp },
-  { href: '/screener', label: 'Screener', icon: Search },
-  { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
-  { href: '/ai-analyzer', label: 'AI Analyst', icon: Sparkles, proBadge: true },
-  { href: '/backtester', label: 'Backtester', icon: BarChart3 },
-  { href: '/blog', label: 'Research Log', icon: BookOpen },
+type NavGroup = {
+  label?: string;
+  items: NavItem[];
+};
+
+const navGroups: NavGroup[] = [
+  {
+    items: [{ href: '/', label: 'Home', icon: Home }],
+  },
+  {
+    label: 'Markets',
+    items: [
+      { href: '/markets', label: 'Scanners', icon: Activity },
+      { href: '/earnings', label: 'Earnings', icon: CalendarDays },
+      { href: '/insiders', label: 'Insiders', icon: Users },
+      { href: '/macro', label: 'Macro', icon: Landmark },
+    ],
+  },
+  {
+    label: 'Tools',
+    items: [
+      { href: '/screener', label: 'Screener', icon: Search },
+      { href: '/compare', label: 'Compare', icon: GitCompareArrows },
+      { href: '/backtester', label: 'Backtester', icon: BarChart3 },
+      { href: '/ai-analyzer', label: 'AI Analyst', icon: Sparkles, proBadge: true },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
+      { href: '/pricing', label: 'Pricing', icon: Tag },
+      { href: '/blog', label: 'Research Log', icon: BookOpen },
+    ],
+  },
 ];
 
 function isNavItemActive(pathname: string, href: string) {
@@ -227,7 +261,7 @@ export default function Header() {
         href={href}
         onClick={() => setIsMobileMenuOpen(false)}
         className={cn(
-          'group relative flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-[13.5px] transition-[background,color] duration-200',
+          'group relative flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
           isActive
             ? 'bg-[rgba(216,210,192,0.06)] font-medium text-[var(--ink)]'
             : 'text-[var(--mute)] hover:bg-[rgba(216,210,192,0.04)] hover:text-[var(--ink)]',
@@ -243,13 +277,45 @@ export default function Header() {
     );
   };
 
-  const accountControls = (
-    <div className="grid gap-2">
+  const renderNavGroups = (mobile = false) => (
+    <>
+      {navGroups.map((group, index) => (
+        <div key={group.label ?? `group-${index}`} className={cn(index > 0 && 'mt-4')}>
+          {group.label ? (
+            <div className="px-3.5 pb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--whisper)]">
+              {group.label}
+            </div>
+          ) : null}
+          <div className="grid gap-0.5">
+            {group.items.map((item) => renderNavLink(item, mobile))}
+          </div>
+        </div>
+      ))}
+    </>
+  );
+
+  const renderAccountControls = (mobile = false) => (
+    <div className="grid gap-1.5">
       {isLoggedIn ? (
-        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        <>
+          <Link
+            href="/settings/emails"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={cn(
+              'flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
+              isNavItemActive(pathname, '/settings/emails')
+                ? 'bg-[rgba(216,210,192,0.06)] font-medium text-[var(--ink)]'
+                : 'text-[var(--mute)] hover:bg-[rgba(216,210,192,0.04)] hover:text-[var(--ink)]'
+            )}
+          >
+            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.5} />
+            <span className="flex-1">Email preferences</span>
+          </Link>
+          <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </>
       ) : (
         <>
           <Button asChild variant="ghost" className="w-full justify-start">
@@ -269,7 +335,7 @@ export default function Header() {
   return (
     <>
       <aside className="fixed inset-y-0 left-0 z-[90] hidden w-[248px] flex-col border-r border-[var(--line)] bg-[rgba(5,4,5,0.88)] px-4 py-5 backdrop-blur-xl lg:flex">
-        <Link href="/" className="group flex items-center gap-3 px-1 py-1">
+        <Link href="/" className="group flex shrink-0 items-center gap-3 px-1 py-1">
           <BrandMark className="transition-transform duration-300 group-hover:scale-[1.03]" />
           <div className="leading-tight">
             <div className="serif-tight text-[20px] text-[var(--ink)]">Quantor<span className="italic text-[var(--forest)]">signal</span></div>
@@ -280,30 +346,32 @@ export default function Header() {
         <button
           type="button"
           onClick={openCommandPalette}
-          className="mt-7 flex w-full items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--ink-2)] shadow-[var(--shadow-1)] transition-[border-color,background,color] hover:border-[var(--line-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
+          className="mt-6 flex w-full shrink-0 items-center gap-3 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2.5 text-left text-sm text-[var(--ink-2)] shadow-[var(--shadow-1)] transition-[border-color,background,color] hover:border-[var(--line-2)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]"
         >
           <Search className="h-4 w-4" strokeWidth={1.5} />
           <span className="flex-1">Search</span>
           <kbd className="kbd">Ctrl K</kbd>
         </button>
 
-        <nav className="mt-7 grid gap-1.5">{navItems.map((item) => renderNavLink(item))}</nav>
+        <nav className="deco-scroll mt-6 min-h-0 flex-1 overflow-y-auto pr-1">
+          {renderNavGroups()}
 
-        <div className="flex-1" />
+          {userTier && !isProTier(userTier) ? (
+            <div className="hud hud-blue mt-6 rounded-[14px] border border-[var(--line)] bg-[var(--ivory)] p-4 shadow-[var(--shadow-1)]">
+              <span className="hud-c1" />
+              <span className="hud-c2" />
+              <div className="smallcap text-[var(--sapphire)]">Quantor Pro</div>
+              <p className="mt-2 text-sm leading-5 text-[var(--ink-2)]">
+                AI swing reports, daily briefs, and higher research limits.
+              </p>
+              <Button asChild size="sm" className="mt-4 w-full">
+                <Link href="/pricing">View tiers</Link>
+              </Button>
+            </div>
+          ) : null}
+        </nav>
 
-        <div className="hud hud-blue mb-4 rounded-[14px] border border-[var(--line)] bg-[var(--ivory)] p-4 shadow-[var(--shadow-1)]">
-          <span className="hud-c1" />
-          <span className="hud-c2" />
-          <div className="smallcap text-[var(--sapphire)]">Quantor Pro</div>
-          <p className="mt-2 text-sm leading-5 text-[var(--ink-2)]">
-            Unlock AI briefs and faster research workflows.
-          </p>
-          <Button asChild size="sm" className="mt-4 w-full">
-            <Link href="/pricing">View tiers</Link>
-          </Button>
-        </div>
-
-        <div className="border-t border-[var(--line)] pt-4">
+        <div className="mt-4 shrink-0 border-t border-[var(--line)] pt-4">
           <div className="mb-3 flex items-center gap-3 rounded-[12px] bg-[rgba(216,210,192,0.03)] px-3 py-2.5">
             <div className="grid h-8 w-8 place-items-center rounded-full border border-[var(--line-2)] bg-[var(--surface-2)] font-mono text-[11px] text-[var(--ink)]">
               QS
@@ -312,9 +380,8 @@ export default function Header() {
               <div className="truncate text-sm text-[var(--ink)]">{isLoggedIn ? 'Workspace' : 'Guest'}</div>
               <div className="smallcap-low truncate">{userTier ?? 'free'} tier</div>
             </div>
-            <Settings className="h-4 w-4 text-[var(--mute)]" aria-hidden="true" strokeWidth={1.5} />
           </div>
-          {accountControls}
+          {renderAccountControls()}
         </div>
       </aside>
 
@@ -342,7 +409,10 @@ export default function Header() {
           </div>
 
           {isMobileMenuOpen ? (
-            <div id="mobile-navigation" className="grid gap-4 border-t border-[var(--line)] py-4">
+            <div
+              id="mobile-navigation"
+              className="deco-scroll grid max-h-[calc(100vh-68px)] gap-4 overflow-y-auto border-t border-[var(--line)] py-4"
+            >
               {renderSearchForm(true)}
               <button
                 type="button"
@@ -355,8 +425,8 @@ export default function Header() {
                 </span>
                 <kbd className="kbd">Ctrl K</kbd>
               </button>
-              <nav className="grid gap-2">{navItems.map((item) => renderNavLink(item, true))}</nav>
-              {accountControls}
+              <nav>{renderNavGroups(true)}</nav>
+              <div className="border-t border-[var(--line)] pt-4">{renderAccountControls(true)}</div>
             </div>
           ) : null}
         </div>

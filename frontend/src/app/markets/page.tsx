@@ -29,10 +29,10 @@ export default function MarketsPage() {
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div className="max-w-3xl">
             <div className="live-dot">Free scanners</div>
-            <h1 className="mt-3">Markets</h1>
+            <h1 className="mt-3">Market scanners</h1>
             <p className="mt-3 text-base leading-relaxed text-[var(--text-secondary)]">
-              Daily-refreshed gainers, losers, 52-week breakouts, unusual volume, and gaps, plus a live sector
-              heatmap. Computed once per close from data already in the warehouse.
+              Daily-refreshed gainers, losers, 52-week breakouts, unusual volume, and gaps, plus a
+              sector heatmap. Recomputed once per market close.
             </p>
           </div>
 

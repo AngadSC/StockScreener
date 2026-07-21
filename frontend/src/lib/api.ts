@@ -14,6 +14,7 @@ import type {
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
 import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
+import type { EmailPreferences, EmailPreferencesUpdate } from '@/types/email';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -332,6 +333,24 @@ export const generateAIReport = async (ticker: string): Promise<AIReportResponse
 
     throw error;
   }
+};
+
+// ====================================
+// EMAIL PREFERENCES API
+// ====================================
+
+export const emailAPI = {
+  getPreferences: async (): Promise<EmailPreferences> => {
+    const response = await api.get<EmailPreferences>('/email/preferences');
+    return response.data;
+  },
+
+  updatePreferences: async (
+    update: EmailPreferencesUpdate
+  ): Promise<EmailPreferences> => {
+    const response = await api.put<EmailPreferences>('/email/preferences', update);
+    return response.data;
+  },
 };
 
 export default api;

@@ -304,7 +304,7 @@ export default function StockDetailPage({ params }: PageProps) {
               className="pointer-events-none absolute inset-y-0 left-0 w-[40%]"
               style={{
                 background:
-                  'linear-gradient(90deg, rgba(91,156,214,0.08) 0%, rgba(174,185,199,0.04) 24%, transparent 48%)',
+                  'linear-gradient(90deg, rgba(69,181,208,0.08) 0%, rgba(49,169,196,0.04) 24%, transparent 48%)',
               }}
             />
 
@@ -354,7 +354,7 @@ export default function StockDetailPage({ params }: PageProps) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[rgba(216,210,192,0.015)] md:grid-cols-3">
+                <div className="grid grid-cols-2 overflow-hidden rounded-[var(--radius-md)] border border-[var(--line)] bg-[rgba(221,228,225,0.015)] md:grid-cols-3">
                   {heroStats.map((stat) => (
                     <div key={stat.label} className="border-b border-r border-[var(--line)] px-4 py-4 last:border-r-0">
                       <div className="smallcap-low">{stat.label}</div>
@@ -413,7 +413,7 @@ export default function StockDetailPage({ params }: PageProps) {
                     <Link
                       key={candidate.ticker}
                       href={`/stocks/${candidate.ticker}`}
-                      className="group min-w-[250px] max-w-[250px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-4 hover:-translate-y-[2px] hover:border-[var(--accent)] hover:shadow-[0_0_0_1px_var(--accent),0_16px_32px_rgba(91,91,214,0.14)]"
+                      className="group min-w-[250px] max-w-[250px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-4 hover:-translate-y-[2px] hover:border-[var(--accent)] hover:shadow-[0_0_0_1px_var(--accent),0_16px_32px_rgba(49,169,196,0.14)]"
                       style={{
                         transition: 'transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease',
                       }}

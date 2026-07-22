@@ -11,20 +11,20 @@ export default function BrandMark({ className, size = "md" }: BrandMarkProps) {
   return (
     <svg
       aria-hidden="true"
-      className={cn("shrink-0 drop-shadow-[0_0_16px_rgba(174,185,199,0.16)]", className)}
+      className={cn("shrink-0 drop-shadow-[0_0_16px_rgba(49,169,196,0.16)]", className)}
       height={dimension}
       viewBox="0 0 48 48"
       width={dimension}
     >
       <defs>
         <linearGradient id="qs-crest" x1="12" x2="38" y1="7" y2="42">
-          <stop stopColor="#c8d2de" />
-          <stop offset="0.48" stopColor="#aeb9c7" />
+          <stop stopColor="#55c0d6" />
+          <stop offset="0.48" stopColor="#31a9c4" />
           <stop offset="1" stopColor="#6f7885" />
         </linearGradient>
         <radialGradient id="qs-glow" cx="45%" cy="20%" r="70%">
-          <stop stopColor="rgba(91,156,214,0.22)" />
-          <stop offset="1" stopColor="rgba(91,156,214,0)" />
+          <stop stopColor="rgba(69,181,208,0.22)" />
+          <stop offset="1" stopColor="rgba(69,181,208,0)" />
         </radialGradient>
       </defs>
       <path
@@ -36,11 +36,11 @@ export default function BrandMark({ className, size = "md" }: BrandMarkProps) {
       <path
         d="M24 8.65 36.95 16.1v15.8L24 39.35 11.05 31.9V16.1L24 8.65Z"
         fill="rgba(15,14,19,0.86)"
-        stroke="rgba(216,210,192,0.16)"
+        stroke="rgba(221,228,225,0.16)"
         strokeWidth="1"
       />
       <text
-        fill="#d8d2c0"
+        fill="#dde4e1"
         fontFamily="Spectral, Times New Roman, serif"
         fontSize="23"
         fontStyle="italic"
@@ -51,7 +51,7 @@ export default function BrandMark({ className, size = "md" }: BrandMarkProps) {
       >
         Q
       </text>
-      <path d="M28.25 30.2 33.1 34" stroke="#5b9cd6" strokeLinecap="round" strokeWidth="1.3" />
+      <path d="M28.25 30.2 33.1 34" stroke="#45b5d0" strokeLinecap="round" strokeWidth="1.3" />
     </svg>
   );
 }

@@ -6,45 +6,47 @@
 
 @layer base {
   :root {
-    --bone: #050405;
-    --bone-deep: #020203;
-    --ivory: #0c0b0e;
-    --surface: #0f0e13;
-    --surface-2: #16151c;
+    --bone: #070b0c;
+    --bone-deep: #040709;
+    --ivory: #0b1113;
+    --surface: #0e1416;
+    --surface-2: #141c1f;
 
-    --ink: #d8d2c0;
-    --ink-2: #a8a294;
-    --mute: #7a7568;
-    --whisper: #4f4a42;
-    --ghost: #2a2730;
+    --ink: #dde4e1;
+    --ink-2: #a3aeaa;
+    --mute: #74807c;
+    --whisper: #4c5754;
+    --ghost: #263030;
 
-    --line: rgba(216, 210, 192, 0.06);
-    --line-2: rgba(216, 210, 192, 0.13);
-    --line-3: rgba(216, 210, 192, 0.26);
+    --line: rgba(221, 228, 225, 0.06);
+    --line-2: rgba(221, 228, 225, 0.13);
+    --line-3: rgba(221, 228, 225, 0.26);
 
-    --forest: #aeb9c7;
-    --forest-2: #c8d2de;
-    --forest-soft: rgba(174, 185, 199, 0.10);
-    --forest-line: rgba(174, 185, 199, 0.28);
+    /* "Harbor" palette — petrol accent. Var names kept for compatibility:
+       --forest IS the accent, --ink IS the primary text. See DESIGN_LOG.md. */
+    --forest: #31a9c4;
+    --forest-2: #55c0d6;
+    --forest-soft: rgba(49, 169, 196, 0.10);
+    --forest-line: rgba(49, 169, 196, 0.28);
 
-    --sapphire: #5b9cd6;
-    --sapphire-2: #7ab2e0;
-    --sapphire-soft: rgba(91, 156, 214, 0.10);
-    --sapphire-glow: rgba(91, 156, 214, 0.22);
+    --sapphire: #45b5d0;
+    --sapphire-2: #6fcbe0;
+    --sapphire-soft: rgba(69, 181, 208, 0.10);
+    --sapphire-glow: rgba(69, 181, 208, 0.22);
 
-    --amber: #e8a032;
-    --amber-soft: rgba(232, 160, 50, 0.14);
+    --amber: #dfa042;
+    --amber-soft: rgba(223, 160, 66, 0.14);
 
-    --up: #5ba879;
-    --up-soft: rgba(91, 168, 121, 0.12);
-    --up-glow: rgba(91, 168, 121, 0.30);
-    --dn: #c25a3a;
-    --dn-soft: rgba(194, 90, 58, 0.12);
-    --dn-glow: rgba(194, 90, 58, 0.30);
+    --up: #5ec973;
+    --up-soft: rgba(94, 201, 115, 0.12);
+    --up-glow: rgba(94, 201, 115, 0.30);
+    --dn: #c14f36;
+    --dn-soft: rgba(193, 79, 54, 0.12);
+    --dn-glow: rgba(193, 79, 54, 0.30);
 
-    --shadow-1: 0 0 0 1px rgba(216, 210, 192, 0.05), 0 2px 12px rgba(0, 0, 0, 0.6);
-    --shadow-2: 0 0 0 1px rgba(216, 210, 192, 0.06), 0 12px 32px rgba(0, 0, 0, 0.7);
-    --shadow-3: 0 0 0 1px rgba(216, 210, 192, 0.09), 0 32px 80px rgba(0, 0, 0, 0.85);
+    --shadow-1: 0 0 0 1px rgba(221, 228, 225, 0.05), 0 2px 12px rgba(0, 0, 0, 0.6);
+    --shadow-2: 0 0 0 1px rgba(221, 228, 225, 0.06), 0 12px 32px rgba(0, 0, 0, 0.7);
+    --shadow-3: 0 0 0 1px rgba(221, 228, 225, 0.09), 0 32px 80px rgba(0, 0, 0, 0.85);
 
     --ease: cubic-bezier(0.22, 1, 0.36, 1);
     --ease-slow: cubic-bezier(0.16, 1, 0.3, 1);
@@ -52,14 +54,14 @@
     --bg-base: var(--bone);
     --bg-surface-1: var(--surface);
     --bg-surface-2: var(--surface-2);
-    --bg-surface-3: #1c1a22;
+    --bg-surface-3: #1a2427;
     --border-subtle: var(--line);
     --border-default: var(--line-2);
     --border-strong: var(--line-3);
     --accent: var(--forest);
     --accent-hover: var(--forest-2);
     --accent-subtle: var(--forest-soft);
-    --accent-subtle-hover: rgba(174, 185, 199, 0.16);
+    --accent-subtle-hover: rgba(49, 169, 196, 0.16);
     --text-primary: var(--ink);
     --text-secondary: var(--ink-2);
     --text-tertiary: var(--mute);
@@ -72,7 +74,7 @@
     --shadow-sm: var(--shadow-1);
     --shadow-md: var(--shadow-2);
     --shadow-lg: var(--shadow-3);
-    --glow-accent: 0 0 22px rgba(174, 185, 199, 0.16);
+    --glow-accent: 0 0 22px rgba(49, 169, 196, 0.16);
 
     --space-1: 4px;
     --space-2: 8px;
@@ -102,21 +104,21 @@
     --label: 500 10.5px / 1.4 'Geist Mono', monospace;
     --caption: 400 11px / 1.45 'Geist Mono', monospace;
 
-    --bg-base-rgb: 5 4 5;
-    --bg-surface-1-rgb: 15 14 19;
-    --bg-surface-2-rgb: 22 21 28;
-    --bg-surface-3-rgb: 28 26 34;
-    --border-subtle-rgb: 216 210 192;
-    --border-default-rgb: 216 210 192;
-    --border-strong-rgb: 216 210 192;
-    --accent-rgb: 174 185 199;
-    --accent-hover-rgb: 200 210 222;
-    --text-primary-rgb: 216 210 192;
-    --text-secondary-rgb: 168 162 148;
-    --text-tertiary-rgb: 122 117 104;
-    --positive-rgb: 91 168 121;
-    --negative-rgb: 194 90 58;
-    --neutral-rgb: 122 117 104;
+    --bg-base-rgb: 7 11 12;
+    --bg-surface-1-rgb: 14 20 22;
+    --bg-surface-2-rgb: 20 28 31;
+    --bg-surface-3-rgb: 26 36 39;
+    --border-subtle-rgb: 221 228 225;
+    --border-default-rgb: 221 228 225;
+    --border-strong-rgb: 221 228 225;
+    --accent-rgb: 49 169 196;
+    --accent-hover-rgb: 85 192 214;
+    --text-primary-rgb: 221 228 225;
+    --text-secondary-rgb: 163 174 170;
+    --text-tertiary-rgb: 116 128 124;
+    --positive-rgb: 94 201 115;
+    --negative-rgb: 193 79 54;
+    --neutral-rgb: 116 128 124;
   }
 
   *,
@@ -135,8 +137,8 @@
     min-height: 100vh;
     margin: 0;
     background:
-      radial-gradient(1400px 700px at 100% 0%, rgba(91, 156, 214, 0.06), transparent 60%),
-      radial-gradient(900px 600px at 0% 100%, rgba(174, 185, 199, 0.04), transparent 60%),
+      radial-gradient(1400px 700px at 100% 0%, rgba(69, 181, 208, 0.06), transparent 60%),
+      radial-gradient(900px 600px at 0% 100%, rgba(49, 169, 196, 0.04), transparent 60%),
       radial-gradient(800px 400px at 50% 50%, rgba(0, 0, 0, 0.4), transparent 70%),
       var(--bone);
     background-attachment: fixed;
@@ -157,7 +159,7 @@
     inset: 0;
     z-index: 2;
     pointer-events: none;
-    background: radial-gradient(120% 100% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.5) 100%);
+    background: radial-gradient(120% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.32) 100%);
   }
 
   body > * {
@@ -326,7 +328,7 @@
     border: 1px solid var(--line);
     border-radius: var(--radius-xl);
     background:
-      linear-gradient(180deg, rgba(216, 210, 192, 0.025), rgba(216, 210, 192, 0)),
+      linear-gradient(180deg, rgba(221, 228, 225, 0.025), rgba(221, 228, 225, 0)),
       var(--surface);
     box-shadow: var(--shadow-1);
   }
@@ -427,7 +429,7 @@
     border: 1px solid var(--line);
     border-radius: var(--radius-lg);
     background:
-      linear-gradient(180deg, rgba(216, 210, 192, 0.025), rgba(216, 210, 192, 0)),
+      linear-gradient(180deg, rgba(221, 228, 225, 0.025), rgba(221, 228, 225, 0)),
       var(--surface);
     box-shadow: var(--shadow-2);
   }
@@ -534,14 +536,14 @@
 
   .chip-up,
   .status-up {
-    border-color: rgba(91, 168, 121, 0.22);
+    border-color: rgba(94, 201, 115, 0.22);
     background: var(--up-soft);
     color: var(--up);
   }
 
   .chip-dn,
   .status-dn {
-    border-color: rgba(194, 90, 58, 0.22);
+    border-color: rgba(193, 79, 54, 0.22);
     background: var(--dn-soft);
     color: var(--dn);
   }
@@ -552,12 +554,12 @@
   }
 
   .chip-neutral {
-    background: rgba(216, 210, 192, 0.04);
+    background: rgba(221, 228, 225, 0.04);
     color: var(--mute);
   }
 
   .status {
-    border: 1px solid rgba(91, 156, 214, 0.18);
+    border: 1px solid rgba(69, 181, 208, 0.18);
     background: var(--sapphire-soft);
     padding: 3px 8px;
     color: var(--sapphire);
@@ -566,7 +568,7 @@
   }
 
   .status-amber {
-    border-color: rgba(232, 160, 50, 0.22);
+    border-color: rgba(223, 160, 66, 0.22);
     background: var(--amber-soft);
     color: var(--amber);
   }
@@ -611,7 +613,7 @@
 
   .btn-primary:hover {
     background: var(--forest);
-    box-shadow: 0 4px 14px -4px rgba(174, 185, 199, 0.42);
+    box-shadow: 0 4px 14px -4px rgba(49, 169, 196, 0.42);
     transform: translateY(-1px);
   }
 
@@ -763,7 +765,7 @@
     height: 3px;
     overflow: hidden;
     border-radius: 999px;
-    background: rgba(216, 210, 192, 0.08);
+    background: rgba(221, 228, 225, 0.08);
   }
 
   .bar-fill {
@@ -775,7 +777,7 @@
 
   .kbd {
     border-radius: 4px;
-    background: rgba(216, 210, 192, 0.08);
+    background: rgba(221, 228, 225, 0.08);
     color: var(--mute);
     font-family: 'Geist Mono', ui-monospace, monospace;
     font-size: 10px;
@@ -838,8 +840,8 @@
     background: linear-gradient(
       90deg,
       transparent 0%,
-      rgba(216, 210, 192, 0.08) 45%,
-      rgba(216, 210, 192, 0.14) 50%,
+      rgba(221, 228, 225, 0.08) 45%,
+      rgba(221, 228, 225, 0.14) 50%,
       transparent 100%
     );
     animation: screener-shimmer 1.5s infinite;
@@ -945,8 +947,8 @@
 
   .bg-grid-luxe {
     background:
-      linear-gradient(rgba(216, 210, 192, 0.025) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(216, 210, 192, 0.025) 1px, transparent 1px),
+      linear-gradient(rgba(221, 228, 225, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(221, 228, 225, 0.025) 1px, transparent 1px),
       var(--surface);
     background-size: 36px 36px;
   }
@@ -960,7 +962,7 @@
   }
 
   .surface-3 {
-    background: #1c1a22;
+    background: #1a2427;
   }
 }
 

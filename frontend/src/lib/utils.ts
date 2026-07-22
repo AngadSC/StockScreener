@@ -5,6 +5,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Validate an untrusted post-auth `redirect` value and return a safe,
+ * same-origin relative path. Anything that could escape the origin
+ * (absolute URLs, protocol-relative `//host`, backslash tricks) falls
+ * back to the provided default so we never become an open redirect.
+ */
+export function sanitizeRedirectPath(
+  raw: string | string[] | null | undefined,
+  fallback = '/screener'
+): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || typeof value !== 'string') return fallback;
+  // Must be an absolute path on our own origin.
+  if (value[0] !== '/') return fallback;
+  // Reject protocol-relative ("//evil.com") and backslash variants ("/\\evil.com").
+  if (value[1] === '/' || value[1] === '\\') return fallback;
+  return value;
+}
+
 // ====================================
 // FORMATTING UTILITIES
 // ====================================

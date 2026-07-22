@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation';
 import { Loader2, LogIn } from 'lucide-react';
 
 import { authAPI } from '@/lib/api';
+import { sanitizeRedirectPath } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-export default function LoginForm() {
+export default function LoginForm({ redirectTo = '/screener' }: { redirectTo?: string }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -24,7 +25,7 @@ export default function LoginForm() {
 
     try {
       await authAPI.login({ email, password });
-      router.push('/screener');
+      router.push(sanitizeRedirectPath(redirectTo));
     } catch (err: any) {
       const detail = err.response?.data?.detail;
       if (Array.isArray(detail)) {

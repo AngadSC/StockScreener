@@ -37,7 +37,7 @@ const plans: Plan[] = [
     tier: 'pro',
     price: '$19.99 USD',
     priceNote: 'Founders Edition',
-    description: 'Unlock the AI Swing Analyzer and the active Pro workflow.',
+    description: 'Structured AI swing reports for any US ticker.',
     features: [
       'AI Swing Analyzer access',
       'Setup-focused AI reports',

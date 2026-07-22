@@ -81,6 +81,7 @@ export default function Header() {
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const latestQueryRef = useRef(0);
+  const isSearchFocusedRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
@@ -132,7 +133,9 @@ export default function Header() {
         const result = await screenerAPI.suggestStocks(trimmed, 6);
         if (requestId !== latestQueryRef.current) return;
         setSuggestions(result.results);
-        setSuggestOpen(true);
+        // Only open the dropdown for explicit user typing/focus, not for
+        // URL-driven searchQuery changes (e.g. navigating to ?search=...).
+        if (isSearchFocusedRef.current) setSuggestOpen(true);
       } catch {
         if (requestId !== latestQueryRef.current) return;
         setSuggestions([]);
@@ -187,10 +190,12 @@ export default function Header() {
           aria-label="Search stocks"
           className="w-full border-none bg-transparent p-0 text-sm text-[var(--ink)] shadow-none outline-none placeholder:text-[var(--whisper)] focus:border-none focus:shadow-none"
           onBlur={() => {
+            isSearchFocusedRef.current = false;
             setTimeout(() => setSuggestOpen(false), 150);
           }}
           onChange={(event) => setSearchQuery(event.target.value)}
           onFocus={() => {
+            isSearchFocusedRef.current = true;
             if (suggestions.length > 0) setSuggestOpen(true);
           }}
           placeholder="Ticker or company"

@@ -6,6 +6,38 @@ from typing import List, Tuple, Dict, Any, Optional
 import math
 
 
+# Real, sortable columns on StockFundamental. Any sort_by outside this set
+# falls back to a sensible default rather than raising on order_by(...).
+SORTABLE_FIELDS = {
+    "pe_ratio",
+    "forward_pe",
+    "peg_ratio",
+    "price_to_book",
+    "price_to_sales",
+    "ev_to_ebitda",
+    "profit_margin",
+    "operating_margin",
+    "roe",
+    "roa",
+    "debt_to_equity",
+    "current_ratio",
+    "quick_ratio",
+    "revenue_growth",
+    "earnings_growth",
+    "dividend_yield",
+    "dividend_rate",
+    "payout_ratio",
+    "market_cap",
+    "volume",
+    "avg_volume",
+    "beta",
+    "current_price",
+    "day_change_percent",
+    "fifty_two_week_high",
+    "fifty_two_week_low",
+}
+
+
 def _resolve_company_name(ticker: Ticker, fundamental: Optional[StockFundamental]) -> Optional[str]:
     if ticker.name:
         return ticker.name
@@ -175,12 +207,12 @@ def screen_stocks(db: Session, filters: StockFilter) -> Tuple[List[Dict[str, Any
     total = query.count()
 
     # Sorting
-    if hasattr(StockFundamental, filters.sort_by):
-        sort_column = getattr(StockFundamental, filters.sort_by)
-        if filters.sort_order == "desc":
-            query = query.order_by(nulls_last(desc(sort_column)), Ticker.symbol.asc())
-        else:
-            query = query.order_by(nulls_last(asc(sort_column)), Ticker.symbol.asc())
+    sort_by = filters.sort_by if filters.sort_by in SORTABLE_FIELDS else "market_cap"
+    sort_column = getattr(StockFundamental, sort_by)
+    if filters.sort_order == "desc":
+        query = query.order_by(nulls_last(desc(sort_column)), Ticker.symbol.asc())
+    else:
+        query = query.order_by(nulls_last(asc(sort_column)), Ticker.symbol.asc())
 
     # Pagination
     results = query.offset(filters.skip).limit(filters.limit).all()

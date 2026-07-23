@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, desc, asc, or_, nulls_last
+from sqlalchemy import and_, case, desc, asc, func, or_, nulls_last
 from app.database.models import Ticker, StockFundamental
 from app.models.stock import StockFilter
 from typing import List, Tuple, Dict, Any, Optional
@@ -85,6 +85,46 @@ def _build_search_filter(term: str):
         StockFundamental.additional_data['displayName'].astext.ilike(like_term),
     )
 
+def _search_name_expr():
+    """Best-available company name across Ticker.name and fundamental JSON."""
+    return func.lower(
+        func.coalesce(
+            Ticker.name,
+            StockFundamental.additional_data['price']['longName'].astext,
+            StockFundamental.additional_data['price']['shortName'].astext,
+            StockFundamental.additional_data['summary']['longName'].astext,
+            StockFundamental.additional_data['longName'].astext,
+            StockFundamental.additional_data['shortName'].astext,
+            StockFundamental.additional_data['displayName'].astext,
+            '',
+        )
+    )
+
+
+def _search_rank(term: str):
+    """Lower rank = better match, so exact/prefix hits sort above substring hits.
+
+    Without this, suggestions were ordered alphabetically by symbol, which
+    buried near-exact matches (e.g. searching "intel" put INTC last, under
+    AIO, AXIN, CCC...).
+    """
+    lowered = term.strip().lower()
+    prefix = f"{lowered}%"
+    word_prefix = f"{lowered} %"              # term as the first whole word
+    symbol_lower = func.lower(Ticker.symbol)
+    name_lower = _search_name_expr()
+    return case(
+        (symbol_lower == lowered, 0),          # exact symbol match
+        (name_lower == lowered, 1),            # exact company-name match
+        (symbol_lower.like(prefix), 2),        # symbol starts with term
+        # name's first word is the term ("Intel Corporation" for "intel"),
+        # ranked above a raw prefix so "Intelligent..." doesn't outrank it.
+        (name_lower.like(word_prefix), 3),
+        (name_lower.like(prefix), 4),          # name starts with term
+        else_=5,                               # substring match elsewhere
+    )
+
+
 def get_search_suggestions(
     db: Session,
     term: str,
@@ -96,7 +136,15 @@ def get_search_suggestions(
     )
 
     query = query.filter(_build_search_filter(term))
-    results = query.order_by(Ticker.symbol.asc()).limit(limit).all()
+    results = (
+        query.order_by(
+            _search_rank(term).asc(),
+            func.length(Ticker.symbol).asc(),
+            Ticker.symbol.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
 
     suggestions = []
     for ticker, fundamental in results:

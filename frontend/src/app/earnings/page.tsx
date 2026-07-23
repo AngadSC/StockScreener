@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, Loader2, Star, Sunrise, Sunset } from 'lucide-react';
+import { CalendarDays, ChevronRight, Loader2, Star, Sunrise, Sunset } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { marketAPI } from '@/lib/api';
@@ -106,11 +106,9 @@ export default function EarningsPage() {
             </p>
           </div>
 
-          <div className="hud flex min-w-[220px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
-              <CalendarDays className="h-5 w-5" />
+          <div className="flex min-w-[220px] items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <div className="icon-tile h-11 w-11">
+              <CalendarDays className="h-5 w-5" strokeWidth={1.6} />
             </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
@@ -164,10 +162,11 @@ export default function EarningsPage() {
                 ) : (
                   <div className="divide-y divide-[var(--border-subtle)]">
                     {events.map((event) => (
-                      <div
+                      <Link
                         key={`${event.ticker}-${event.earnings_date}`}
+                        href={`/stocks/${event.ticker}`}
                         className={cn(
-                          'flex flex-wrap items-center justify-between gap-3 px-4 py-3',
+                          'group row-hover flex flex-wrap items-center justify-between gap-3 px-4 py-3',
                           event.is_watchlisted && 'bg-[var(--accent-subtle)]'
                         )}
                       >
@@ -175,12 +174,9 @@ export default function EarningsPage() {
                           {event.is_watchlisted ? (
                             <Star className="h-3.5 w-3.5 shrink-0 fill-current text-[var(--accent)]" />
                           ) : null}
-                          <Link
-                            href={`/stocks/${event.ticker}`}
-                            className="serif-num text-base text-[var(--text-primary)] transition-colors hover:text-[var(--accent)]"
-                          >
+                          <span className="serif-num text-base text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
                             {event.ticker}
-                          </Link>
+                          </span>
                           <span className="truncate text-sm text-[var(--text-secondary)]">
                             {event.name || ''}
                           </span>
@@ -198,8 +194,9 @@ export default function EarningsPage() {
                               {formatMarketCap(event.market_cap)}
                             </span>
                           ) : null}
+                          <ChevronRight className="row-arrow h-4 w-4" strokeWidth={1.6} />
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}

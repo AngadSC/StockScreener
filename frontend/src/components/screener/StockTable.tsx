@@ -203,9 +203,7 @@ export default function StockTable({
   }
 
   return (
-    <div className="deco-panel hud overflow-hidden bg-[var(--bg-surface-1)]">
-      <span className="hud-c1" />
-      <span className="hud-c2" />
+    <div className="deco-panel overflow-hidden bg-[var(--bg-surface-1)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[var(--bg-surface-1)] px-5 py-4">
         <div>
           <h2 className="heading-md text-[var(--text-primary)]">Results</h2>
@@ -223,9 +221,9 @@ export default function StockTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table>
+        <table className="deco-table">
           <thead className="bg-[var(--bg-surface-2)]">
-            <tr className="border-b border-[var(--border-default)] text-xs font-medium text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border-default)]">
               <th className="px-4 py-3 text-left">Ticker</th>
               <th className="px-4 py-3 text-left">Company</th>
               <SortableColumn

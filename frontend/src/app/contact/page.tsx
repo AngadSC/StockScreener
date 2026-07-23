@@ -6,6 +6,9 @@ export default function ContactPage() {
       <section className="deco-panel max-w-3xl p-6 md:p-8">
         <div className="eyebrow">Contact</div>
         <h1 className="mt-3">Support</h1>
+        <p className="mt-2 text-sm text-[var(--text-tertiary)]">
+          Reach the team for account, billing, or product questions.
+        </p>
         <p className="mt-4 text-sm leading-7 text-[var(--text-secondary)]">
           For product questions, bug reports, or account issues, use the contact channel configured
           for your deployment.

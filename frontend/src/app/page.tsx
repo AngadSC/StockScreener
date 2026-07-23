@@ -206,7 +206,7 @@ function ToolTile({ tool }: { tool: Tool }) {
       href={tool.href}
       className="group row-hover flex items-center gap-3.5 rounded-[12px] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] px-4 py-3.5"
     >
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--accent)]">
+      <span className="icon-tile h-9 w-9 transition-colors duration-[180ms] group-hover:text-[var(--text-primary)]">
         <Icon className="h-4 w-4" strokeWidth={1.6} aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">
@@ -232,9 +232,7 @@ function MarketSection({
   historyByTicker: Map<string, StockPrice[]>;
 }) {
   return (
-    <Card className="hud p-5 md:p-6">
-      <span className="hud-c1" />
-      <span className="hud-c2" />
+    <Card className="p-5 md:p-6">
       <div>
         <div className="eyebrow">{eyebrow}</div>
         <h2 className="heading-md mt-2 text-[var(--text-primary)]">{title}</h2>
@@ -556,7 +554,7 @@ export default function HomePage() {
                 <span className="text-[12px] text-[var(--text-tertiary)]">$19.99 / mo</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--accent)]">
+                <span className="icon-tile h-10 w-10">
                   <Sparkles className="h-5 w-5" strokeWidth={1.6} />
                 </span>
                 <h3 className="heading-md text-[var(--text-primary)]">AI Swing Analyzer</h3>
@@ -584,7 +582,7 @@ export default function HomePage() {
                 <span className="text-[12px] text-[var(--text-tertiary)]">$39.99 / $79.99 / mo</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--accent)]">
+                <span className="icon-tile h-10 w-10">
                   <Mail className="h-5 w-5" strokeWidth={1.6} />
                 </span>
                 <h3 className="heading-md text-[var(--text-primary)]">Daily research, emailed</h3>

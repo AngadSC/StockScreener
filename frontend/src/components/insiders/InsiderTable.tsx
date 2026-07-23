@@ -69,13 +69,11 @@ export default function InsiderTable({ transactions, isLoading }: InsiderTablePr
   }
 
   return (
-    <div className="deco-panel hud overflow-hidden bg-[var(--bg-surface-1)]">
-      <span className="hud-c1" />
-      <span className="hud-c2" />
+    <div className="deco-panel overflow-hidden bg-[var(--bg-surface-1)]">
       <div className="overflow-x-auto">
-        <table>
+        <table className="deco-table">
           <thead className="bg-[var(--bg-surface-2)]">
-            <tr className="border-b border-[var(--border-default)] text-xs font-medium text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border-default)]">
               <th className="px-4 py-3 text-left">Filed</th>
               <th className="px-4 py-3 text-left">Symbol</th>
               <th className="px-4 py-3 text-left">Company</th>

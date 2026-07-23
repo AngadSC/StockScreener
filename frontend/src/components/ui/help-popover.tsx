@@ -98,7 +98,7 @@ export default function HelpPopover({
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-primary/30 bg-[var(--accent-subtle)] text-primary transition-[background,border-color,box-shadow,color,transform] duration-[180ms] hover:bg-[var(--accent-subtle-hover)]"
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--text-tertiary)] transition-[background,border-color,box-shadow,color,transform] duration-[180ms] hover:border-[var(--accent)] hover:text-[var(--accent)]"
         aria-label={`Help for ${title}`}
         aria-controls={open ? popoverId : undefined}
         aria-expanded={open}
@@ -141,7 +141,7 @@ export default function HelpPopover({
               <div className="mt-2 text-base font-semibold text-foreground">{title}</div>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{description}</p>
               {suggestion ? (
-                <div className="mt-4 rounded-md border border-primary/20 bg-[var(--accent-subtle)] px-3 py-2 text-xs text-primary">
+                <div className="mt-4 rounded-md border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-3 py-2 text-xs text-[var(--text-secondary)]">
                   Suggested: {suggestion}
                 </div>
               ) : null}

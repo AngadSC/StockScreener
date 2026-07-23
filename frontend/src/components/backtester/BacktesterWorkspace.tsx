@@ -322,8 +322,8 @@ export default function BacktesterWorkspace({
         <FieldShell label="End Date"><Input type="date" value={request.end_date} onChange={(event) => setRequest((prev) => ({ ...prev, end_date: event.target.value }))} /></FieldShell>
       </div>
       <FieldShell label="Timeframe">
-        <div className="grid grid-cols-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] p-1">
-          {TIMEFRAME_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRequest((prev) => ({ ...prev, timeframe: option.value }))} className={cn('rounded-[var(--radius-md)] px-3 py-2 text-sm transition-colors', request.timeframe === option.value ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>{option.label}</button>)}
+        <div className="seg w-full">
+          {TIMEFRAME_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRequest((prev) => ({ ...prev, timeframe: option.value }))} className={cn('seg-btn flex-1', request.timeframe === option.value && 'active')}>{option.label}</button>)}
         </div>
       </FieldShell>
     </div>
@@ -405,8 +405,8 @@ export default function BacktesterWorkspace({
         <FieldShell label="End Date"><Input type="date" value={request.end_date} onChange={(event) => setRequest((prev) => ({ ...prev, end_date: event.target.value }))} /></FieldShell>
       </div>
       <FieldShell label="Timeframe">
-        <div className="grid grid-cols-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] p-1">
-          {TIMEFRAME_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRequest((prev) => ({ ...prev, timeframe: option.value }))} className={cn('rounded-[var(--radius-md)] px-3 py-2 text-sm transition-colors', request.timeframe === option.value ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>{option.label}</button>)}
+        <div className="seg w-full">
+          {TIMEFRAME_OPTIONS.map((option) => <button key={option.value} type="button" onClick={() => setRequest((prev) => ({ ...prev, timeframe: option.value }))} className={cn('seg-btn flex-1', request.timeframe === option.value && 'active')}>{option.label}</button>)}
         </div>
       </FieldShell>
       <FieldShell label="Transaction Cost"><AffixInput value={request.tc_bps} suffix="bps" min="0" step="1" onChange={(value) => setRequest((prev) => ({ ...prev, tc_bps: parseNumber(value, prev.tc_bps) }))} /></FieldShell>
@@ -423,12 +423,12 @@ export default function BacktesterWorkspace({
           <aside className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--bg-surface-1)] shadow-[var(--shadow-sm)] xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)]">
             <div className="flex min-h-[760px] flex-col">
               <div className="border-b border-[var(--border-subtle)] px-5 py-5">
-                <div className="grid grid-cols-2 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] p-1">
+                <div className="seg w-full">
                   {[
                     { id: 'automated', label: 'Automated Strategies' },
                     { id: 'indicator', label: 'Indicator Strategies' },
                   ].map((item) => (
-                    <button key={item.id} type="button" onClick={() => setMode(item.id as BacktesterMode)} className={cn('rounded-[var(--radius-md)] px-3 py-2 text-sm transition-colors', mode === item.id ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>{item.label}</button>
+                    <button key={item.id} type="button" onClick={() => setMode(item.id as BacktesterMode)} className={cn('seg-btn flex-1', mode === item.id && 'active')}>{item.label}</button>
                   ))}
                 </div>
                 {mode === 'automated' ? (
@@ -438,7 +438,7 @@ export default function BacktesterWorkspace({
                       { id: 'strategy', label: 'Strategy' },
                       { id: 'risk', label: 'Risk' },
                     ].map((step) => (
-                      <button key={step.id} type="button" onClick={() => setActiveStep(step.id as typeof activeStep)} className={cn('rounded-[var(--radius-md)] border px-3 py-2 text-xs font-medium transition-colors', activeStep === step.id ? 'border-[var(--accent)] text-[var(--text-primary)]' : 'border-[var(--border-default)] text-[var(--text-secondary)]')}>{step.label}</button>
+                      <button key={step.id} type="button" onClick={() => setActiveStep(step.id as typeof activeStep)} className={cn('rounded-[var(--radius-md)] border px-3 py-2 text-xs font-medium transition-colors', activeStep === step.id ? 'border-[var(--border-strong)] bg-[var(--bg-surface-2)] text-[var(--text-primary)]' : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]')}>{step.label}</button>
                     ))}
                   </div>
                 ) : null}
@@ -458,7 +458,7 @@ export default function BacktesterWorkspace({
               <div className="rounded-[var(--radius-xl)] border border-[var(--negative)]/40 bg-[var(--bg-surface-1)] p-8 shadow-[var(--shadow-sm)]"><div style={headingMdStyle}>Backtest failed</div><p className="mt-2 text-sm text-[var(--negative)]">{(activeError as Error).message || 'The request could not be completed.'}</p></div>
             ) : activeResult ? (
               <div className="results-enter space-y-6">
-                {activeResult.warnings.length > 0 ? <div className="rounded-[var(--radius-lg)] border border-[var(--accent)]/30 bg-[var(--accent-subtle)] px-4 py-3 text-sm text-[var(--text-primary)]">{activeResult.warnings.map((warning) => <div key={warning}>{warning}</div>)}</div> : null}
+                {activeResult.warnings.length > 0 ? <div className="rounded-[var(--radius-lg)] border border-[var(--amber)]/30 bg-[var(--amber-soft)] px-4 py-3 text-sm text-[var(--text-secondary)]">{activeResult.warnings.map((warning) => <div key={warning}>{warning}</div>)}</div> : null}
                 <div className="rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--bg-surface-1)] p-5 shadow-[var(--shadow-sm)]">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div><div style={headingMdStyle}>Equity Curve</div><p className="mt-1 text-sm text-[var(--text-secondary)]">{formatDate(activeResult.start_date)} to {formatDate(activeResult.end_date)} {'\u00B7'} {activeResult.timeframe}</p></div>

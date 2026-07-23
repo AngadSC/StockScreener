@@ -127,7 +127,7 @@ export default function AiAnalyzerPage() {
                     {suggestions.map((item) => (
                       <div
                         key={item.ticker}
-                        className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--accent-subtle)]"
+                        className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--bg-surface-2)]"
                         onMouseDown={(event) => {
                           event.preventDefault();
                           handleSuggestionSelect(item.ticker);
@@ -167,6 +167,12 @@ export default function AiAnalyzerPage() {
               </button>
             ))}
           </div>
+          {!submittedTicker ? (
+            <p className="mt-4 max-w-[70ch] text-xs leading-5 text-[var(--text-secondary)]">
+              Each report covers the setup and trend, key support and resistance levels, recent
+              catalysts, and a plain-English thesis. Uses one of your monthly reports.
+            </p>
+          ) : null}
         </section>
 
         {isLoading ? (
@@ -201,8 +207,8 @@ export default function AiAnalyzerPage() {
           <section className="deco-panel p-6 md:p-7">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="flex gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--accent)]/25 bg-[var(--accent-subtle)]">
-                  <Lock className="h-5 w-5 text-[var(--accent)]" />
+                <div className="icon-tile h-10 w-10">
+                  <Lock className="h-5 w-5" strokeWidth={1.6} />
                 </div>
                 <div>
                   <div className="eyebrow">Pro Access</div>
@@ -220,9 +226,7 @@ export default function AiAnalyzerPage() {
         ) : null}
 
         {canAnalyze && submittedTicker ? (
-          <div className="card-ivory hud p-1">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
+          <div className="card-ivory p-1">
             <AIReportCard key={submittedTicker} ticker={submittedTicker} userTier={userTier} />
           </div>
         ) : null}

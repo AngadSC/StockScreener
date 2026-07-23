@@ -71,7 +71,7 @@ export default function AIReportNewsSection({
               return (
                 <Tag
                   key={`${headline}-${article.url ?? article.source ?? ''}`}
-                  className="group flex items-start justify-between gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4 transition-[border-color,background,color] duration-[180ms] hover:border-[var(--accent)] hover:bg-[var(--accent-subtle)]"
+                  className="group flex items-start justify-between gap-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] p-4 transition-[border-color,background,color] duration-[180ms] hover:border-[var(--border-default)] hover:bg-[var(--bg-surface-3)]"
                   {...linkProps}
                 >
                   <span className="min-w-0">

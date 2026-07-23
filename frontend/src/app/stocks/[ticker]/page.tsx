@@ -296,17 +296,9 @@ export default function StockDetailPage({ params }: PageProps) {
         </nav>
 
         <div className="space-y-4">
-          <section className="hud relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--line)] bg-[var(--surface)] p-6 shadow-[var(--shadow-2)] md:p-8">
+          <section className="hud relative overflow-hidden rounded-[var(--radius-xl)] border border-[var(--line-2)] bg-[var(--surface)] p-6 shadow-[var(--shadow-2)] md:p-8">
             <span className="hud-c1" />
             <span className="hud-c2" />
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 left-0 w-[40%]"
-              style={{
-                background:
-                  'linear-gradient(90deg, rgba(69,181,208,0.08) 0%, rgba(49,169,196,0.04) 24%, transparent 48%)',
-              }}
-            />
 
             <div className="relative z-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.92fr)] xl:items-center">
               <div className="min-w-0">
@@ -319,6 +311,9 @@ export default function StockDetailPage({ params }: PageProps) {
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Button asChild size="lg">
                     <Link href="/ai-analyzer">AI analysis</Link>
+                  </Button>
+                  <Button asChild size="lg" variant="outline">
+                    <Link href={`/compare?symbols=${ticker}`}>Compare with…</Link>
                   </Button>
                   <Button asChild size="lg" variant="ghost">
                     <Link href={`/backtester?tickers=${ticker}`}>Backtest</Link>
@@ -371,9 +366,7 @@ export default function StockDetailPage({ params }: PageProps) {
           <TradingViewChart ticker={ticker} />
         </div>
 
-        <section className="deco-panel hud p-6 md:p-7">
-          <span className="hud-c1" />
-          <span className="hud-c2" />
+        <section className="deco-panel p-6 md:p-7">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="eyebrow">Fundamentals</div>
@@ -413,7 +406,7 @@ export default function StockDetailPage({ params }: PageProps) {
                     <Link
                       key={candidate.ticker}
                       href={`/stocks/${candidate.ticker}`}
-                      className="group min-w-[250px] max-w-[250px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-4 hover:-translate-y-[2px] hover:border-[var(--accent)] hover:shadow-[0_0_0_1px_var(--accent),0_16px_32px_rgba(49,169,196,0.14)]"
+                      className="group min-w-[250px] max-w-[250px] rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-4 hover:-translate-y-[2px] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-2)]"
                       style={{
                         transition: 'transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease',
                       }}

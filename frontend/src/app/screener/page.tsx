@@ -98,11 +98,9 @@ function ScreenerPageContent() {
             </div>
           </div>
 
-          <div className="hud flex min-w-[240px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
-              <BarChart3 className="h-5 w-5" />
+          <div className="flex min-w-[240px] items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <div className="icon-tile h-11 w-11">
+              <BarChart3 className="h-5 w-5" strokeWidth={1.6} />
             </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
@@ -118,9 +116,7 @@ function ScreenerPageContent() {
 
       <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
         <aside>
-          <div className="deco-scroll hud flex flex-col overflow-hidden border border-[var(--line)] bg-[var(--surface)] shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
+          <div className="deco-scroll flex flex-col overflow-hidden rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] shadow-[var(--shadow-1)] lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
             <FilterPanel
               filters={filters}
               isFetching={isFetching}

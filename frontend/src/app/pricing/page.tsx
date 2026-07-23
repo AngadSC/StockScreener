@@ -98,7 +98,7 @@ export default function PricingPage() {
             </p>
           </div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-1)] px-4 py-2 text-sm text-[var(--text-secondary)]">
-            <CreditCard className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
+            <CreditCard className="h-4 w-4 text-[var(--text-tertiary)]" aria-hidden="true" strokeWidth={1.6} />
             Secure checkout
           </div>
         </section>

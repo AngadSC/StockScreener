@@ -11,6 +11,17 @@ import type { MacroSeriesData } from '@/types/macro';
 
 const YIELD_CURVE_SERIES_ID = 'T10Y2Y';
 
+// Plain-English "what this implies" line for each FRED series, keyed by id.
+const MACRO_IMPLICATIONS: Record<string, string> = {
+  DGS10: 'The benchmark long-term rate that prices mortgages and long-dated debt.',
+  DGS2: 'The short-term rate that tracks expected Fed policy most closely.',
+  FEDFUNDS: 'The Fed’s policy rate — the anchor for borrowing costs across the economy.',
+  UNRATE: 'A rising rate points to a cooling labor market; a falling rate to a tightening one.',
+  CPIAUCSL: 'Year-over-year inflation. Hotter readings keep pressure on the Fed to hold rates high.',
+  MORTGAGE30US: 'The typical 30-year home loan rate — a read on housing affordability.',
+  VIXCLS: 'The market’s expected volatility over the next 30 days — Wall Street’s fear gauge.',
+};
+
 function formatMacroValue(value: number | null | undefined, unit: string): string {
   if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
   if (unit === 'idx') return value.toFixed(2);
@@ -66,6 +77,11 @@ function StatTile({ series }: { series: MacroSeriesData }) {
             </span>
           ) : null}
         </div>
+        {MACRO_IMPLICATIONS[series.id] ? (
+          <p className="mt-2.5 text-xs leading-relaxed text-[var(--text-tertiary)]">
+            {MACRO_IMPLICATIONS[series.id]}
+          </p>
+        ) : null}
       </div>
       <MacroSparkline data={series.sparkline} />
     </div>
@@ -174,11 +190,9 @@ export default function MacroPage() {
             </p>
           </div>
 
-          <div className="hud flex min-w-[220px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
-              <Landmark className="h-5 w-5" />
+          <div className="flex min-w-[220px] items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <div className="icon-tile h-11 w-11">
+              <Landmark className="h-5 w-5" strokeWidth={1.6} />
             </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">

@@ -40,7 +40,7 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
           theme: 'dark',
           style: '1',
           locale: 'en',
-          toolbar_bg: '#0f0f1a',
+          toolbar_bg: '#0d1011',
           enable_publishing: false,
           withdateranges: true,
           hide_side_toolbar: false,
@@ -48,8 +48,8 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
           save_image: true,
           container_id: 'tradingview_chart',
           studies: ['Volume@tv-basicstudies'],
-          backgroundColor: '#0f0f1a',
-          gridColor: 'rgba(61, 61, 96, 0.22)',
+          backgroundColor: '#0d1011',
+          gridColor: 'rgba(221, 228, 225, 0.06)',
         });
 
         setTimeout(() => setIsLoading(false), 1500);
@@ -107,7 +107,7 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
             <button
               key={feature}
               type="button"
-              className="rounded-[var(--radius-pill)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              className="rounded-[var(--radius-pill)] border border-[var(--border-default)] bg-[var(--bg-surface-2)] px-3 py-1 text-[12px] font-medium text-[var(--text-secondary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]"
               style={{ transition: 'border-color 180ms ease, color 180ms ease' }}
             >
               {feature}

@@ -59,11 +59,13 @@ const fromPercentInput = (rawValue: string): number | undefined => {
 
 function AccordionSection({
   title,
+  hint,
   isOpen,
   onToggle,
   children,
 }: {
   title: string;
+  hint?: string;
   isOpen: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -87,7 +89,7 @@ function AccordionSection({
         <ChevronDown
           className={cn(
             'h-4 w-4 text-[var(--text-tertiary)] transition-transform duration-[250ms] ease-[cubic-bezier(0.16,1,0.3,1)]',
-            isOpen && 'rotate-180 text-[var(--accent)]'
+            isOpen && 'rotate-180 text-[var(--text-secondary)]'
           )}
         />
       </button>
@@ -97,6 +99,9 @@ function AccordionSection({
         style={{ maxHeight: isOpen ? `${contentHeight}px` : '0px' }}
       >
         <div ref={contentRef} className="pb-5">
+          {hint ? (
+            <p className="mb-4 text-xs leading-relaxed text-[var(--text-tertiary)]">{hint}</p>
+          ) : null}
           {children}
         </div>
       </div>
@@ -217,6 +222,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
           <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-2)] px-4 py-2">
             <AccordionSection
               title="Valuation & Price"
+              hint="Filter by valuation multiples, share price, company size, and how actively a name trades."
               isOpen={openSections.valuation}
               onToggle={() => toggleSection('valuation')}
             >
@@ -294,6 +300,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
 
             <AccordionSection
               title="Quality & Risk"
+              hint="Screen on profitability, growth, leverage, and volatility to filter for balance-sheet quality."
               isOpen={openSections.quality}
               onToggle={() => toggleSection('quality')}
             >
@@ -349,6 +356,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
 
             <AccordionSection
               title="Sector & Industry"
+              hint="Restrict the results to one or more sectors or industries."
               isOpen={openSections.sectorIndustry}
               onToggle={() => toggleSection('sectorIndustry')}
             >
@@ -405,6 +413,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
 
             <AccordionSection
               title="Sorting"
+              hint="Choose which column ranks the results, and the direction."
               isOpen={openSections.sorting}
               onToggle={() => toggleSection('sorting')}
             >
@@ -443,7 +452,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
         </div>
       </div>
 
-      <div className="sticky bottom-0 border-t border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(15,15,26,0.94)_0%,rgba(15,15,26,1)_30%)] px-[var(--space-5)] py-4 backdrop-blur">
+      <div className="sticky bottom-0 border-t border-[var(--border-subtle)] bg-[rgb(var(--bg-surface-1-rgb)/0.95)] px-[var(--space-5)] py-4 backdrop-blur">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
             {isFetching ? (

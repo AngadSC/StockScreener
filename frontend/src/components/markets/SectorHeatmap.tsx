@@ -61,11 +61,9 @@ export default function SectorHeatmap({ sectors, isLoading }: SectorHeatmapProps
         return (
           <div
             key={sector.sector}
-            className="hud flex flex-col justify-between gap-2 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5"
+            className="flex flex-col justify-between gap-2 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5"
             style={{ backgroundColor: `rgba(${rgb}, ${alpha})` }}
           >
-            <span className="hud-c1" />
-            <span className="hud-c2" />
             <div className="truncate text-xs font-medium uppercase tracking-[0.08em] text-[var(--text-secondary)]">
               {sector.sector}
             </div>

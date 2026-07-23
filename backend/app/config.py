@@ -92,20 +92,75 @@ class Settings(BaseSettings):
         default=150,
         validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_PRO", "ai_monthly_report_limit_pro"),
     )
+    ai_monthly_report_limit_trader: int = Field(
+        default=400,
+        validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_TRADER", "ai_monthly_report_limit_trader"),
+    )
+    ai_monthly_report_limit_elite: int = Field(
+        default=1000,
+        validation_alias=AliasChoices("AI_MONTHLY_REPORT_LIMIT_ELITE", "ai_monthly_report_limit_elite"),
+    )
 
     # ===== STRIPE BILLING =====
     STRIPE_SECRET_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
+    STRIPE_TRADER_PRICE_ID: str = ""
+    STRIPE_ELITE_PRICE_ID: str = ""
     STRIPE_SUCCESS_URL: str = "http://localhost:3000/ai-analyzer?checkout=success"
     STRIPE_CANCEL_URL: str = "http://localhost:3000/pricing?checkout=cancelled"
     STRIPE_PORTAL_RETURN_URL: str = "http://localhost:3000/ai-analyzer"
 
+    # ===== SEC EDGAR (Insider Activity / Form 4) =====
+    # Mandatory politeness: EDGAR requires a descriptive User-Agent on every request.
+    EDGAR_USER_AGENT: str = "QuantorSignal contact@quantorsignal.com"
+    # Throttle to stay under EDGAR's 10 req/sec fair-access ceiling (we target ~4.5/sec).
+    EDGAR_MIN_REQUEST_INTERVAL: float = 0.22
+    EDGAR_CIK_MAP_TTL: int = 86400            # Cache ticker->CIK map for a day
+    EDGAR_BACKFILL_DAYS: int = 7              # Days to backfill on first/empty run
+    EDGAR_ACTIVITY_CACHE_TTL: int = 300       # Public insider-activity endpoint cache
+
     # ===== ADMIN ACCESS =====
     ADMIN_EMAILS: Union[str, List[str]] = []
-    
+
     # Environment
     ENVIRONMENT: str = "development"
+
+    # ===== EMAIL (Resend) =====
+    # Transactional / lifecycle email via the Resend HTTP API. The sending
+    # domain in EMAIL_FROM must be verified in the Resend dashboard (SPF/DKIM)
+    # before mail will deliver. Leave EMAIL_ENABLED False to make all sends
+    # no-op (logged as "skipped") until credentials/domain are ready.
+    RESEND_API_KEY: str = ""
+    EMAIL_FROM: str = "QuantorSignal <alerts@quantorsignal.com>"
+    EMAIL_REPLY_TO: str = ""  # optional; empty means no Reply-To header
+    EMAIL_ENABLED: bool = False
+    # Public base URL used to build unsubscribe links (must route /api/v1/* to
+    # this backend). Falls back to the marketing domain.
+    PUBLIC_APP_URL: str = "https://quantorsignal.com"
+
+    # ===== DAILY MARKET BRIEF =====
+    # Master switch for the once-per-day AI market brief email (Trader/Elite).
+    # When False, the scheduled job exits early (no LLM call, no sends).
+    DAILY_BRIEF_ENABLED: bool = True
+
+    # ===== ELITE DAILY WATCHLIST AI DIGEST =====
+    # Feature flag for the morning "Daily Watchlist AI Digest" email sent to
+    # Elite users. When False, the scheduled job logs and exits (an admin can
+    # still force a run for testing). EMAIL_ENABLED is a separate hard gate.
+    WATCHLIST_DIGEST_ENABLED: bool = True
+    # Max number of watchlist tickers analyzed per user's digest (oldest first).
+    # Caps per-user LLM cost; extra tickers are noted as "showing N of M".
+    ELITE_DIGEST_MAX_STOCKS: int = 10
+    # Global safety cap on fresh LLM report generations across a single digest
+    # run. Once exceeded, remaining users get digests built from cached reports
+    # only (no new LLM calls). Cached (already-generated-today) reports are free.
+    DIGEST_MAX_LLM_CALLS_PER_RUN: int = 300
+
+
+    # ===== FRED (Federal Reserve Economic Data) =====
+    # Free key from https://fred.stlouisfed.org/docs/api/api_key.html
+    FRED_API_KEY: str = Field(default="", validation_alias=AliasChoices("FRED_API_KEY", "fred_api_key"))
     
     @field_validator('BACKEND_CORS_ORIGINS', mode='before')
     @classmethod

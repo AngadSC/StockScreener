@@ -4,17 +4,23 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
+  Activity,
   BarChart3,
   BookOpen,
+  CalendarDays,
+  GitCompareArrows,
   Home,
+  Landmark,
   Lock,
   LogIn,
   LogOut,
+  Mail,
   Menu,
   Search,
   Sparkles,
   Star,
   Tag,
+  Users,
   X,
   type LucideIcon,
 } from 'lucide-react';
@@ -44,9 +50,19 @@ const navGroups: NavGroup[] = [
     items: [{ href: '/', label: 'Home', icon: Home }],
   },
   {
+    label: 'Markets',
+    items: [
+      { href: '/markets', label: 'Scanners', icon: Activity },
+      { href: '/earnings', label: 'Earnings', icon: CalendarDays },
+      { href: '/insiders', label: 'Insiders', icon: Users },
+      { href: '/macro', label: 'Macro', icon: Landmark },
+    ],
+  },
+  {
     label: 'Tools',
     items: [
       { href: '/screener', label: 'Screener', icon: Search },
+      { href: '/compare', label: 'Compare', icon: GitCompareArrows },
       { href: '/backtester', label: 'Backtester', icon: BarChart3 },
       { href: '/ai-analyzer', label: 'AI Analyst', icon: Sparkles, proBadge: true },
     ],
@@ -281,10 +297,25 @@ export default function Header() {
   const renderAccountControls = (mobile = false) => (
     <div className="grid gap-1.5">
       {isLoggedIn ? (
-        <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
-          <LogOut className="h-4 w-4" />
-          Sign Out
-        </Button>
+        <>
+          <Link
+            href="/settings/emails"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={cn(
+              'flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
+              isNavItemActive(pathname, '/settings/emails')
+                ? 'bg-[rgba(221,228,225,0.06)] font-medium text-[var(--ink)]'
+                : 'text-[var(--mute)] hover:bg-[rgba(221,228,225,0.04)] hover:text-[var(--ink)]'
+            )}
+          >
+            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.5} />
+            <span className="flex-1">Email preferences</span>
+          </Link>
+          <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
+            <LogOut className="h-4 w-4" />
+            Sign Out
+          </Button>
+        </>
       ) : (
         <>
           <Button asChild variant="ghost" className="w-full justify-start">

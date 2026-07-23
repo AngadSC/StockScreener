@@ -272,3 +272,129 @@ class AIUsageEvent(Base):
     tokens_output = Column(Integer)
 
     user = relationship("User", back_populates="ai_usage_events")
+
+
+# ============================================
+# EMAIL PREFERENCES
+# ============================================
+# One row per user storing per-category opt-in flags plus a per-user
+# unsubscribe token used to build one-click unsubscribe links. Booleans use
+# Python-side defaults (see existing models); the Alembic migration sets the
+# matching Postgres server_default so raw inserts also default to opted-in.
+
+class EmailPreference(Base):
+    __tablename__ = "email_preferences"
+
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    daily_brief = Column(Boolean, default=True, nullable=False)
+    watchlist_digest = Column(Boolean, default=True, nullable=False)
+    weekly_recap = Column(Boolean, default=True, nullable=False)
+    product_updates = Column(Boolean, default=True, nullable=False)
+    unsubscribe_token = Column(String(64), unique=True, index=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+# ============================================
+# EMAIL SEND LOG
+# ============================================
+# Append-only audit / idempotency log for outbound categorized emails. Daily
+# jobs use (user_id, category, sent_date) to avoid re-sending on re-run.
+
+class EmailSendLog(Base):
+    __tablename__ = "email_send_log"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = Column(String(32), nullable=False)
+    sent_date = Column(Date, nullable=False)
+    status = Column(String(16), nullable=False)  # sent | failed | skipped
+    provider_message_id = Column(String(64))
+    error = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index('idx_email_send_log_user_category_date', 'user_id', 'category', 'sent_date'),
+    )
+
+
+# ============================================
+# INSIDER TRANSACTIONS (SEC EDGAR Form 4)
+# ============================================
+
+class InsiderTransaction(Base):
+    """
+    A single non-derivative insider transaction (Form 4, transaction code P or S).
+
+    One Form 4 filing (accession_no) can contain multiple non-derivative
+    transactions; txn_index is the 0-based position of the transaction within the
+    filing's ownershipDocument. The (accession_no, txn_index) pair is unique and
+    is what makes ingestion idempotent.
+    """
+    __tablename__ = "insider_transactions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker_id = Column(
+        SmallInteger,
+        ForeignKey("tickers.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    accession_no = Column(String(25), nullable=False, index=True)
+    txn_index = Column(SmallInteger, nullable=False)
+    filed_date = Column(Date, nullable=False, index=True)
+    transaction_date = Column(Date)
+    owner_name = Column(String(255))
+    owner_title = Column(String(255))
+    is_officer = Column(Boolean, default=False)
+    is_director = Column(Boolean, default=False)
+    transaction_code = Column(String(2))
+    shares = Column(REAL)
+    price = Column(REAL)
+    value = Column(REAL)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # One-directional relationship (Ticker model intentionally left untouched)
+    ticker = relationship("Ticker")
+
+    __table_args__ = (
+        # Unique key that makes ingestion idempotent (one row per transaction
+        # within a filing). ticker_id / accession_no / filed_date are already
+        # indexed via their column-level index=True.
+        Index("uq_insider_accession_txn", "accession_no", "txn_index", unique=True),
+    )
+
+
+# ============================================
+# EARNINGS CALENDAR
+# ============================================
+
+class EarningsEvent(Base):
+    __tablename__ = "earnings_events"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticker_id = Column(SmallInteger, ForeignKey("tickers.id", ondelete="CASCADE"), nullable=False, index=True)
+    earnings_date = Column(Date, nullable=False, index=True)
+    time_hint = Column(String(16), default="unknown")  # 'bmo', 'amc', 'unknown'
+    eps_estimate = Column(REAL, nullable=True)
+    fetched_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # One-directional relationship only (Ticker model left untouched to avoid
+    # conflicting with parallel edits from other agents).
+    ticker = relationship("Ticker")
+
+    __table_args__ = (
+        Index('idx_earnings_events_ticker_date', 'ticker_id', 'earnings_date', unique=True),
+    )
+
+
+# ============================================
+# FRED MACRO OBSERVATIONS
+# ============================================
+
+class MacroObservation(Base):
+    __tablename__ = "macro_observations"
+
+    series_id = Column(String(20), primary_key=True)
+    date = Column(Date, primary_key=True)
+    value = Column(REAL, nullable=True)

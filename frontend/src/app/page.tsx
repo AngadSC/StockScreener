@@ -4,14 +4,18 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import {
+  Activity,
   ArrowRight,
   BarChart3,
-  BookOpen,
+  CalendarDays,
   ChevronRight,
+  GitCompareArrows,
+  Landmark,
   Mail,
   Search,
   Sparkles,
   Star,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -186,9 +190,13 @@ type Tool = {
 
 const FREE_TOOLS: Tool[] = [
   { href: '/screener', icon: Search, name: 'Screener', descriptor: '35+ fundamental and technical filters' },
+  { href: '/markets', icon: Activity, name: 'Scanners', descriptor: 'Gainers, losers, breakouts, unusual volume' },
+  { href: '/earnings', icon: CalendarDays, name: 'Earnings', descriptor: 'Reporting calendar for the next 14 days' },
+  { href: '/insiders', icon: Users, name: 'Insiders', descriptor: 'Form 4 buys and sells from SEC filings' },
+  { href: '/macro', icon: Landmark, name: 'Macro', descriptor: 'Rates, inflation, jobs, and volatility (FRED)' },
+  { href: '/compare', icon: GitCompareArrows, name: 'Compare', descriptor: 'Line up to four tickers side by side' },
   { href: '/backtester', icon: BarChart3, name: 'Backtester', descriptor: 'Test a strategy against price history' },
   { href: '/watchlist', icon: Star, name: 'Watchlist', descriptor: 'Track the names you revisit most' },
-  { href: '/blog', icon: BookOpen, name: 'Research Log', descriptor: 'Notes on screening and market structure' },
 ];
 
 function ToolTile({ tool }: { tool: Tool }) {
@@ -451,8 +459,8 @@ export default function HomePage() {
                 <div className="live-dot">Live market desk</div>
                 <h1 className="mt-4 max-w-[18ch]">Screen, scan, and analyze US equities</h1>
                 <p className="mt-4 max-w-[60ch] text-base leading-7 text-[var(--text-secondary)]">
-                  A free screener, backtester, and watchlist over 5,000+ US stocks. Pro adds
-                  structured AI swing reports; daily research emails are on the way.
+                  Free screeners, market scanners, earnings, insider filings, and macro data. Pro
+                  adds AI swing reports; Trader and Elite add daily research emails.
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Button asChild>
@@ -462,9 +470,9 @@ export default function HomePage() {
                     </Link>
                   </Button>
                   <Button asChild variant="outline">
-                    <Link href="/backtester">
-                      <BarChart3 className="h-4 w-4" />
-                      Run a backtest
+                    <Link href="/markets">
+                      <Activity className="h-4 w-4" />
+                      Browse scanners
                     </Link>
                   </Button>
                   <Button asChild variant="ghost">
@@ -495,10 +503,10 @@ export default function HomePage() {
                 <h2 className="heading-lg mt-2 text-[var(--text-primary)]">Market movers</h2>
               </div>
               <Link
-                href="/screener"
+                href="/markets"
                 className="inline-flex items-center gap-2 text-sm font-medium text-[var(--accent)] transition-colors duration-[180ms] hover:text-[var(--accent-hover)]"
               >
-                Open screener
+                All scanners
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -573,7 +581,7 @@ export default function HomePage() {
             <Card className="flex flex-col p-6 md:p-7">
               <div className="flex items-center gap-2">
                 <span className="status">Trader &amp; Elite</span>
-                <span className="text-[12px] text-[var(--text-tertiary)]">Coming soon</span>
+                <span className="text-[12px] text-[var(--text-tertiary)]">$39.99 / $79.99 / mo</span>
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-[10px] border border-[var(--border-default)] bg-[var(--bg-surface-2)] text-[var(--accent)]">
@@ -596,6 +604,12 @@ export default function HomePage() {
               <div className="mt-auto flex flex-wrap gap-3 pt-6">
                 <Button asChild variant="outline">
                   <Link href="/pricing">Compare plans</Link>
+                </Button>
+                <Button asChild variant="ghost">
+                  <Link href="/settings/emails">
+                    <Mail className="h-4 w-4" />
+                    Email settings
+                  </Link>
                 </Button>
               </div>
             </Card>

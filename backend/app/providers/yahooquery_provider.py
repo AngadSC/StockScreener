@@ -59,9 +59,10 @@ class YahooQueryProvider(StockDataProvider):
                 'summaryDetail',
                 'defaultKeyStatistics',
                 'financialData',
-                'price'
+                'price',
+                'assetProfile'
             ])
-            
+
             # Check for errors
             if ticker not in modules:
                 print(f"✗ No data for {ticker}")
@@ -79,7 +80,10 @@ class YahooQueryProvider(StockDataProvider):
             stats = data.get('defaultKeyStatistics', {})
             financials = data.get('financialData', {})
             price_data = data.get('price', {})
-            
+            profile = data.get('assetProfile', {})
+            if not isinstance(profile, dict):
+                profile = {}
+
             # Build normalized fundamentals dict
             fundamentals = {
                 'ticker': ticker,
@@ -124,16 +128,17 @@ class YahooQueryProvider(StockDataProvider):
                 'fifty_two_week_high': summary.get('fiftyTwoWeekHigh'),
                 'fifty_two_week_low': summary.get('fiftyTwoWeekLow'),
                 
-                # Classification
-                'sector': price_data.get('sector'),
-                'industry': price_data.get('industry'),
-                
+                # Classification (sector/industry live in assetProfile, NOT price)
+                'sector': profile.get('sector'),
+                'industry': profile.get('industry'),
+
                 # Store raw data for anything we missed
                 'additional_data': {
                     'summary': summary,
                     'stats': stats,
                     'financials': financials,
-                    'price': price_data
+                    'price': price_data,
+                    'profile': profile
                 }
             }
             
@@ -176,7 +181,8 @@ class YahooQueryProvider(StockDataProvider):
                 'summaryDetail',
                 'defaultKeyStatistics',
                 'financialData',
-                'price'
+                'price',
+                'assetProfile'
             ])
             
             results = {}
@@ -197,7 +203,10 @@ class YahooQueryProvider(StockDataProvider):
                 stats = data.get('defaultKeyStatistics', {})
                 financials = data.get('financialData', {})
                 price_data = data.get('price', {})
-                
+                profile = data.get('assetProfile', {})
+                if not isinstance(profile, dict):
+                    profile = {}
+
                 # Build normalized fundamentals
                 fundamentals = {
                     'ticker': ticker_symbol,
@@ -242,16 +251,17 @@ class YahooQueryProvider(StockDataProvider):
                     'fifty_two_week_high': summary.get('fiftyTwoWeekHigh'),
                     'fifty_two_week_low': summary.get('fiftyTwoWeekLow'),
                     
-                    # Classification
-                    'sector': price_data.get('sector'),
-                    'industry': price_data.get('industry'),
-                    
+                    # Classification (sector/industry live in assetProfile, NOT price)
+                    'sector': profile.get('sector'),
+                    'industry': profile.get('industry'),
+
                     # Store raw data
                     'additional_data': {
                         'summary': summary,
                         'stats': stats,
                         'financials': financials,
-                        'price': price_data
+                        'price': price_data,
+                        'profile': profile
                     }
                 }
                 

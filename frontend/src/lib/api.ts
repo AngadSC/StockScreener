@@ -14,6 +14,15 @@ import type {
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
 import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
+import type { EmailPreferences, EmailPreferencesUpdate } from '@/types/email';
+import type { MarketScansResponse, MarketSectorsResponse } from '@/types/market';
+import type {
+  InsiderActivityFilters,
+  InsiderActivityResponse,
+  InsiderTickerResponse,
+} from '@/types/insiders';
+import type { EarningsCalendarResponse } from '@/types/earnings';
+import type { MacroDashboardResponse } from '@/types/macro';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
@@ -117,9 +126,14 @@ export const authAPI = {
 // ====================================
 
 export const billingAPI = {
-  createCheckoutSession: async (): Promise<{ url: string; id: string }> => {
+  // `tier` is optional and defaults to Pro on the backend when omitted, keeping
+  // older callers working. Pass 'trader' | 'elite' to check out those plans.
+  createCheckoutSession: async (
+    tier?: 'pro' | 'trader' | 'elite'
+  ): Promise<{ url: string; id: string }> => {
     const response = await api.post<{ url: string; id: string }>(
-      '/billing/create-checkout-session'
+      '/billing/create-checkout-session',
+      tier ? { tier } : {}
     );
     return response.data;
   },
@@ -268,6 +282,60 @@ export const screenerAPI = {
 };
 
 // ====================================
+// MARKET SCANNERS API (free, public -- no auth)
+// ====================================
+
+export const marketAPI = {
+  getScans: async (): Promise<MarketScansResponse> => {
+    const response = await api.get<MarketScansResponse>('/market/scans');
+    return response.data;
+  },
+
+  getSectors: async (): Promise<MarketSectorsResponse> => {
+    const response = await api.get<MarketSectorsResponse>('/market/sectors');
+    return response.data;
+  },
+
+  getEarningsCalendar: async (days: number = 14): Promise<EarningsCalendarResponse> => {
+    const response = await api.get<EarningsCalendarResponse>('/market/earnings', {
+      params: { days },
+    });
+    return response.data;
+  },
+
+  getMacroDashboard: async (): Promise<MacroDashboardResponse> => {
+    const response = await api.get<MacroDashboardResponse>('/market/macro');
+    return response.data;
+  },
+};
+
+// ====================================
+// INSIDER ACTIVITY API (SEC EDGAR Form 4 - free/public)
+// ====================================
+
+export const insidersAPI = {
+  getActivity: async (
+    filters: InsiderActivityFilters
+  ): Promise<InsiderActivityResponse> => {
+    const response = await api.get<InsiderActivityResponse>('/market/insider-activity', {
+      params: filters,
+    });
+    return response.data;
+  },
+
+  getForTicker: async (
+    ticker: string,
+    days: number = 90
+  ): Promise<InsiderTickerResponse> => {
+    const response = await api.get<InsiderTickerResponse>(
+      `/market/insider-activity/${encodeURIComponent(ticker.trim().toUpperCase())}`,
+      { params: { days } }
+    );
+    return response.data;
+  },
+};
+
+// ====================================
 // WATCHLIST API
 // ====================================
 
@@ -332,6 +400,24 @@ export const generateAIReport = async (ticker: string): Promise<AIReportResponse
 
     throw error;
   }
+};
+
+// ====================================
+// EMAIL PREFERENCES API
+// ====================================
+
+export const emailAPI = {
+  getPreferences: async (): Promise<EmailPreferences> => {
+    const response = await api.get<EmailPreferences>('/email/preferences');
+    return response.data;
+  },
+
+  updatePreferences: async (
+    update: EmailPreferencesUpdate
+  ): Promise<EmailPreferences> => {
+    const response = await api.put<EmailPreferences>('/email/preferences', update);
+    return response.data;
+  },
 };
 
 export default api;

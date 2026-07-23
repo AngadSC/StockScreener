@@ -9,12 +9,21 @@ type FooterColumn = {
 
 const footerColumns: FooterColumn[] = [
   {
+    heading: 'Markets',
+    links: [
+      { href: '/markets', label: 'Scanners' },
+      { href: '/earnings', label: 'Earnings' },
+      { href: '/insiders', label: 'Insiders' },
+      { href: '/macro', label: 'Macro' },
+    ],
+  },
+  {
     heading: 'Tools',
     links: [
       { href: '/screener', label: 'Screener' },
+      { href: '/compare', label: 'Compare' },
       { href: '/backtester', label: 'Backtester' },
       { href: '/ai-analyzer', label: 'AI Analyst' },
-      { href: '/watchlist', label: 'Watchlist' },
     ],
   },
   {
@@ -23,6 +32,7 @@ const footerColumns: FooterColumn[] = [
       { href: '/pricing', label: 'Pricing' },
       { href: '/blog', label: 'Research Log' },
       { href: '/contact', label: 'Contact' },
+      { href: '/settings/emails', label: 'Email preferences' },
     ],
   },
 ];

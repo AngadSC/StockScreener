@@ -7,6 +7,8 @@ from app.providers.factory import ProviderFactory
 from app.utils.market_calendar import is_trading_day, get_last_trading_day, get_previous_trading_day
 from app.services.cache import cache_service
 from app.config import settings
+from app.jobs.earnings_sync import sync_earnings_events
+from app.jobs.macro_sync import sync_macro_observations
 from datetime import datetime, timedelta, date as date_type
 import time
 from typing import List
@@ -286,6 +288,50 @@ def scheduled_data_trimming():
     """Runs Sunday at 3:00 AM ET"""
     print("⏰ Triggering weekly data trimming...")
     trim_old_price_data()
+
+
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=7, minute=45, timezone='America/New_York')
+def scheduled_daily_brief():
+    """Runs weekdays at 7:45 AM ET — sends the AI Daily Market Brief."""
+    print("⏰ Triggering daily market brief...")
+    # Imported lazily to avoid import cycles at scheduler module load.
+    from app.jobs.daily_brief_job import run_daily_brief
+    run_daily_brief()
+
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=7, minute=0, timezone='America/New_York')
+def scheduled_watchlist_digest():
+    """Runs weekday mornings at 7:00 AM ET: Elite watchlist AI digest email."""
+    print("⏰ Triggering Elite watchlist AI digest...")
+    # Imported lazily so a digest-side import error can never break the scheduler.
+    from app.jobs.watchlist_digest_job import run_watchlist_digest
+    run_watchlist_digest()
+
+@scheduler.scheduled_job('cron', hour=22, minute=30, timezone='America/New_York')
+def scheduled_market_scans_warm():
+    """Runs at 10:30 PM ET, after the nightly sync -- warms the market scanners cache"""
+    from app.jobs.market_scans_job import warm_market_scans_cache
+    warm_market_scans_cache()
+
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=18, minute=45, timezone='America/New_York')
+def scheduled_insider_sync():
+    """Runs weekdays at 6:45 PM ET: pull that day's SEC Form 4 insider filings."""
+    print("⏰ Triggering insider (Form 4) sync...")
+    # Lazy import keeps job logic isolated in its own module.
+    from app.jobs.insider_sync import run_insider_sync
+    run_insider_sync()
+
+@scheduler.scheduled_job('cron', hour=23, minute=15, timezone='America/New_York')
+def scheduled_earnings_sync():
+    """Runs at 11:15 PM ET every night"""
+    print("⏰ Triggering nightly earnings calendar sync...")
+    sync_earnings_events(manual_trigger=False)
+
+
+@scheduler.scheduled_job('cron', hour=6, minute=0, timezone='America/New_York')
+def scheduled_macro_sync():
+    """Runs at 6:00 AM ET every day"""
+    print("⏰ Triggering daily FRED macro sync...")
+    sync_macro_observations(manual_trigger=False)
 
 
 def start_scheduler():

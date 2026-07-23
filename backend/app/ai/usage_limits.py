@@ -24,10 +24,15 @@ def _month_start() -> datetime:
 
 def _tier_limit(tier: str | None) -> int:
     normalized = (tier or "free").strip().lower()
-    if normalized in {"pro", "trader", "elite"}:
+    if normalized == "pro":
         return settings.ai_monthly_report_limit_pro
+    if normalized == "trader":
+        return settings.ai_monthly_report_limit_trader
+    if normalized == "elite":
+        return settings.ai_monthly_report_limit_elite
     if normalized == "admin":
-        return settings.ai_monthly_report_limit_pro
+        # Admins get the highest configured allowance.
+        return settings.ai_monthly_report_limit_elite
     return 0
 
 
@@ -69,14 +74,55 @@ def record_usage_event(
     tokens_input: int,
     tokens_output: int,
     db: Session,
+    report_type: str = "single_stock",
 ) -> None:
+    """Record a single AI generation as a usage event.
+
+    ``report_type`` defaults to ``"single_stock"`` so existing callers keep
+    their behavior (these are the events counted by ``check_usage_limit``).
+    Background features that must NOT consume a user's on-demand quota — such
+    as the Elite watchlist digest — pass a different ``report_type`` (e.g.
+    ``"watchlist_digest"``) so the event is logged for cost tracking but not
+    counted against the monthly limit.
+    """
     event = AIUsageEvent(
         user_id=_coerce_user_id(user_id),
         ticker=ticker.strip().upper(),
-        report_type="single_stock",
+        report_type=report_type,
         model_used=model_used,
         tokens_input=tokens_input,
         tokens_output=tokens_output,
     )
     db.add(event)
     db.commit()
+
+
+# Usage event type for digest-generated reports. Intentionally distinct from
+# "single_stock" so check_usage_limit (which counts only "single_stock") never
+# charges a user's on-demand quota for the automated morning digest.
+DIGEST_REPORT_TYPE = "watchlist_digest"
+
+
+def record_digest_usage_event(
+    user_id: str,
+    ticker: str,
+    model_used: str,
+    tokens_input: int,
+    tokens_output: int,
+    db: Session,
+) -> None:
+    """Record an LLM generation performed for the Elite watchlist digest.
+
+    Thin wrapper over ``record_usage_event`` that stamps
+    ``report_type="watchlist_digest"`` so digest generations are tracked for
+    cost/analytics without consuming the user's on-demand monthly allowance.
+    """
+    record_usage_event(
+        user_id=user_id,
+        ticker=ticker,
+        model_used=model_used,
+        tokens_input=tokens_input,
+        tokens_output=tokens_output,
+        db=db,
+        report_type=DIGEST_REPORT_TYPE,
+    )

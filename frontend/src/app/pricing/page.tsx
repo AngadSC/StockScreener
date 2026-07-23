@@ -4,7 +4,8 @@ import { Check, Clock, CreditCard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { ProCheckoutButton } from './ProCheckoutButton';
+import type { PaidTier } from '@/types/user';
+import { CheckoutButton } from './CheckoutButton';
 
 type Plan = {
   name: string;
@@ -52,22 +53,34 @@ const plans: Plan[] = [
   {
     name: 'Trader',
     tier: 'trader',
-    price: 'Coming soon',
-    priceNote: 'Advanced tier',
+    price: '$39.99 USD',
+    priceNote: 'Founders Edition',
     description: 'A higher-usage plan for more active research workflows.',
-    features: ['Higher AI report limits', 'Expanded research tooling', 'Priority feature access'],
-    status: 'soon',
-    cta: 'Coming soon',
+    features: [
+      'Everything in Pro',
+      '400 AI reports monthly',
+      'Daily Market Brief email every market morning',
+      'Watchlist earnings & signal alerts (rolling out)',
+    ],
+    status: 'checkout',
+    cta: 'Continue to checkout',
+    badge: 'Founders Edition',
   },
   {
     name: 'Elite',
     tier: 'elite',
-    price: 'Coming soon',
-    priceNote: 'Highest tier',
+    price: '$79.99 USD',
+    priceNote: 'Founders Edition',
     description: 'The top tier reserved for the most complete QuantorSignal feature set.',
-    features: ['Highest AI limits', 'Premium workflow features', 'Early access experiments'],
-    status: 'soon',
-    cta: 'Coming soon',
+    features: [
+      'Everything in Trader',
+      '1,000 AI reports monthly',
+      'Daily Watchlist AI Digest — pre-market AI analysis of up to 10 watchlist stocks, emailed',
+      'Early access to new features',
+    ],
+    status: 'checkout',
+    cta: 'Continue to checkout',
+    badge: 'Founders Edition',
   },
 ];
 
@@ -80,13 +93,13 @@ export default function PricingPage() {
             <div className="eyebrow">Pricing</div>
             <h1 className="heading-xl mt-3 text-[var(--text-primary)]">Choose your research tier</h1>
             <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)]">
-              Start free, upgrade to Pro for AI reports, or keep an eye on the upcoming Trader and
-              Elite tiers.
+              Start free, or upgrade to Pro, Trader, or Elite for AI reports and higher
+              monthly limits.
             </p>
           </div>
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border-default)] bg-[var(--bg-surface-1)] px-4 py-2 text-sm text-[var(--text-secondary)]">
             <CreditCard className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
-            Secure checkout for Pro
+            Secure checkout
           </div>
         </section>
 
@@ -142,9 +155,10 @@ export default function PricingPage() {
                 ) : null}
 
                 {plan.status === 'checkout' ? (
-                  <ProCheckoutButton
+                  <CheckoutButton
+                    tier={plan.tier as PaidTier}
                     label={plan.cta}
-                    fallbackUrl={proFallbackCheckoutUrl}
+                    fallbackUrl={plan.tier === 'pro' ? proFallbackCheckoutUrl : undefined}
                   />
                 ) : null}
 
@@ -162,10 +176,10 @@ export default function PricingPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <div className="eyebrow">Secure checkout</div>
-              <h2 className="heading-md mt-2 text-[var(--text-primary)]">Pro access is granted automatically</h2>
+              <h2 className="heading-md mt-2 text-[var(--text-primary)]">Access is granted automatically</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-                After payment, Stripe notifies our backend and your account is upgraded to Pro
-                immediately — no manual step required.
+                After payment, Stripe notifies our backend and your account is upgraded to your
+                chosen tier immediately — no manual step required.
               </p>
             </div>
             <Button asChild variant="outline" className="rounded-full">

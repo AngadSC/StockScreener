@@ -206,7 +206,7 @@ function HeaderCell({
   return (
     <th className="min-w-[140px] whitespace-nowrap px-4 py-3 text-right align-top">
       <div className="flex items-start justify-end gap-2">
-        <div className="min-w-0 text-right">
+        <div className="min-w-0 text-right font-body tracking-normal">
           <div className="inline-flex items-center gap-1.5">
             <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
             <span className="text-sm font-semibold text-[var(--text-primary)]">{ticker}</span>
@@ -253,18 +253,16 @@ export default function ComparisonTable({
   onRemove,
 }: ComparisonTableProps) {
   return (
-    <div className="deco-panel hud overflow-hidden bg-[var(--bg-surface-1)]">
-      <span className="hud-c1" />
-      <span className="hud-c2" />
+    <div className="deco-panel overflow-hidden bg-[var(--bg-surface-1)]">
       <div className="border-b border-[var(--line)] px-5 py-4">
         <div className="eyebrow">Fundamentals</div>
         <h2 className="heading-md mt-2 text-[var(--text-primary)]">Side-by-side comparison</h2>
       </div>
 
       <div className="deco-scroll overflow-x-auto">
-        <table className="w-full caption-bottom text-sm">
+        <table className="deco-table w-full text-sm">
           <thead className="bg-[var(--bg-surface-2)]">
-            <tr className="border-b border-[var(--border-default)] text-xs font-medium uppercase tracking-[0.06em] text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border-default)]">
               <th className="sticky left-0 z-10 min-w-[160px] bg-[var(--bg-surface-2)] px-4 py-3 text-left">
                 Metric
               </th>

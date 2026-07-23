@@ -187,7 +187,10 @@ export default function CommandPalette() {
                         : 'border-l-2 border-l-transparent hover:bg-[var(--surface-2)]'
                     }`}
                   >
-                    <Icon className="h-5 w-5 text-[var(--forest)]" strokeWidth={1.5} />
+                    <Icon
+                      className={`h-5 w-5 ${isSelected ? 'text-[var(--forest)]' : 'text-[var(--text-tertiary)]'}`}
+                      strokeWidth={1.5}
+                    />
                     <div className="flex-1 text-left">
                       <p className="font-medium text-[var(--ink)]">{cmd.label}</p>
                       {cmd.description ? <p className="text-xs text-[var(--ink-2)]">{cmd.description}</p> : null}

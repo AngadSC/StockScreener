@@ -36,11 +36,9 @@ export default function MarketsPage() {
             </p>
           </div>
 
-          <div className="hud flex min-w-[220px] items-center gap-4 rounded-[16px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
-            <span className="hud-c1" />
-            <span className="hud-c2" />
-            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--accent-subtle)] text-[var(--accent)]">
-              <Activity className="h-5 w-5" />
+          <div className="flex min-w-[220px] items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
+            <div className="icon-tile h-11 w-11">
+              <Activity className="h-5 w-5" strokeWidth={1.6} />
             </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
@@ -60,7 +58,7 @@ export default function MarketsPage() {
       </section>
 
       <section>
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {MARKET_SCAN_TABS.map((tab) => (
             <button
               key={tab.key}
@@ -78,6 +76,10 @@ export default function MarketsPage() {
             </button>
           ))}
         </div>
+
+        <p className="mb-4 mt-3 text-[13px] leading-relaxed text-[var(--text-tertiary)]">
+          {activeTabConfig.description}
+        </p>
 
         <ScanTable
           rows={activeRows}

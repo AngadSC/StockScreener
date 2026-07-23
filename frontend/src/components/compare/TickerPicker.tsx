@@ -133,10 +133,10 @@ export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: Tic
                   <div
                     key={item.ticker}
                     className={cn(
-                      'flex items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms]',
+                      'group flex items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms]',
                       alreadyAdded
                         ? 'cursor-not-allowed opacity-40'
-                        : 'cursor-pointer hover:bg-[var(--accent-subtle)]'
+                        : 'cursor-pointer hover:bg-[var(--bg-surface-2)]'
                     )}
                     onMouseDown={(event) => {
                       event.preventDefault();
@@ -152,7 +152,14 @@ export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: Tic
                         {item.name || 'Company profile'}
                       </div>
                     </div>
-                    <div className="text-xs font-medium text-[var(--accent)]">
+                    <div
+                      className={cn(
+                        'text-xs font-medium',
+                        alreadyAdded
+                          ? 'text-[var(--text-tertiary)]'
+                          : 'text-[var(--text-secondary)] group-hover:text-[var(--accent)]'
+                      )}
+                    >
                       {alreadyAdded ? 'Added' : 'Add'}
                     </div>
                   </div>

@@ -20,7 +20,7 @@ function BulletList({ items }: { items: string[] }) {
     <ul className="mt-3 space-y-2">
       {items.map((item, i) => (
         <li key={`${i}-${item}`} className="flex gap-3 text-sm leading-6 text-[var(--text-secondary)]">
-          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-tertiary)]" />
           <span>{item}</span>
         </li>
       ))}
@@ -178,7 +178,7 @@ export default function AIReportThesisSection({ report }: AIReportThesisSectionP
         <BulletList items={confirmationItems} />
       </div>
 
-      <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--accent)]/30 bg-[var(--accent-subtle)] p-5">
+      <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] p-5">
         <h3 className="heading-sm text-[var(--text-primary)]">Final Verdict</h3>
         <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
           {report.final_verdict}

@@ -6,9 +6,12 @@ import { Loader2, StarOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { watchlistAPI } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 export default function WatchlistPage() {
   const queryClient = useQueryClient();
+  const { isLoggedIn, userTier } = useAuth();
+  const isElite = userTier.trim().toLowerCase() === 'elite';
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['watchlist'],
@@ -34,7 +37,7 @@ export default function WatchlistPage() {
 
       {isLoading ? (
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading watchlist...</p>
         </div>
       ) : null}
@@ -58,10 +61,37 @@ export default function WatchlistPage() {
 
           {data.items.length === 0 ? (
             <div className="deco-panel p-10 text-center">
-              <p className="mb-2 text-sm text-muted-foreground">No stocks in your watchlist yet.</p>
-              <Link href="/screener" className="deco-link text-sm font-medium">
-                Open Screener
-              </Link>
+              <p className="mb-2 text-sm font-medium text-foreground">
+                No stocks in your watchlist yet.
+              </p>
+              <p className="mx-auto mb-6 max-w-md text-sm leading-relaxed text-muted-foreground">
+                Search a ticker in the header, open its page, then use the star to add it here.
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm">
+                <Link href="/screener" className="deco-link font-medium">
+                  Find names in the screener
+                </Link>
+                {isLoggedIn ? (
+                  <>
+                    <span aria-hidden="true" className="text-muted-foreground/50">
+                      ·
+                    </span>
+                    <Link href="/ai-analyzer" className="deco-link font-medium">
+                      Open the AI Analyzer
+                    </Link>
+                  </>
+                ) : null}
+                {isLoggedIn && isElite ? (
+                  <>
+                    <span aria-hidden="true" className="text-muted-foreground/50">
+                      ·
+                    </span>
+                    <Link href="/settings/emails" className="deco-link font-medium">
+                      Watchlist digest settings
+                    </Link>
+                  </>
+                ) : null}
+              </div>
             </div>
           ) : (
             <div className="deco-panel overflow-hidden bg-card">

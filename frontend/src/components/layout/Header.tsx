@@ -362,10 +362,8 @@ export default function Header() {
           {renderNavGroups()}
 
           {userTier && !isProTier(userTier) ? (
-            <div className="hud hud-blue mt-6 rounded-[14px] border border-[var(--line)] bg-[var(--ivory)] p-4 shadow-[var(--shadow-1)]">
-              <span className="hud-c1" />
-              <span className="hud-c2" />
-              <div className="smallcap text-[var(--sapphire)]">Quantor Pro</div>
+            <div className="mt-6 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--ivory)] p-4 shadow-[var(--shadow-1)]">
+              <div className="smallcap">Quantor Pro</div>
               <p className="mt-2 text-sm leading-5 text-[var(--ink-2)]">
                 AI swing reports, daily briefs, and higher research limits.
               </p>

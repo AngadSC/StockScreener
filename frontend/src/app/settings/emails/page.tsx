@@ -129,7 +129,7 @@ export default function EmailPreferencesPage() {
       <div className="mx-auto max-w-3xl space-y-7">
         <section className="flex flex-col gap-4 border-b border-t border-[var(--line)] py-7">
           <div className="eyebrow flex items-center gap-2">
-            <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+            <Mail className="h-3.5 w-3.5" aria-hidden="true" strokeWidth={1.6} />
             Account
           </div>
           <h1 className="heading-xl text-[var(--text-primary)]">Email preferences</h1>

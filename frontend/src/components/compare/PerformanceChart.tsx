@@ -157,13 +157,15 @@ export default function PerformanceChart({ tickers, colorMap }: PerformanceChart
   }, [tickers, historyQueries]);
 
   return (
-    <div className="deco-panel hud p-5 md:p-6">
-      <span className="hud-c1" />
-      <span className="hud-c2" />
+    <div className="deco-panel p-5 md:p-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="eyebrow">Performance</div>
           <h2 className="heading-md mt-2 text-[var(--text-primary)]">Normalized % change</h2>
+          <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-[var(--text-tertiary)]">
+            Each line is rebased to 0% at the start of the window, so you compare percentage moves,
+            not share prices.
+          </p>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface)] p-1">
           {PERIOD_OPTIONS.map((option) => (

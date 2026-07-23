@@ -107,7 +107,14 @@ contrast. Vignette softened (0.5 → 0.32) to kill the v6 murk. Note: the
 `--forest`/`--ink`/`--bone` names are legacy from v6 and now describe petrol/
 chalk/blue-black — kept so component classes didn't need a mass rename.
 
-Verdict: _pending — live on main since 2026-07-21._
+Verdict: _mixed (2026-07-22): user found it "too much blue/cyan." Amended
+rather than replaced: dark surfaces neutralized toward true black (base
+`#070b0c` → `#060809`, surfaces likewise — the cool cast now reads as a
+whisper, not a tint), and the polish pass reduces how often the accent is
+applied (neutral-first icons/chips; petrol reserved for primary actions,
+links, and live elements). Accent hue itself unchanged. If it still doesn't
+land, v8 candidate: keep the neutral-black bases, swap accent family entirely
+(warm brass? desaturated green?) — bases and accent are now independent._
 
 ---
 

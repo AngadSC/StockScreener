@@ -6,11 +6,11 @@
 
 @layer base {
   :root {
-    --bone: #070b0c;
-    --bone-deep: #040709;
-    --ivory: #0b1113;
-    --surface: #0e1416;
-    --surface-2: #141c1f;
+    --bone: #060809;
+    --bone-deep: #030405;
+    --ivory: #0a0d0e;
+    --surface: #0d1011;
+    --surface-2: #131718;
 
     --ink: #dde4e1;
     --ink-2: #a3aeaa;
@@ -54,7 +54,7 @@
     --bg-base: var(--bone);
     --bg-surface-1: var(--surface);
     --bg-surface-2: var(--surface-2);
-    --bg-surface-3: #1a2427;
+    --bg-surface-3: #191e20;
     --border-subtle: var(--line);
     --border-default: var(--line-2);
     --border-strong: var(--line-3);
@@ -104,10 +104,10 @@
     --label: 500 10.5px / 1.4 'Geist Mono', monospace;
     --caption: 400 11px / 1.45 'Geist Mono', monospace;
 
-    --bg-base-rgb: 7 11 12;
-    --bg-surface-1-rgb: 14 20 22;
-    --bg-surface-2-rgb: 20 28 31;
-    --bg-surface-3-rgb: 26 36 39;
+    --bg-base-rgb: 6 8 9;
+    --bg-surface-1-rgb: 13 16 17;
+    --bg-surface-2-rgb: 19 23 24;
+    --bg-surface-3-rgb: 25 30 32;
     --border-subtle-rgb: 221 228 225;
     --border-default-rgb: 221 228 225;
     --border-strong-rgb: 221 228 225;
@@ -962,7 +962,7 @@
   }
 
   .surface-3 {
-    background: #1a2427;
+    background: #191e20;
   }
 }
 

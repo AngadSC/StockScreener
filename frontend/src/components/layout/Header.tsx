@@ -334,7 +334,7 @@ export default function Header() {
 
   return (
     <>
-      <aside className="fixed inset-y-0 left-0 z-[90] hidden w-[248px] flex-col border-r border-[var(--line)] bg-[rgba(7,11,12,0.88)] px-4 py-5 backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-[90] hidden w-[248px] flex-col border-r border-[var(--line)] bg-[rgba(6,8,9,0.88)] px-4 py-5 backdrop-blur-xl lg:flex">
         <Link href="/" className="group flex shrink-0 items-center gap-3 px-1 py-1">
           <BrandMark className="transition-transform duration-300 group-hover:scale-[1.03]" />
           <div className="leading-tight">
@@ -385,7 +385,7 @@ export default function Header() {
         </div>
       </aside>
 
-      <header className="sticky top-0 z-[100] border-b border-[var(--line)] bg-[rgba(7,11,12,0.88)] backdrop-blur-xl lg:hidden">
+      <header className="sticky top-0 z-[100] border-b border-[var(--line)] bg-[rgba(6,8,9,0.88)] backdrop-blur-xl lg:hidden">
         <div className="container-custom">
           <div className="flex min-h-[68px] items-center gap-4">
             <Link href="/" className="flex shrink-0 items-center gap-3">

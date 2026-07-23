@@ -10,7 +10,7 @@ import { useMemo, useRef } from 'react';
  * signal — identity only, never polarity.
  *
  * Validated with the dataviz palette checker against the app's dark surface
- * (#0e1416) on the adjacent-pair gate that applies to line charts: worst
+ * (#0d1011) on the adjacent-pair gate that applies to line charts: worst
  * adjacent CVD ΔE 8.4 (protan/deutan, target >= 8), worst adjacent
  * normal-vision ΔE 19.8 (floor >= 15), all four slots clear 3:1 contrast and
  * sit inside the dark lightness band (OKLCH L 0.48-0.67). Order matters —

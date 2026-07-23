@@ -210,3 +210,77 @@ def test_ai_payload_backfills_missing_ohlcv_and_rebuilds_context_from_db(
     assert data_quality["final_quality_reasons"] == []
     assert data_quality["warnings"] == []
     assert data_quality["errors"] == []
+
+
+def test_ai_payload_serves_live_history_when_ticker_not_in_db(
+    sqlite_db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No Ticker row is seeded — the symbol is valid on yfinance but absent from our DB.
+    all_days = get_trading_days_between(date(2025, 11, 14), date(2026, 5, 8))
+    monkeypatch.setattr(market_context, "_today", lambda: date(2026, 5, 10))
+    _mock_news(monkeypatch)
+
+    history = pd.DataFrame(
+        [
+            {
+                "Open": 300.0 + index,
+                "High": 302.0 + index,
+                "Low": 299.0 + index,
+                "Close": 301.0 + index,
+                "Volume": 2_000_000 + index,
+            }
+            for index, _day in enumerate(all_days)
+        ],
+        index=pd.to_datetime(all_days),
+    )
+
+    class FakeTicker:
+        def __init__(self, symbol: str) -> None:
+            self.symbol = symbol
+
+        def history(self, **_kwargs: Any) -> pd.DataFrame:
+            return history
+
+    monkeypatch.setattr(ohlcv_backfill.yf, "Ticker", FakeTicker)
+
+    payload = payload_builder.build_ai_payload("shop.to", sqlite_db)
+
+    # Nothing was persisted (no ticker row to attach rows to)...
+    assert sqlite_db.query(DailyOHLCV).count() == 0
+    # ...but the AI payload still received live candles instead of an empty payload.
+    assert payload["price_history"]["available_candle_count"] == len(all_days)
+    assert payload["price_history"]["candles"][-1]["close"] == 301.0 + len(all_days) - 1
+
+    data_quality = payload["data_quality"]
+    assert data_quality["yfinance_used"] is True
+    assert data_quality["yfinance_valid_count"] == len(all_days)
+    assert data_quality["inserted_rows"] == 0
+    assert data_quality["updated_rows"] == 0
+    assert any(
+        "not found in the database" in warning for warning in data_quality["warnings"]
+    )
+
+
+def test_ai_payload_is_empty_when_symbol_has_no_price_data(
+    sqlite_db: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Symbol is not in the DB and yfinance returns no candles (e.g. a company
+    # name typed instead of a ticker, like "INTEL" for INTC).
+    monkeypatch.setattr(market_context, "_today", lambda: date(2026, 5, 10))
+    _mock_news(monkeypatch)
+
+    class FakeTicker:
+        def __init__(self, symbol: str) -> None:
+            self.symbol = symbol
+
+        def history(self, **_kwargs: Any) -> pd.DataFrame:
+            return pd.DataFrame()
+
+    monkeypatch.setattr(ohlcv_backfill.yf, "Ticker", FakeTicker)
+
+    payload = payload_builder.build_ai_payload("intel", sqlite_db)
+
+    assert payload["price_history"]["available_candle_count"] == 0
+    assert payload["price_history"]["candles"] == []

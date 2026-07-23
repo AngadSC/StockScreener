@@ -187,6 +187,20 @@ def create_ai_report(
             payload_log_summary,
         )
 
+        available_candles = int(payload.get("price_history", {}).get("available_candle_count") or 0)
+        if not available_candles:
+            logger.info(
+                "AI report aborted: no price data ticker=%s user_id=%s", ticker_symbol, user_id
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=(
+                    f"No price data is available for '{ticker_symbol}'. "
+                    "Check the ticker symbol — enter the exchange symbol (e.g. AAPL, INTC), "
+                    "not the company name."
+                ),
+            )
+
         ai_response = generate_single_stock_report(payload, user_id, ticker_symbol, db)
         usage = _pop_usage_metadata(ai_response)
         logger.info(

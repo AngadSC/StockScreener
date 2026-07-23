@@ -187,6 +187,33 @@ def _build_data_quality(initial_quality: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _candles_to_transient_prices(candles: list[dict[str, Any]]) -> list[DailyOHLCV]:
+    """Wrap fetched candle dicts in un-persisted DailyOHLCV rows.
+
+    These objects are never added to the session; they only carry the same
+    attribute shape (date/open/high/low/close/volume) that downstream context
+    building reads, so a valid symbol that isn't in our DB yet can still be
+    analyzed from live yfinance history.
+    """
+    rows: list[DailyOHLCV] = []
+    for candle in candles:
+        candle_date = candle.get("date")
+        if candle_date is None:
+            continue
+        rows.append(
+            DailyOHLCV(
+                date=candle_date,
+                open=candle.get("open"),
+                high=candle.get("high"),
+                low=candle.get("low"),
+                close=candle.get("close"),
+                volume=candle.get("volume"),
+            )
+        )
+    rows.sort(key=lambda row: row.date)
+    return rows
+
+
 def _finalize_data_quality(data_quality: dict[str, Any], final_quality: dict[str, Any]) -> None:
     data_quality["final_candle_count"] = final_quality.get("initial_candle_count", 0)
     data_quality["latest_candle_date"] = final_quality.get("latest_db_date")
@@ -208,17 +235,33 @@ def _fill_ohlcv_gaps_from_yfinance(
     initial_quality = assess_ohlcv_quality(prices, as_of_date=end_date)
     data_quality = _build_data_quality(initial_quality)
 
-    if not initial_quality.get("has_gaps"):
-        return prices, data_quality
-
-    if ticker_obj is None:
-        data_quality["warnings"].append(
-            "Ticker was not found in the database; yfinance backfill was skipped."
-        )
+    if not initial_quality.get("has_gaps") and ticker_obj is not None:
         return prices, data_quality
 
     data_quality["yfinance_used"] = True
     fetched = fetch_yfinance_daily_history(ticker, period="1y")
+
+    if ticker_obj is None:
+        # Symbol isn't in our DB yet. We can't persist, but we can still serve
+        # live history in-memory so the AI payload isn't empty for a valid ticker.
+        data_quality["yfinance_fetched_count"] = fetched.get("fetched_count", 0)
+        data_quality["yfinance_valid_count"] = fetched.get("valid_count", 0)
+        data_quality["yfinance_dropped_count"] = fetched.get("dropped_count", 0)
+        if fetched.get("error"):
+            data_quality["errors"].append(str(fetched["error"]))
+        transient = [
+            row
+            for row in _candles_to_transient_prices(fetched.get("candles") or [])
+            if start_date <= row.date <= end_date
+        ]
+        final_quality = assess_ohlcv_quality(transient, as_of_date=end_date)
+        _finalize_data_quality(data_quality, final_quality)
+        # Appended after _finalize_data_quality, which replaces the warnings list.
+        data_quality["warnings"].append(
+            "Ticker was not found in the database; served live yfinance history without persisting."
+        )
+        return transient, data_quality
+
     data_quality["yfinance_fetched_count"] = fetched.get("fetched_count", 0)
     data_quality["yfinance_valid_count"] = fetched.get("valid_count", 0)
     data_quality["yfinance_dropped_count"] = fetched.get("dropped_count", 0)

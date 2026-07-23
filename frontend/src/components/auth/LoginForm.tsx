@@ -27,7 +27,16 @@ export default function LoginForm({ redirectTo = '/screener' }: { redirectTo?: s
       await authAPI.login({ email, password });
       router.push(sanitizeRedirectPath(redirectTo));
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Sign in failed. Please check your credentials.');
+      const detail = err.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        setError(detail.map((d: any) => d.msg).join(', '));
+      } else if (typeof detail === 'string') {
+        setError(detail);
+      } else if (!err.response) {
+        setError('Cannot reach the server. Please check your connection.');
+      } else {
+        setError('Sign in failed. Please check your credentials.');
+      }
     } finally {
       setIsLoading(false);
     }

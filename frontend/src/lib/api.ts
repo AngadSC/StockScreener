@@ -52,6 +52,25 @@ api.interceptors.response.use(
   }
 );
 
+// Serialize query params so array values become repeated keys WITHOUT brackets
+// (e.g. sectors=Tech&sectors=Energy), matching FastAPI's Query(None) list parsing.
+// Axios' default serializer emits `sectors[]=...`, which the backend ignores.
+const serializeParams = (params: Record<string, unknown>): string => {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item === undefined || item === null) return;
+        searchParams.append(key, String(item));
+      });
+    } else {
+      searchParams.append(key, String(value));
+    }
+  });
+  return searchParams.toString();
+};
+
 const getApiOrigin = () => {
   try {
     return new URL(API_BASE_URL).origin;
@@ -256,6 +275,7 @@ export const screenerAPI = {
   screenStocks: async (filters: ScreenerFilters): Promise<ScreenerResponse> => {
     const response = await api.get<ScreenerResponse>('/screener/screen', {
       params: filters,
+      paramsSerializer: serializeParams,
     });
     return response.data;
   },

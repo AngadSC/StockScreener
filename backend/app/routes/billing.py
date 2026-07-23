@@ -191,7 +191,7 @@ def create_portal_session(
     return {"url": session.url}
 
 
-def _find_user_for_event(db: Session, *, user_id_meta: Optional[str], customer_id: Optional[str]) -> Optional[User]:
+def _find_user_for_event(db: Session, *, user_id_meta: Optional[str], customer_id: Optional[str], email: Optional[str] = None) -> Optional[User]:
     if user_id_meta:
         try:
             user = db.query(User).filter(User.id == int(user_id_meta)).first()
@@ -200,7 +200,11 @@ def _find_user_for_event(db: Session, *, user_id_meta: Optional[str], customer_i
         if user:
             return user
     if customer_id:
-        return db.query(User).filter(User.stripe_customer_id == customer_id).first()
+        user = db.query(User).filter(User.stripe_customer_id == customer_id).first()
+        if user:
+            return user
+    if email:
+        return db.query(User).filter(User.email == email).first()
     return None
 
 
@@ -211,7 +215,10 @@ def _apply_subscription_state(
     subscription_id: Optional[str],
     period_end: Optional[int],
     tier: Optional[str],
+    customer_id: Optional[str] = None,
 ) -> None:
+    if customer_id:
+        user.stripe_customer_id = customer_id
     if subscription_id:
         user.stripe_subscription_id = subscription_id
     user.subscription_status = status_value
@@ -229,6 +236,7 @@ async def stripe_webhook(
     db: Session = Depends(get_db),
 ):
     if not settings.STRIPE_WEBHOOK_SECRET:
+        print("[stripe-webhook] STRIPE_WEBHOOK_SECRET is not set — returning 503; all Stripe webhooks will fail until it is configured.", flush=True)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Stripe webhook secret is not configured.",
@@ -261,8 +269,9 @@ async def stripe_webhook(
         client_ref = data.get("client_reference_id")
         metadata = data.get("metadata") or {}
         user_id_meta = metadata.get("user_id") or client_ref
+        email = (data.get("customer_details") or {}).get("email") or data.get("customer_email")
 
-        user = _find_user_for_event(db, user_id_meta=user_id_meta, customer_id=customer_id)
+        user = _find_user_for_event(db, user_id_meta=user_id_meta, customer_id=customer_id, email=email)
         if not user:
             # Nothing we can do — log and acknowledge so Stripe stops retrying.
             print(f"[stripe-webhook] checkout.session.completed had no matching user. session={data.get('id')}")
@@ -300,6 +309,10 @@ async def stripe_webhook(
         customer_id = data.get("customer")
         status_value = data.get("status")
         period_end = data.get("current_period_end")
+        if period_end is None:
+            items = (data.get("items") or {}).get("data") or []
+            if items:
+                period_end = items[0].get("current_period_end")
         metadata = data.get("metadata") or {}
         user_id_meta = metadata.get("user_id")
 
@@ -324,6 +337,7 @@ async def stripe_webhook(
             subscription_id=subscription_id,
             period_end=period_end,
             tier=tier,
+            customer_id=customer_id,
         )
         db.commit()
 

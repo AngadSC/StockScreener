@@ -266,7 +266,7 @@ export default function Header() {
         href={href}
         onClick={() => setIsMobileMenuOpen(false)}
         className={cn(
-          'group relative flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
+          'group relative flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-[13.5px] transition-[background,color] duration-200 lg:py-2',
           isActive
             ? 'bg-[rgba(221,228,225,0.06)] font-medium text-[var(--ink)]'
             : 'text-[var(--mute)] hover:bg-[rgba(221,228,225,0.04)] hover:text-[var(--ink)]',
@@ -307,7 +307,7 @@ export default function Header() {
             href="/settings/emails"
             onClick={() => setIsMobileMenuOpen(false)}
             className={cn(
-              'flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
+              'flex items-center gap-3 rounded-[10px] px-3.5 py-2.5 text-[13.5px] transition-[background,color] duration-200 lg:py-2',
               isNavItemActive(pathname, '/settings/emails')
                 ? 'bg-[rgba(221,228,225,0.06)] font-medium text-[var(--ink)]'
                 : 'text-[var(--mute)] hover:bg-[rgba(221,228,225,0.04)] hover:text-[var(--ink)]'

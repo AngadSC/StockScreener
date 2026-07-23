@@ -272,13 +272,15 @@ function MarketSection({
                 <div className="text-sm font-medium text-[var(--text-primary)]">
                   {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
                 </div>
-                <Sparkline
-                  color={accent.stroke}
-                  height={20}
-                  strokeWidth={1.8}
-                  values={getSparklineSeries(stock, historyByTicker.get(stock.ticker))}
-                  width={40}
-                />
+                <span className="hidden sm:flex">
+                  <Sparkline
+                    color={accent.stroke}
+                    height={20}
+                    strokeWidth={1.8}
+                    values={getSparklineSeries(stock, historyByTicker.get(stock.ticker))}
+                    width={40}
+                  />
+                </span>
                 <div
                   className={cn(
                     'rounded-[var(--radius-sm)] px-2 py-[2px] text-xs font-medium',
@@ -288,7 +290,7 @@ function MarketSection({
                   {formatPercent(changePercent, { mode: 'percent', withSign: true })}
                 </div>
                 <ChevronRight
-                  className="row-arrow h-4 w-4 shrink-0"
+                  className="row-arrow hidden h-4 w-4 shrink-0 sm:block"
                   style={{ transition: 'transform 150ms ease' }}
                 />
               </div>

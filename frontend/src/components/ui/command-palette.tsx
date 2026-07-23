@@ -164,7 +164,7 @@ export default function CommandPalette() {
           </kbd>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto">
+        <div className="max-h-[50vh] overflow-y-auto sm:max-h-[400px]">
           {filteredCommands.length === 0 ? (
             <div className="px-4 py-8 text-center text-[var(--ink-2)]">
               <p>No commands found</p>

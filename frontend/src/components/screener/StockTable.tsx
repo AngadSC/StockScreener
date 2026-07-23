@@ -220,7 +220,7 @@ export default function StockTable({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="deco-scroll overflow-x-auto">
         <table className="deco-table">
           <thead className="bg-[var(--bg-surface-2)]">
             <tr className="border-b border-[var(--border-default)]">

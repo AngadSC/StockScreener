@@ -1017,6 +1017,22 @@
   }
 }
 
+/* Mobile refinements — scoped to small viewports (below the lg sidebar
+   breakpoint) so desktop rendering is untouched. */
+@media (max-width: 1023.98px) {
+  html,
+  body {
+    overflow-x: clip;
+  }
+}
+
+@media (max-width: 640px) {
+  .container-custom {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 @keyframes page-enter {
   from {
     transform: translateY(10px);

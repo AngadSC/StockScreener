@@ -421,7 +421,7 @@ export default function BacktesterWorkspace({
         {returnHref ? <div className="mb-4"><Link href={returnHref} className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"><ArrowLeft className="h-4 w-4" />{returnLabel}</Link></div> : null}
         <div className="grid gap-6 xl:grid-cols-[480px_minmax(0,1fr)] xl:items-start">
           <aside className="overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--bg-surface-1)] shadow-[var(--shadow-sm)] xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)]">
-            <div className="flex min-h-[760px] flex-col">
+            <div className="flex flex-col lg:min-h-[760px]">
               <div className="border-b border-[var(--border-subtle)] px-5 py-5">
                 <div className="seg w-full">
                   {[

@@ -41,6 +41,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.models import InsiderTransaction, Ticker
 from app.services.cache import cache_service
+from app.utils.market_calendar import today_et
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -625,7 +626,9 @@ def backfill(
         "filings_failed": 0,
     }
     try:
-        today = date.today()
+        # ET date, not host date: backfill() is invoked from the 22:45 ET sync
+        # (already the next day in UTC), and EDGAR indexes are keyed by ET day.
+        today = today_et()
         for offset in range(days, -1, -1):
             day = today - timedelta(days=offset)
             stats = sync_form4_for_date(day, db, client=client)

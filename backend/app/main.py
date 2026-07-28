@@ -72,6 +72,12 @@ def _resolve_rate_limit(path: str):
         return ("register", settings.RATE_LIMIT_REGISTER_PER_5_MINUTES, 300)
     if path.endswith("/backtest-data") or path.endswith("/backtest") or path.endswith("/ml-features") or path.endswith("/intraday") or path.endswith("/backtests/run"):
         return ("heavy", settings.RATE_LIMIT_HEAVY_PER_MINUTE, 60)
+    # ai_reports.router is deliberately mounted at /api/ai-reports (no version
+    # prefix), so it falls outside every api_prefix check below. Matched
+    # explicitly here — it is the most expensive endpoint we serve (2 LLM calls
+    # plus retries) and must not be the only unthrottled one.
+    if path.startswith("/api/ai-reports"):
+        return ("heavy", settings.RATE_LIMIT_HEAVY_PER_MINUTE, 60)
     if path.startswith(f"{api_prefix}/screener"):
         return ("screener", settings.RATE_LIMIT_SCREENER_PER_MINUTE, 60)
     if path.startswith(api_prefix):

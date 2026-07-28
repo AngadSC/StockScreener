@@ -1,7 +1,23 @@
 """
 Test 3: yahooquery batch fundamentals
 Tests: Batch fundamentals fetch, module extraction
+
+Live-network script. Collected by pytest only when RUN_LIVE_MARKET_DATA_TESTS=1
+(same gate as test_yfinance_batch.py); otherwise skipped at module level so a
+Yahoo outage or rate limit can't kill the whole suite's collection via the
+module-scope exit(1) calls below. `python tests/test_yahooquery.py` still runs
+it directly.
 """
+
+import os
+
+if __name__ != "__main__" and os.getenv("RUN_LIVE_MARKET_DATA_TESTS") != "1":
+    import pytest
+
+    pytest.skip(
+        "live Yahoo network script; set RUN_LIVE_MARKET_DATA_TESTS=1 to run",
+        allow_module_level=True,
+    )
 
 from yahooquery import Ticker
 

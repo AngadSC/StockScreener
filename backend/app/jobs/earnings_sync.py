@@ -20,6 +20,7 @@ from app.services.earnings import (
     get_earnings_scope_tickers,
     parse_calendar_event,
 )
+from app.utils.market_calendar import today_et
 
 
 def sync_earnings_events(manual_trigger: bool = False) -> None:
@@ -43,7 +44,10 @@ def sync_earnings_events(manual_trigger: bool = False) -> None:
             for t in db.query(Ticker).filter(Ticker.symbol.in_(symbols)).all()
         }
 
-        today = datetime.now().date()
+        # ET date, not the host date: this job runs at 23:15 ET, which is
+        # already the next day in UTC — a naive date would spare stale rows
+        # dated "today" from the cleanup below.
+        today = today_et()
         stats = {"upserted": 0, "no_data": 0, "failed_batches": 0}
 
         batches = chunk_symbols(symbols)

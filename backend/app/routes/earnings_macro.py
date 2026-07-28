@@ -8,7 +8,7 @@ below (a local, tolerant variant of app.services.auth.get_current_user).
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -20,6 +20,7 @@ from app.database.connection import get_db
 from app.database.models import EarningsEvent, MacroObservation, Ticker, User, Watchlist
 from app.services.cache import cache_service
 from app.services.fred import FRED_SERIES
+from app.utils.market_calendar import today_et
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -77,7 +78,9 @@ def get_earnings_calendar(
     Upcoming earnings events for the next `days` days, ordered by date.
     Public endpoint. When authenticated, each event includes is_watchlisted.
     """
-    today = datetime.now().date()
+    # Market-time date: on a UTC host, anything after 20:00 ET would otherwise
+    # roll the calendar forward a day and hide the current session's earnings.
+    today = today_et()
     end_date = today + timedelta(days=days)
 
     events = (

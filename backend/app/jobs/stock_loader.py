@@ -1,10 +1,17 @@
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 from app.database.connection import SessionLocal
 from app.database.models import Ticker, DailyOHLCV, StockFundamental
 from app.providers.factory import ProviderFactory
-from app.utils.market_calendar import is_trading_day, get_last_trading_day, get_previous_trading_day
+from app.utils.market_calendar import (
+    MARKET_TZ,
+    is_trading_day,
+    get_last_trading_day,
+    get_previous_trading_day,
+    today_et,
+)
 from app.services.cache import cache_service
 from app.config import settings
 from app.jobs.earnings_sync import sync_earnings_events
@@ -15,6 +22,12 @@ from typing import List
 import pandas as pd
 
 scheduler = AsyncIOScheduler()
+
+# Upper bound (calendar days) on the self-healing price backfill window. Lets a
+# handful of missed nights heal themselves while making it impossible for an
+# empty or long-stale table to trigger an accidental multi-year refetch --
+# bulk_population.py is the tool for that.
+MAX_PRICE_BACKFILL_DAYS = 14
 
 
 def get_active_tickers(db: Session) -> List[str]:
@@ -62,7 +75,7 @@ def update_all_stocks_batch(manual_trigger: bool = False):
     Strategy: Optimized with Bulk Upserts for price updates.
     """
     db = SessionLocal()
-    start_time = datetime.now()
+    start_time = datetime.now(MARKET_TZ)
 
     try:
         print("\n" + "="*70)
@@ -70,7 +83,10 @@ def update_all_stocks_batch(manual_trigger: bool = False):
         print(f"   Time: {start_time.strftime('%Y-%m-%d %H:%M:%S ET')}")
         print("="*70 + "\n")
 
-        today = datetime.now().date()
+        # Must be the ET date: this job is scheduled at 21:00 ET, which on a UTC
+        # host is already the next UTC day. A naive date here made every Friday
+        # run look like Saturday (non-trading) and silently dropped Friday's close.
+        today = today_et()
         if not manual_trigger and not is_trading_day(today):
             print("📅 Market closed today (weekend/holiday), skipping update")
             return
@@ -167,11 +183,29 @@ def update_all_stocks_batch(manual_trigger: bool = False):
 
         # yfinance treats `end` as exclusive, so use next day to include today's close.
         end_date = today + timedelta(days=1)
-        # IMPORTANT: Use get_previous_trading_day() to ensure start_date < end_date
-        # This prevents Yahoo Finance "startDate == endDate" errors
-        start_date = get_previous_trading_day(today) if not manual_trigger else today - timedelta(days=5)
 
-        print(f"📅 Fetching prices from {start_date} to {end_date} (end-exclusive)\n")
+        # Self-healing start date: resume from the day after the newest row we
+        # already hold, so a night that was skipped or failed gets backfilled on
+        # the next successful run instead of leaving a permanent hole.
+        previous_trading_day = get_previous_trading_day(today)
+        last_stored_date = db.query(func.max(DailyOHLCV.date)).scalar()
+
+        if manual_trigger:
+            start_date = today - timedelta(days=5)
+        elif last_stored_date:
+            start_date = last_stored_date + timedelta(days=1)
+        else:
+            start_date = previous_trading_day
+
+        # Clamp: start must stay <= the previous trading day (Yahoo errors on
+        # startDate == endDate), and the window is capped at MAX_PRICE_BACKFILL_DAYS.
+        start_date = min(start_date, previous_trading_day)
+        start_date = max(start_date, today - timedelta(days=MAX_PRICE_BACKFILL_DAYS))
+
+        print(
+            f"📅 Fetching prices from {start_date} to {end_date} (end-exclusive) "
+            f"— last stored close: {last_stored_date or 'none'}\n"
+        )
 
         for i in range(0, total, price_batch_size):
             batch = active_tickers[i:i + price_batch_size]
@@ -244,8 +278,8 @@ def update_all_stocks_batch(manual_trigger: bool = False):
         print("\n🗑️  Clearing screener caches...")
         cache_service.clear_pattern("screener:*")
 
-        end_time = datetime.now()
-        duration = (end_time - start_time).seconds / 60
+        end_time = datetime.now(MARKET_TZ)
+        duration = (end_time - start_time).total_seconds() / 60
         print(f"\n✅ BATCH UPDATE COMPLETE in {duration:.1f} mins")
 
     except Exception as e:
@@ -260,7 +294,7 @@ def trim_old_price_data():
     db = SessionLocal()
     try:
         print("\n🗑️  TRIMMING OLD PRICE DATA")
-        cutoff_date = datetime.now().date() - timedelta(days=365 * settings.STOCK_HISTORY_YEARS)
+        cutoff_date = today_et() - timedelta(days=365 * settings.STOCK_HISTORY_YEARS)
         deleted = db.query(DailyOHLCV).filter(DailyOHLCV.date < cutoff_date).delete()
         db.commit()
         print(f"   ✓ Deleted {deleted} old price records")
@@ -312,9 +346,14 @@ def scheduled_market_scans_warm():
     from app.jobs.market_scans_job import warm_market_scans_cache
     warm_market_scans_cache()
 
-@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=18, minute=45, timezone='America/New_York')
+@scheduler.scheduled_job('cron', day_of_week='mon-fri', hour=22, minute=45, timezone='America/New_York')
 def scheduled_insider_sync():
-    """Runs weekdays at 6:45 PM ET: pull that day's SEC Form 4 insider filings."""
+    """
+    Runs weekdays at 10:45 PM ET: pull that day's SEC Form 4 insider filings.
+
+    EDGAR publishes the full daily index around 22:00 ET, so an earlier run
+    (this was 18:45) could only ever see the previous day's filings.
+    """
     print("⏰ Triggering insider (Form 4) sync...")
     # Lazy import keeps job logic isolated in its own module.
     from app.jobs.insider_sync import run_insider_sync

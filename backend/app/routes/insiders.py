@@ -6,7 +6,7 @@ agent -- FastAPI allows multiple routers under one prefix). Mounted under
 ``settings.API_V1_PREFIX`` in ``app/main.py``.
 """
 
-from datetime import date, timedelta
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -15,8 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database.connection import get_db
-from app.database.models import InsiderTransaction, Ticker
+from app.database.models import InsiderTransaction, StockFundamental, Ticker
 from app.services.cache import cache_service
+from app.utils.market_calendar import today_et
 
 router = APIRouter(prefix="/market", tags=["insiders"])
 
@@ -26,6 +27,39 @@ _TYPE_CODES = {
     "sells": ("S",),
     "all": ("P", "S"),
 }
+
+
+def _resolve_company_name(
+    ticker_name: Optional[str], additional: Optional[dict]
+) -> Optional[str]:
+    """
+    Company display name with a StockFundamental.additional_data fallback.
+
+    ``tickers.name`` is NULL for the large majority of rows (including megacaps
+    like MSFT/NVDA/TSLA), so relying on it alone rendered "N/A" for most of the
+    insider feed. Mirrors services/screener.py::_resolve_company_name.
+    """
+    if ticker_name:
+        return ticker_name
+
+    if not isinstance(additional, dict):
+        return None
+
+    # YahooQuery structure: additional_data.price.{shortName,longName}
+    for section in ("price", "summary"):
+        block = additional.get(section)
+        if isinstance(block, dict):
+            name = block.get("shortName") or block.get("longName") or block.get("name")
+            if name:
+                return name
+
+    # YFinance structure: additional_data.{shortName,longName,displayName}
+    for key in ("shortName", "longName", "displayName", "name"):
+        name = additional.get(key)
+        if name:
+            return name
+
+    return None
 
 
 def _serialize(txn: InsiderTransaction, symbol: str, company: Optional[str]) -> dict:
@@ -66,10 +100,18 @@ def get_insider_activity(
     if cached:
         return {"cached": True, **cached}
 
-    since = date.today() - timedelta(days=days)
+    since = today_et() - timedelta(days=days)
+    # StockFundamental is 1:1 with Ticker (ticker_id is its primary key), so the
+    # outer join carries the name fallback without multiplying rows.
     query = (
-        db.query(InsiderTransaction, Ticker.symbol, Ticker.name)
+        db.query(
+            InsiderTransaction,
+            Ticker.symbol,
+            Ticker.name,
+            StockFundamental.additional_data,
+        )
         .join(Ticker, Ticker.id == InsiderTransaction.ticker_id)
+        .outerjoin(StockFundamental, StockFundamental.ticker_id == Ticker.id)
         .filter(InsiderTransaction.transaction_code.in_(codes))
         .filter(InsiderTransaction.filed_date >= since)
         .filter(InsiderTransaction.value >= min_value)
@@ -77,7 +119,10 @@ def get_insider_activity(
         .limit(limit)
     )
 
-    results = [_serialize(txn, symbol, name) for txn, symbol, name in query.all()]
+    results = [
+        _serialize(txn, symbol, _resolve_company_name(name, additional))
+        for txn, symbol, name, additional in query.all()
+    ]
     payload = {
         "results": results,
         "count": len(results),
@@ -106,11 +151,19 @@ def get_insider_activity_for_ticker(
     activity_type = type.lower().strip()
     codes = _TYPE_CODES.get(activity_type, _TYPE_CODES["all"])
 
-    ticker_obj = db.query(Ticker).filter(Ticker.symbol == symbol).first()
-    if ticker_obj is None:
+    row = (
+        db.query(Ticker, StockFundamental.additional_data)
+        .outerjoin(StockFundamental, StockFundamental.ticker_id == Ticker.id)
+        .filter(Ticker.symbol == symbol)
+        .first()
+    )
+    if row is None:
         return {"symbol": symbol, "results": [], "count": 0}
 
-    since = date.today() - timedelta(days=days)
+    ticker_obj, additional = row
+    company = _resolve_company_name(ticker_obj.name, additional)
+
+    since = today_et() - timedelta(days=days)
     query = (
         db.query(InsiderTransaction)
         .filter(InsiderTransaction.ticker_id == ticker_obj.id)
@@ -120,10 +173,10 @@ def get_insider_activity_for_ticker(
         .limit(limit)
     )
 
-    results = [_serialize(txn, symbol, ticker_obj.name) for txn in query.all()]
+    results = [_serialize(txn, symbol, company) for txn in query.all()]
     return {
         "symbol": symbol,
-        "company": ticker_obj.name,
+        "company": company,
         "results": results,
         "count": len(results),
         "filters": {"type": activity_type, "days": days, "limit": limit},

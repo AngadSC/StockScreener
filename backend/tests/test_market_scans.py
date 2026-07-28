@@ -9,14 +9,19 @@ connection; these tests instead pin down every building block it relies on.
 """
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from app.services.market_scans import (
     GAP_PCT_THRESHOLD,
+    MARKET_SCANS_CACHE_KEY,
+    MARKET_SCANS_CACHE_TTL,
     MIN_AVG_VOLUME,
     MIN_CLOSE_PRICE,
     NEAR_52W_PCT_THRESHOLD,
     UNUSUAL_VOLUME_RATIO,
+    VOLUME_BASELINE_DAYS,
     _empty_payload,
     _finalize_sectors,
     _make_row,
@@ -25,6 +30,8 @@ from app.services.market_scans import (
     _round,
     _top_n,
     effective_avg_volume,
+    expected_latest_trading_day,
+    is_cached_payload_fresh,
     is_gap_down,
     is_gap_up,
     is_near_52w_high,
@@ -179,6 +186,31 @@ class TestIsUnusualVolume:
 
     def test_missing_data(self):
         assert is_unusual_volume(None, None) is False
+
+    def test_baseline_must_exclude_the_current_bar(self):
+        """Regression: the 20-day baseline used to include the spike itself.
+
+        With `n` quiet bars at volume V and a spike of k*V, a baseline that
+        swallows the spike averages to V*(n-1+k)/n, so the ratio reads
+        n*k/(n-1+k) instead of k. Every real spike prints smaller than it is,
+        and the ones just over the threshold vanish from the tab entirely.
+        """
+        n = VOLUME_BASELINE_DAYS
+        quiet_volume = 100_000.0
+        k = UNUSUAL_VOLUME_RATIO  # a genuine 2.5x day
+        spike_volume = quiet_volume * k
+
+        # Correct baseline: the n bars BEFORE today, none of them the spike.
+        assert volume_ratio(spike_volume, quiet_volume) == pytest.approx(k)
+        assert is_unusual_volume(spike_volume, quiet_volume) is True
+
+        # Old behaviour: spike folded into its own baseline -> understated, and
+        # for a threshold-grazing day, dropped from the scan.
+        diluted_baseline = (quiet_volume * (n - 1) + spike_volume) / n
+        diluted_ratio = volume_ratio(spike_volume, diluted_baseline)
+        assert diluted_ratio == pytest.approx(n * k / (n - 1 + k))
+        assert diluted_ratio < k
+        assert is_unusual_volume(spike_volume, diluted_baseline) is False
 
 
 # ---------------------------------------------------------------------------
@@ -360,12 +392,77 @@ class TestEmptyPayload:
 
 
 class TestMarketScansCacheKey:
-    def test_uses_provided_date(self):
-        from datetime import date
-        assert market_scans_cache_key(date(2026, 7, 20)) == "market:scans:2026-07-20"
+    def test_key_is_stable_and_not_date_stamped(self):
+        # Regression: the key used to embed the ET calendar date, so the 22:30 ET
+        # warm job wrote market:scans:<D> while every reader after ET midnight
+        # asked for market:scans:<D+1> -- a guaranteed miss. One fixed key now.
+        assert market_scans_cache_key() == MARKET_SCANS_CACHE_KEY == "market:scans:latest"
+        assert market_scans_cache_key() == market_scans_cache_key()
 
-    def test_defaults_to_today_and_has_expected_prefix(self):
-        key = market_scans_cache_key()
-        assert key.startswith("market:scans:")
-        # YYYY-MM-DD suffix
-        assert len(key.split(":")[-1]) == 10
+    def test_ttl_outlives_a_long_weekend(self):
+        # Friday 22:30 ET write must still be there Monday morning.
+        assert MARKET_SCANS_CACHE_TTL >= 2 * 86400
+
+
+# ---------------------------------------------------------------------------
+# cache freshness (expected_latest_trading_day / is_cached_payload_fresh)
+# ---------------------------------------------------------------------------
+
+class TestExpectedLatestTradingDay:
+    def test_midweek_expects_the_prior_session(self):
+        # Wed 2026-07-22 -> Tue 2026-07-21 (21:00 ET sync means Tue's close is
+        # the newest one we can count on during Wednesday).
+        assert expected_latest_trading_day(date(2026, 7, 22)) == date(2026, 7, 21)
+
+    def test_monday_skips_back_over_the_weekend(self):
+        # Mon 2026-07-20 -> Fri 2026-07-17, not Sunday.
+        assert expected_latest_trading_day(date(2026, 7, 20)) == date(2026, 7, 17)
+
+    def test_saturday_expects_friday(self):
+        assert expected_latest_trading_day(date(2026, 7, 25)) == date(2026, 7, 24)
+
+    def test_skips_back_over_a_market_holiday(self):
+        # Fri 2026-07-03 is the observed Independence Day holiday, so the Monday
+        # after (2026-07-06) must look back to Thu 2026-07-02.
+        assert expected_latest_trading_day(date(2026, 7, 6)) == date(2026, 7, 2)
+
+
+class TestIsCachedPayloadFresh:
+    def test_payload_from_the_expected_session_is_fresh(self):
+        # Wednesday reader, Tuesday's payload (written by Tue 22:30 ET warm job).
+        payload = {"as_of_date": "2026-07-21"}
+        assert is_cached_payload_fresh(payload, date(2026, 7, 22)) is True
+
+    def test_payload_newer_than_expected_is_fresh(self):
+        # Same evening, after the 22:30 warm job has already stored Wednesday.
+        payload = {"as_of_date": "2026-07-22"}
+        assert is_cached_payload_fresh(payload, date(2026, 7, 22)) is True
+
+    def test_payload_from_a_previous_session_is_stale(self):
+        # Regression for the miss-by-construction bug: yesterday's-yesterday
+        # payload must trigger a recompute, not be served.
+        payload = {"as_of_date": "2026-07-20"}
+        assert is_cached_payload_fresh(payload, date(2026, 7, 22)) is False
+
+    def test_weekend_serves_fridays_payload(self):
+        payload = {"as_of_date": "2026-07-24"}
+        assert is_cached_payload_fresh(payload, date(2026, 7, 25)) is True
+        assert is_cached_payload_fresh(payload, date(2026, 7, 26)) is True
+
+    def test_missing_or_empty_payload_is_not_fresh(self):
+        assert is_cached_payload_fresh(None, date(2026, 7, 22)) is False
+        assert is_cached_payload_fresh({}, date(2026, 7, 22)) is False
+
+    def test_empty_payload_shape_is_never_served_from_cache(self):
+        # _empty_payload() has as_of_date=None -- an empty/dev DB must not get
+        # stuck serving nothing.
+        assert is_cached_payload_fresh(_empty_payload(), date(2026, 7, 22)) is False
+
+    def test_unparseable_as_of_date_is_not_fresh(self):
+        assert is_cached_payload_fresh({"as_of_date": "not-a-date"}, date(2026, 7, 22)) is False
+
+    def test_accepts_datetime_ish_string(self):
+        # cache_service serializes with json.dumps(default=str); be tolerant if a
+        # date ever round-trips as "YYYY-MM-DD 00:00:00".
+        payload = {"as_of_date": "2026-07-21 00:00:00"}
+        assert is_cached_payload_fresh(payload, date(2026, 7, 22)) is True

@@ -1,7 +1,7 @@
 """add ai stock reports and usage events
 
 Revision ID: 20260506_0001
-Revises:
+Revises: 20250101_0000
 Create Date: 2026-05-06
 """
 
@@ -13,7 +13,11 @@ from sqlalchemy.dialects import postgresql
 
 
 revision: str = "20260506_0001"
-down_revision: Union[str, None] = None
+# Re-parented onto the bootstrap revision: this migration references users(id),
+# so on an empty database the core tables must exist first. Production is
+# stamped at this revision and Alembic only walks forward from a stamp, so the
+# bootstrap never re-runs there.
+down_revision: Union[str, None] = "20250101_0000"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

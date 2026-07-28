@@ -8,9 +8,13 @@ Hard cost guards (a runaway here spends real LLM + email money):
     - ``EMAIL_ENABLED`` False  -> log and exit BEFORE any LLM call.
     - ``WATCHLIST_DIGEST_ENABLED`` False -> log and exit (unless force).
     - Non-trading day -> exit (unless force).
+    - Recipients are pre-filtered on the ``watchlist_digest`` preference, so an
+      opted-out user never triggers LLM work nor consumes the per-run cap.
     - Global per-run cap ``DIGEST_MAX_LLM_CALLS_PER_RUN`` -> once exceeded,
       remaining users get digests built from cached reports only.
     - Per-user idempotency via ``already_sent_today`` (unless force).
+    - A digest with zero analyzed stocks is never sent (and never logged as
+      sent), so a corrective re-run the same day is still possible.
 
 Per-user failures never abort the run.
 """
@@ -21,6 +25,7 @@ import logging
 from datetime import date
 from typing import Any, Optional
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.ai.watchlist_digest import (
@@ -31,20 +36,43 @@ from app.ai.watchlist_digest import (
 )
 from app.config import settings
 from app.database.connection import SessionLocal
-from app.database.models import User
+from app.database.models import EmailPreference, User
 from app.services.email import already_sent_today, send_categorized_email
 from app.utils.market_calendar import is_trading_day
 
 logger = logging.getLogger(__name__)
 
 DIGEST_CATEGORY = "watchlist_digest"
+# Tiers eligible to receive the digest. Authoritative for the tier gate on
+# PUT /email/preferences (see app/routes/email_prefs.py).
+RECIPIENT_TIERS = ("elite",)
 
 
 def _elite_recipients(db: Session, target_user_id: Optional[int]) -> list[User]:
-    """Active Elite users (optionally narrowed to a single user)."""
-    query = db.query(User).filter(
-        User.is_active.is_(True),
-        User.tier == "elite",
+    """Active Elite users who have NOT opted out of the digest.
+
+    The preference filter is applied here — not after the digest is built —
+    because ``build_user_digest`` can spend up to ``ELITE_DIGEST_MAX_STOCKS``
+    LLM calls per user. Filtering later would burn budget (and the shared
+    per-run cap) on mail that ``send_categorized_email`` then discards as
+    "opted_out", starving opted-in users later in the id ordering.
+
+    Users with no ``EmailPreference`` row are included: the model defaults all
+    categories to True, and the row is created on first send.
+    """
+    query = (
+        db.query(User)
+        .outerjoin(EmailPreference, EmailPreference.user_id == User.id)
+        .filter(
+            User.is_active.is_(True),
+            # Case-insensitive, matching daily_brief_job -- a tier stored as
+            # "Elite" must not pass the prefs tier gate yet silently miss here.
+            func.lower(User.tier).in_(RECIPIENT_TIERS),
+            or_(
+                EmailPreference.user_id.is_(None),
+                EmailPreference.watchlist_digest.is_(True),
+            ),
+        )
     )
     if target_user_id is not None:
         query = query.filter(User.id == target_user_id)
@@ -61,6 +89,7 @@ def _new_summary() -> dict[str, Any]:
         "emails_skipped": 0,
         "emails_failed": 0,
         "empty_watchlists": 0,
+        "skipped_no_content": 0,
         "already_sent": 0,
         "llm_calls": 0,
         "cache_hits": 0,
@@ -148,6 +177,24 @@ def run_watchlist_digest(
                 summary["cache_hits"] += digest["cache_hits"]
                 summary["ticker_failures"] += digest["failures"]
 
+                # Every ticker came back "unavailable" (LLM budget exhausted or
+                # the provider failed). Sending would mean "We analyzed 0
+                # stocks..." AND would write a status=sent log that blocks any
+                # corrective re-run today, so skip without logging a send.
+                if digest["available_count"] == 0:
+                    summary["skipped_no_content"] += 1
+                    logger.warning(
+                        "Watchlist digest has no analyzed stocks user_id=%s "
+                        "attempted=%s failures=%s llm_calls=%s cache_hits=%s; "
+                        "skipping send so a re-run today can still deliver.",
+                        user.id,
+                        digest["analyzed_attempted"],
+                        digest["failures"],
+                        digest["llm_calls"],
+                        digest["cache_hits"],
+                    )
+                    continue
+
                 result = send_categorized_email(
                     user,
                     DIGEST_CATEGORY,
@@ -179,12 +226,14 @@ def run_watchlist_digest(
 
         logger.info(
             "Watchlist digest run complete: users=%s sent=%s skipped=%s failed=%s "
-            "empty=%s already_sent=%s llm_calls=%s cache_hits=%s ticker_failures=%s cost_capped_users=%s",
+            "empty=%s no_content=%s already_sent=%s llm_calls=%s cache_hits=%s "
+            "ticker_failures=%s cost_capped_users=%s",
             summary["users_considered"],
             summary["emails_sent"],
             summary["emails_skipped"],
             summary["emails_failed"],
             summary["empty_watchlists"],
+            summary["skipped_no_content"],
             summary["already_sent"],
             summary["llm_calls"],
             summary["cache_hits"],

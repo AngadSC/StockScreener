@@ -20,6 +20,13 @@ webhook_router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 ACTIVE_STATUSES = {"active", "trialing", "past_due"}
 
+# Subscription statuses that revoke paid access.
+DOWNGRADE_STATUSES = {"canceled", "unpaid", "incomplete_expired"}
+
+# Checkout Session payment states that mean the money actually cleared. Anything
+# else (e.g. "unpaid" after a failed 3DS challenge) must not grant a tier.
+SETTLED_PAYMENT_STATUSES = {"paid", "no_payment_required"}
+
 # Paid subscription tiers that map to a Stripe Price.
 PAID_TIERS = {"pro", "trader", "elite"}
 DEFAULT_TIER = "pro"
@@ -70,6 +77,25 @@ def _tier_from_subscription_object(subscription: dict) -> Optional[str]:
     return None
 
 
+def _has_active_subscription(user: User) -> bool:
+    """True when the user already holds a live Stripe subscription."""
+    return bool(user.stripe_subscription_id and (user.subscription_status or "") in ACTIVE_STATUSES)
+
+
+def _is_stale_subscription_event(user: User, subscription_id: Optional[str]) -> bool:
+    """
+    True when an event belongs to an older subscription than the one the user
+    currently holds — e.g. a cancelled Pro subscription lapsing weeks after the
+    user bought Elite. Acting on those events would revoke access the customer
+    is still paying for.
+    """
+    return bool(
+        user.stripe_subscription_id
+        and subscription_id
+        and user.stripe_subscription_id != subscription_id
+    )
+
+
 def _stripe_client() -> stripe:
     if not settings.STRIPE_SECRET_KEY:
         raise HTTPException(
@@ -114,6 +140,10 @@ async def create_checkout_session(
     its URL. Accepts an optional JSON body {"tier": "pro"|"trader"|"elite"} and
     defaults to "pro" when the body is empty. The frontend redirects the browser to
     the returned URL.
+
+    Returns 409 when the user already has a live subscription: a second Checkout
+    Session would bill them twice and orphan the first subscription. Plan changes
+    belong in the Customer Portal.
     """
     sdk = _stripe_client()
 
@@ -129,6 +159,12 @@ async def create_checkout_session(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"Stripe {tier.capitalize()} price is not configured on this server.",
+        )
+
+    if _has_active_subscription(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have an active subscription — use Manage billing to change plans.",
         )
 
     session_args = {
@@ -225,7 +261,7 @@ def _apply_subscription_state(
     user.subscription_current_period_end = _epoch_to_dt(period_end)
     if status_value in ACTIVE_STATUSES:
         user.tier = tier or DEFAULT_TIER
-    elif status_value in {"canceled", "unpaid", "incomplete_expired"}:
+    elif status_value in DOWNGRADE_STATUSES:
         user.tier = "free"
 
 
@@ -263,6 +299,18 @@ async def stripe_webhook(
     if event_type == "checkout.session.completed":
         if data.get("mode") != "subscription":
             return {"received": True}
+
+        # A completed session is not a paid session: a failed 3DS challenge still
+        # fires this event with payment_status "unpaid". Grant nothing until the
+        # money clears and let the customer.subscription.* events settle the tier.
+        payment_status = data.get("payment_status")
+        if payment_status not in SETTLED_PAYMENT_STATUSES:
+            print(
+                f"[stripe-webhook] checkout.session.completed not settled "
+                f"(payment_status={payment_status!r}); deferring tier grant to subscription events. "
+                f"session={data.get('id')}"
+            )
+            return {"received": True, "pending_payment": True}
 
         customer_id = data.get("customer")
         subscription_id = data.get("subscription")
@@ -321,6 +369,19 @@ async def stripe_webhook(
             print(f"[stripe-webhook] {event_type} had no matching user. subscription={subscription_id}")
             return {"received": True, "matched": False}
 
+        # Never let an older subscription revoke access or take the record back. A
+        # new subscription going active still applies (that is how upgrades land);
+        # what is ignored here comes from a subscription the user has already moved
+        # off of — either a downgrade transition or one winding down at period end.
+        if _is_stale_subscription_event(user, subscription_id) and (
+            status_value in DOWNGRADE_STATUSES or data.get("cancel_at_period_end")
+        ):
+            print(
+                f"[stripe-webhook] ignoring stale {event_type} for subscription={subscription_id}; "
+                f"user {user.id} is on {user.stripe_subscription_id}"
+            )
+            return {"received": True, "stale": True}
+
         # Derive the tier from the subscription's actual price so that plan changes
         # made in the Customer Portal (e.g. Pro -> Trader) land on the right tier.
         tier = _tier_from_subscription_object(data)
@@ -350,6 +411,16 @@ async def stripe_webhook(
         user = _find_user_for_event(db, user_id_meta=user_id_meta, customer_id=customer_id)
         if not user:
             return {"received": True, "matched": False}
+
+        # The deleted subscription may be one the user already replaced (cancel Pro
+        # at period end, then buy Elite). Downgrading on the old one would revoke a
+        # subscription Stripe is still billing.
+        if _is_stale_subscription_event(user, subscription_id):
+            print(
+                f"[stripe-webhook] ignoring stale customer.subscription.deleted for "
+                f"subscription={subscription_id}; user {user.id} is on {user.stripe_subscription_id}"
+            )
+            return {"received": True, "stale": True}
 
         user.tier = "free"
         user.subscription_status = "canceled"

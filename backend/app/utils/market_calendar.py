@@ -1,9 +1,21 @@
 from datetime import date, datetime, timedelta
 from typing import List
+from zoneinfo import ZoneInfo
 import pandas as pd
 from pandas.tseries.holiday import USFederalHolidayCalendar, Holiday, nearest_workday
 from pandas import DateOffset
 from pandas.tseries.offsets import Easter
+
+
+# The market clock. Deployments run in UTC, where an evening ET timestamp
+# already belongs to the NEXT UTC day (21:00 ET Friday == 01:00/02:00 UTC
+# Saturday). Any "today" used for market logic must be derived in ET.
+MARKET_TZ = ZoneInfo("America/New_York")
+
+
+def today_et() -> date:
+    """Current calendar date in US market time (America/New_York)."""
+    return datetime.now(MARKET_TZ).date()
 
 
 # ============================================
@@ -53,13 +65,13 @@ def get_last_trading_day(reference_date: date = None) -> date:
     Get the most recent trading day (or current day if market is open)
 
     Args:
-        reference_date: Date to check from (defaults to today)
+        reference_date: Date to check from (defaults to today in ET)
 
     Returns:
         Last trading day
     """
     if reference_date is None:
-        reference_date = datetime.now().date()
+        reference_date = today_et()
 
     current = reference_date
 
@@ -78,13 +90,13 @@ def get_previous_trading_day(reference_date: date = None) -> date:
     before the end date to avoid startDate == endDate errors.
 
     Args:
-        reference_date: Date to check from (defaults to today)
+        reference_date: Date to check from (defaults to today in ET)
 
     Returns:
         Previous trading day (always before reference_date)
     """
     if reference_date is None:
-        reference_date = datetime.now().date()
+        reference_date = today_et()
 
     # Start from the day before reference_date
     current = reference_date - timedelta(days=1)
@@ -147,13 +159,13 @@ def get_next_trading_day(reference_date: date = None) -> date:
     Get the next trading day after reference date
     
     Args:
-        reference_date: Date to start from (defaults to today)
-    
+        reference_date: Date to start from (defaults to today in ET)
+
     Returns:
         Next trading day
     """
     if reference_date is None:
-        reference_date = datetime.now().date()
+        reference_date = today_et()
     
     current = reference_date + timedelta(days=1)
     

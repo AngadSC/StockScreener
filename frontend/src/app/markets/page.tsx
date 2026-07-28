@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity } from 'lucide-react';
+import { Activity, RefreshCw } from 'lucide-react';
 
 import ScanTable from '@/components/markets/ScanTable';
 import SectorHeatmap from '@/components/markets/SectorHeatmap';
+import { Button } from '@/components/ui/button';
 import { marketAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { MARKET_SCAN_TABS } from '@/types/market';
@@ -14,7 +15,7 @@ import type { MarketScanKey } from '@/types/market';
 export default function MarketsPage() {
   const [activeTab, setActiveTab] = useState<MarketScanKey>('gainers');
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
     queryKey: ['market-scans'],
     queryFn: () => marketAPI.getScans(),
     staleTime: 60_000,
@@ -22,6 +23,9 @@ export default function MarketsPage() {
 
   const activeTabConfig = MARKET_SCAN_TABS.find((tab) => tab.key === activeTab) ?? MARKET_SCAN_TABS[0];
   const activeRows = data?.[activeTab] ?? [];
+  // Only take over the page when there is nothing to show; a failed background
+  // refetch should not blank out scans we already have.
+  const showError = isError && !data;
 
   return (
     <div className="container-custom py-8">
@@ -44,50 +48,80 @@ export default function MarketsPage() {
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
                 As of
               </div>
-              <div className="mt-1 text-lg font-semibold text-[var(--text-primary)]">
-                {data?.as_of_date ?? (isLoading ? 'Loading…' : '—')}
+              <div
+                className={cn(
+                  'mt-1 text-lg font-semibold',
+                  showError ? 'text-[var(--negative)]' : 'text-[var(--text-primary)]'
+                )}
+              >
+                {showError ? '—' : data?.as_of_date ?? (isLoading ? 'Loading…' : '—')}
               </div>
+              {showError ? (
+                <div className="mt-0.5 text-[11px] text-[var(--negative)]">Data unavailable</div>
+              ) : null}
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mb-8">
-        <h2 className="heading-md mb-4 text-[var(--text-primary)]">Sector heatmap</h2>
-        <SectorHeatmap sectors={data?.sectors ?? []} isLoading={isLoading} />
-      </section>
-
-      <section>
-        <div className="flex flex-wrap gap-2">
-          {MARKET_SCAN_TABS.map((tab) => (
-            <button
-              key={tab.key}
+      {showError ? (
+        <div className="deco-panel p-8 text-center">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Could not load the market scanners. This is a connection problem, not an empty market.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <Button
               type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                'chip transition-[background,border-color,color]',
-                activeTab === tab.key
-                  ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--ivory)]'
-                  : 'hover:border-[var(--forest-line)] hover:text-[var(--ink)]'
-              )}
+              variant="secondary"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
             >
-              {tab.label}
-              {data ? ` (${data[tab.key]?.length ?? 0})` : ''}
-            </button>
-          ))}
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+              {isFetching ? 'Retrying…' : 'Retry'}
+            </Button>
+          </div>
         </div>
+      ) : (
+        <>
+          <section className="mb-8">
+            <h2 className="heading-md mb-4 text-[var(--text-primary)]">Sector heatmap</h2>
+            <SectorHeatmap sectors={data?.sectors ?? []} isLoading={isLoading} />
+          </section>
 
-        <p className="mb-4 mt-3 text-[13px] leading-relaxed text-[var(--text-tertiary)]">
-          {activeTabConfig.description}
-        </p>
+          <section>
+            <div className="flex flex-wrap gap-2">
+              {MARKET_SCAN_TABS.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    'chip transition-[background,border-color,color]',
+                    activeTab === tab.key
+                      ? 'border-[var(--ink)] bg-[var(--ink)] text-[var(--ivory)]'
+                      : 'hover:border-[var(--forest-line)] hover:text-[var(--ink)]'
+                  )}
+                >
+                  {tab.label}
+                  {data ? ` (${data[tab.key]?.length ?? 0})` : ''}
+                </button>
+              ))}
+            </div>
 
-        <ScanTable
-          rows={activeRows}
-          isLoading={isLoading}
-          tab={activeTabConfig}
-          asOfDate={data?.as_of_date ?? null}
-        />
-      </section>
+            <p className="mb-4 mt-3 text-[13px] leading-relaxed text-[var(--text-tertiary)]">
+              {activeTabConfig.description}
+            </p>
+
+            <ScanTable
+              rows={activeRows}
+              isLoading={isLoading}
+              tab={activeTabConfig}
+              asOfDate={data?.as_of_date ?? null}
+            />
+          </section>
+        </>
+      )}
     </div>
   );
 }

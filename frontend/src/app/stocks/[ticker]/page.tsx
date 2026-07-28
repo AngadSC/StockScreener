@@ -29,12 +29,14 @@ function getCompanyName(stock: Stock): string {
   return stock.name || stock.company_name || 'Company profile';
 }
 
+// The API stores the day move as a ratio (-0.013 = -1.3%), so it has to be
+// scaled by 100 before it is rendered as a percentage.
 function getChangePercent(stock: Stock): number | null {
   if (typeof stock.day_change_percent === 'number') {
-    return normalizePercentValue(stock.day_change_percent, 'percent');
+    return normalizePercentValue(stock.day_change_percent, 'ratio');
   }
   if (typeof stock.change_percent === 'number') {
-    return normalizePercentValue(stock.change_percent, 'percent');
+    return normalizePercentValue(stock.change_percent, 'ratio');
   }
   return null;
 }

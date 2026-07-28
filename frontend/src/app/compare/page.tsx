@@ -34,7 +34,9 @@ function ComparePageContent() {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [tickers, setTickers] = useState<string[]>(() => parseSymbolsParam(searchParams.get('symbols')));
+  const symbolsParam = searchParams.get('symbols');
+
+  const [tickers, setTickers] = useState<string[]>(() => parseSymbolsParam(symbolsParam));
 
   // Keep the URL in sync so a comparison is shareable/bookmarkable.
   useEffect(() => {
@@ -45,6 +47,15 @@ function ComparePageContent() {
     router.replace(`${pathname}${query}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tickers]);
+
+  // ...and follow the URL back. Navigating to a bare /compare from the nav, or
+  // stepping through history, used to leave stale tickers on screen while the
+  // address bar claimed something else. Returning `prev` when the two already
+  // agree keeps this from ping-ponging with the effect above.
+  useEffect(() => {
+    const fromUrl = parseSymbolsParam(symbolsParam);
+    setTickers((prev) => (prev.join(',') === fromUrl.join(',') ? prev : fromUrl));
+  }, [symbolsParam]);
 
   const colorMap = useSeriesColors(tickers);
 

@@ -2,11 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Users } from 'lucide-react';
+import { RefreshCw, Users } from 'lucide-react';
 
 import InsiderControls from '@/components/insiders/InsiderControls';
 import InsiderTable from '@/components/insiders/InsiderTable';
+import { Button } from '@/components/ui/button';
 import { insidersAPI } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import type { InsiderActivityFilters } from '@/types/insiders';
 
 const DEFAULT_FILTERS: InsiderActivityFilters = {
@@ -19,13 +21,16 @@ const DEFAULT_FILTERS: InsiderActivityFilters = {
 export default function InsidersPage() {
   const [filters, setFilters] = useState<InsiderActivityFilters>(DEFAULT_FILTERS);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['insider-activity', filters],
     queryFn: () => insidersAPI.getActivity(filters),
     placeholderData: keepPreviousData,
   });
 
   const results = data?.results ?? [];
+  // Distinguish "the request failed" from "no filings match" — the table's
+  // empty state reads as a real answer, which it isn't when the API is down.
+  const showError = isError && !data;
 
   const buyCount = useMemo(
     () => results.filter((txn) => txn.type === 'buy').length,
@@ -64,8 +69,13 @@ export default function InsidersPage() {
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
                 Filings shown
               </div>
-              <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
-                {(data?.count ?? 0).toLocaleString()}
+              <div
+                className={cn(
+                  'mt-1 text-2xl font-semibold tabular-nums',
+                  showError ? 'text-[var(--negative)]' : 'text-[var(--text-primary)]'
+                )}
+              >
+                {showError ? '—' : (data?.count ?? 0).toLocaleString()}
               </div>
             </div>
           </div>
@@ -80,16 +90,39 @@ export default function InsidersPage() {
         />
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
-        <p className="smallcap-low">
-          {filters.type === 'all' && results.length > 0
-            ? `${buyCount} buys · ${results.length - buyCount} sells`
-            : `Newest first · min ${formatCompact(filters.min_value)} · last ${filters.days}d`}
-        </p>
-        <div className="live-dot">{isLoading ? 'Updating' : 'Live'}</div>
-      </div>
+      {showError ? (
+        <div className="deco-panel p-8 text-center">
+          <p className="text-sm text-[var(--text-secondary)]">
+            Could not load insider filings. This is a connection problem, not an empty result —
+            your filters are still applied.
+          </p>
+          <div className="mt-4 flex justify-center">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+              {isFetching ? 'Retrying…' : 'Retry'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="mb-3 flex items-center justify-between">
+            <p className="smallcap-low">
+              {filters.type === 'all' && results.length > 0
+                ? `${buyCount} buys · ${results.length - buyCount} sells`
+                : `Newest first · min ${formatCompact(filters.min_value)} · last ${filters.days}d`}
+            </p>
+            <div className="live-dot">{isLoading ? 'Updating' : 'Live'}</div>
+          </div>
 
-      <InsiderTable transactions={results} isLoading={isLoading} />
+          <InsiderTable transactions={results} isLoading={isLoading} />
+        </>
+      )}
     </div>
   );
 }

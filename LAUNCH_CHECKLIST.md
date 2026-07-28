@@ -14,8 +14,14 @@ cd backend && alembic upgrade head
 ```
 
 Adds 5 tables (email_preferences, email_send_log, insider_transactions,
-earnings_events, macro_observations) in one linear chain. On Railway, run it
-via `Dockerfile.migrate` or a one-off shell.
+earnings_events, macro_observations) in one linear chain and lands on head
+`20260726_0004` (which also brings the users Stripe columns under Alembic —
+a no-op where they were already applied by hand). On Railway, run it via
+`Dockerfile.migrate` (now actually runs `alembic upgrade head`; it previously
+replayed the old bootstrap SQL and created none of these tables) or a one-off
+shell. Safe to re-run — every revision is idempotent. The old
+`app/database/migrations/001_optimized_schema.sql` / `002_stripe_billing.sql`
+files are superseded by the Alembic chain; don't psql them again.
 
 ## 2. Stripe — activate Trader & Elite checkout
 
@@ -68,11 +74,15 @@ warms at 10:30 PM ET.
 | 06:00 | FRED macro sync |
 | 07:00 Mon–Fri | Elite Watchlist AI Digest emails |
 | 07:45 Mon–Fri | Trader/Elite Daily Market Brief email |
-| 18:45 Mon–Fri | SEC Form 4 insider sync |
-| 21:00 | OHLCV + fundamentals nightly update |
+| 21:00 | OHLCV + fundamentals nightly update (self-heals up to 14 missed days) |
 | 22:30 | Market scanners cache warm |
+| 22:45 Mon–Fri | SEC Form 4 insider sync (EDGAR posts the daily index ~22:00 ET; re-pulls last 3 trading days) |
 | 23:15 | Earnings calendar sync |
 | Sun 03:00 | Old price data trim |
+
+All schedules are registered in `backend/app/jobs/stock_loader.py` — the only
+live scheduler (the old `app/jobs/scheduler.py` was dead code and is deleted).
+Job "today" logic is ET-aware, so UTC hosts no longer skip Friday closes.
 
 ## Cost expectations
 

@@ -1,8 +1,12 @@
+'use client';
+
 import Link from 'next/link';
 import { Check, Clock, CreditCard } from 'lucide-react';
 
+import { ManageSubscriptionButton } from '@/components/billing/ManageSubscriptionButton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { isProTier, useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import type { PaidTier } from '@/types/user';
 import { CheckoutButton } from './CheckoutButton';
@@ -84,7 +88,68 @@ const plans: Plan[] = [
   },
 ];
 
+interface PlanCtaProps {
+  plan: Plan;
+  isCurrent: boolean;
+  isLoggedIn: boolean;
+  userTier: string;
+}
+
+function PlanCta({ plan, isCurrent, isLoggedIn, userTier }: PlanCtaProps) {
+  // The plan the user is already on never offers checkout again — a second
+  // Checkout Session would bill them twice, so send them to the portal instead.
+  if (isCurrent) {
+    if (isProTier(userTier)) {
+      return (
+        <div className="[&_button]:w-full">
+          <ManageSubscriptionButton userTier={userTier} />
+        </div>
+      );
+    }
+    return (
+      <Button disabled variant="outline" className="w-full rounded-full">
+        Current plan
+      </Button>
+    );
+  }
+
+  if (plan.status === 'available') {
+    // Signed-in subscribers already have everything in the free plan.
+    if (isLoggedIn) {
+      return (
+        <Button disabled variant="outline" className="w-full rounded-full">
+          Included in your plan
+        </Button>
+      );
+    }
+    return (
+      <Button asChild variant="outline" className="w-full rounded-full">
+        <Link href="/auth/register">{plan.cta}</Link>
+      </Button>
+    );
+  }
+
+  if (plan.status === 'checkout') {
+    return (
+      <CheckoutButton
+        tier={plan.tier as PaidTier}
+        label={plan.cta}
+        fallbackUrl={plan.tier === 'pro' ? proFallbackCheckoutUrl : undefined}
+      />
+    );
+  }
+
+  return (
+    <Button disabled variant="outline" className="w-full rounded-full">
+      {plan.cta}
+    </Button>
+  );
+}
+
 export default function PricingPage() {
+  const { isLoggedIn, userTier } = useAuth();
+  const normalizedTier = userTier.trim().toLowerCase();
+
   return (
     <div className="container-custom py-8 md:py-12">
       <div className="mx-auto max-w-6xl space-y-8">
@@ -103,73 +168,72 @@ export default function PricingPage() {
           </div>
         </section>
 
+        {isLoggedIn && isProTier(normalizedTier) ? (
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            You are on the {normalizedTier.charAt(0).toUpperCase() + normalizedTier.slice(1)} plan.
+            Switching plans or cancelling happens in Manage subscription — starting a second
+            checkout would bill you twice.
+          </p>
+        ) : null}
+
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {plans.map((plan) => (
-            <article
-              key={plan.tier}
-              className={cn(
-                'flex min-h-[430px] flex-col rounded-[var(--radius-md)] border bg-[var(--bg-surface-1)] p-5 shadow-[var(--shadow-sm)]',
-                plan.highlight
-                  ? 'border-[var(--accent)] shadow-[var(--glow-accent)]'
-                  : 'border-[var(--border-subtle)]'
-              )}
-            >
-              <div className="flex min-h-8 items-center justify-between gap-3">
-                <h2 className="heading-md text-[var(--text-primary)]">{plan.name}</h2>
-                {plan.badge ? <Badge>{plan.badge}</Badge> : null}
-                {plan.status === 'soon' ? (
-                  <Badge variant="secondary" className="gap-1.5">
-                    <Clock className="h-3 w-3" aria-hidden="true" />
-                    Soon
-                  </Badge>
-                ) : null}
-              </div>
+          {plans.map((plan) => {
+            const isCurrent = isLoggedIn && plan.tier === normalizedTier;
 
-              <div className="mt-6">
-                <div className="text-3xl font-semibold leading-tight text-[var(--text-primary)]">
-                  {plan.price}
+            return (
+              <article
+                key={plan.tier}
+                className={cn(
+                  'flex min-h-[430px] flex-col rounded-[var(--radius-md)] border bg-[var(--bg-surface-1)] p-5 shadow-[var(--shadow-sm)]',
+                  plan.highlight || isCurrent
+                    ? 'border-[var(--accent)] shadow-[var(--glow-accent)]'
+                    : 'border-[var(--border-subtle)]'
+                )}
+              >
+                <div className="flex min-h-8 items-center justify-between gap-3">
+                  <h2 className="heading-md text-[var(--text-primary)]">{plan.name}</h2>
+                  {isCurrent ? <Badge>Current plan</Badge> : plan.badge ? <Badge>{plan.badge}</Badge> : null}
+                  {plan.status === 'soon' ? (
+                    <Badge variant="secondary" className="gap-1.5">
+                      <Clock className="h-3 w-3" aria-hidden="true" />
+                      Soon
+                    </Badge>
+                  ) : null}
                 </div>
-                <p className="mt-1 text-xs font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
-                  {plan.priceNote}
+
+                <div className="mt-6">
+                  <div className="text-3xl font-semibold leading-tight text-[var(--text-primary)]">
+                    {plan.price}
+                  </div>
+                  <p className="mt-1 text-xs font-medium uppercase tracking-[0.1em] text-[var(--text-tertiary)]">
+                    {plan.priceNote}
+                  </p>
+                </div>
+
+                <p className="mt-5 min-h-[48px] text-sm leading-6 text-[var(--text-secondary)]">
+                  {plan.description}
                 </p>
-              </div>
 
-              <p className="mt-5 min-h-[48px] text-sm leading-6 text-[var(--text-secondary)]">
-                {plan.description}
-              </p>
+                <ul className="mt-6 space-y-3">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex gap-3 text-sm leading-5 text-[var(--text-secondary)]">
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" aria-hidden="true" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
-              <ul className="mt-6 space-y-3">
-                {plan.features.map((feature) => (
-                  <li key={feature} className="flex gap-3 text-sm leading-5 text-[var(--text-secondary)]">
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--positive)]" aria-hidden="true" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-auto pt-7">
-                {plan.status === 'available' ? (
-                  <Button asChild variant="outline" className="w-full rounded-full">
-                    <Link href="/auth/register">{plan.cta}</Link>
-                  </Button>
-                ) : null}
-
-                {plan.status === 'checkout' ? (
-                  <CheckoutButton
-                    tier={plan.tier as PaidTier}
-                    label={plan.cta}
-                    fallbackUrl={plan.tier === 'pro' ? proFallbackCheckoutUrl : undefined}
+                <div className="mt-auto pt-7">
+                  <PlanCta
+                    plan={plan}
+                    isCurrent={isCurrent}
+                    isLoggedIn={isLoggedIn}
+                    userTier={normalizedTier}
                   />
-                ) : null}
-
-                {plan.status === 'soon' ? (
-                  <Button disabled variant="outline" className="w-full rounded-full">
-                    {plan.cta}
-                  </Button>
-                ) : null}
-              </div>
-            </article>
-          ))}
+                </div>
+              </article>
+            );
+          })}
         </section>
 
         <section className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-surface-1)] p-5 md:p-6">

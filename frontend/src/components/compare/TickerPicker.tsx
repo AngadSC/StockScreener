@@ -16,26 +16,40 @@ interface TickerPickerProps {
   onRemove: (ticker: string) => void;
 }
 
+const LISTBOX_ID = 'compare-ticker-suggestions';
+
 export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: TickerPickerProps) {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const latestQueryRef = useRef(0);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const atLimit = tickers.length >= MAX_COMPARE_TICKERS;
 
   useEffect(() => {
     const trimmed = query.trim();
+    // Invalidate first so every path — including the empty/at-limit early
+    // return — cancels an in-flight response instead of letting it land late.
+    const requestId = ++latestQueryRef.current;
+
+    // Results belong to the previous query until the next response arrives.
+    // Dropping them here is what stops Enter from submitting a stale match.
+    setSuggestions((prev) => (prev.length === 0 ? prev : []));
+    setHighlightIndex(-1);
 
     if (!trimmed || atLimit) {
-      setSuggestions([]);
+      setIsLoading(false);
       setIsOpen(false);
       return;
     }
 
-    const requestId = ++latestQueryRef.current;
+    // Flagged as loading immediately so the open dropdown reads "Searching"
+    // during the debounce rather than flashing "No matches found".
+    setIsLoading(true);
+
     const timer = setTimeout(async () => {
-      setIsLoading(true);
       try {
         const result = await screenerAPI.suggestStocks(trimmed, 8);
         if (requestId !== latestQueryRef.current) return;
@@ -52,34 +66,94 @@ export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: Tic
     return () => clearTimeout(timer);
   }, [query, atLimit]);
 
+  // Keep the active option visible while arrowing through the dropdown.
+  useEffect(() => {
+    if (highlightIndex < 0) return;
+    const node = listRef.current?.querySelector<HTMLElement>(`[data-suggest-index="${highlightIndex}"]`);
+    node?.scrollIntoView({ block: 'nearest' });
+  }, [highlightIndex]);
+
   const addTicker = (raw: string) => {
     const symbol = raw.trim().toUpperCase();
     if (!symbol || atLimit) return;
-    if (tickers.includes(symbol)) {
+
+    // Selecting ends this search session: discard any in-flight response so it
+    // cannot re-open the dropdown over the cleared input.
+    latestQueryRef.current += 1;
+
+    const reset = () => {
       setQuery('');
+      setSuggestions([]);
+      setHighlightIndex(-1);
+      setIsLoading(false);
       setIsOpen(false);
+    };
+
+    if (tickers.includes(symbol)) {
+      reset();
       return;
     }
+
     onAdd(symbol);
-    setQuery('');
-    setSuggestions([]);
-    setIsOpen(false);
+    reset();
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (suggestions.length > 0) {
-      addTicker(suggestions[0].ticker);
-    } else {
-      addTicker(query);
-    }
+    const trimmed = query.trim();
+    if (!trimmed) return;
+
+    // Only ever act on the list currently rendered for this query. Prefer an
+    // exact ticker match; otherwise send the raw input and let the backend
+    // resolve it — never assume the first suggestion is what was typed.
+    const exactMatch = suggestions.find(
+      (item) => item.ticker.toUpperCase() === trimmed.toUpperCase()
+    );
+    addTicker(exactMatch ? exactMatch.ticker : trimmed);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Backspace' && query.length === 0 && tickers.length > 0) {
       onRemove(tickers[tickers.length - 1]);
+      return;
+    }
+
+    if (event.key === 'ArrowDown') {
+      if (suggestions.length === 0) return;
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightIndex((prev) => (prev + 1) % suggestions.length);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      if (suggestions.length === 0) return;
+      event.preventDefault();
+      setIsOpen(true);
+      setHighlightIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      const highlighted = isOpen && highlightIndex >= 0 ? suggestions[highlightIndex] : undefined;
+      if (!highlighted) return; // fall through to the form submit
+      event.preventDefault();
+      if (!tickers.includes(highlighted.ticker.toUpperCase())) addTicker(highlighted.ticker);
+      return;
+    }
+
+    if (event.key === 'Escape' && isOpen) {
+      event.preventDefault();
+      setIsOpen(false);
+      setHighlightIndex(-1);
     }
   };
+
+  const optionId = (index: number) => `${LISTBOX_ID}-option-${index}`;
+  const activeOptionId =
+    isOpen && highlightIndex >= 0 && suggestions[highlightIndex]
+      ? optionId(highlightIndex)
+      : undefined;
 
   return (
     <div className="space-y-4">
@@ -92,18 +166,28 @@ export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: Tic
         >
           <Search className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" aria-hidden="true" />
           <input
+            aria-activedescendant={activeOptionId}
+            aria-autocomplete="list"
+            aria-controls={isOpen ? LISTBOX_ID : undefined}
+            aria-expanded={isOpen}
             aria-label="Add a ticker to compare"
             autoComplete="off"
             className="w-full border-none bg-transparent p-0 text-sm font-semibold uppercase text-[var(--text-primary)] shadow-none outline-none placeholder:font-normal placeholder:normal-case placeholder:text-[var(--text-secondary)] focus:border-none focus:shadow-none"
             disabled={atLimit}
             maxLength={12}
-            onBlur={() => setTimeout(() => setIsOpen(false), 150)}
+            onBlur={() =>
+              setTimeout(() => {
+                setIsOpen(false);
+                setHighlightIndex(-1);
+              }, 150)
+            }
             onChange={(event) => setQuery(event.target.value)}
             onFocus={() => {
               if (suggestions.length > 0) setIsOpen(true);
             }}
             onKeyDown={handleKeyDown}
             placeholder={atLimit ? `Limit of ${MAX_COMPARE_TICKERS} reached` : 'Add a ticker (e.g. AAPL)'}
+            role="combobox"
             type="text"
             value={query}
           />
@@ -123,25 +207,40 @@ export default function TickerPicker({ tickers, colorMap, onAdd, onRemove }: Tic
             <div className="border-b border-[var(--border-subtle)] px-4 py-2 text-xs text-[var(--text-secondary)]">
               {isLoading ? 'Searching' : 'Quick matches'}
             </div>
-            <div className="deco-scroll max-h-64 overflow-auto py-1">
-              {!isLoading && suggestions.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">No matches found.</div>
+            <div
+              ref={listRef}
+              id={LISTBOX_ID}
+              role="listbox"
+              aria-label="Ticker suggestions"
+              className="deco-scroll max-h-64 overflow-auto py-1"
+            >
+              {suggestions.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-[var(--text-secondary)]">
+                  {isLoading ? 'Looking up tickers…' : 'No matches found.'}
+                </div>
               ) : null}
-              {suggestions.map((item) => {
+              {suggestions.map((item, index) => {
                 const alreadyAdded = tickers.includes(item.ticker.toUpperCase());
+                const isHighlighted = index === highlightIndex;
                 return (
                   <div
                     key={item.ticker}
+                    aria-selected={isHighlighted}
+                    data-suggest-index={index}
+                    id={optionId(index)}
+                    role="option"
                     className={cn(
                       'group flex items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms]',
                       alreadyAdded
                         ? 'cursor-not-allowed opacity-40'
-                        : 'cursor-pointer hover:bg-[var(--bg-surface-2)]'
+                        : 'cursor-pointer hover:bg-[var(--bg-surface-2)]',
+                      isHighlighted && !alreadyAdded && 'bg-[var(--bg-surface-2)]'
                     )}
                     onMouseDown={(event) => {
                       event.preventDefault();
                       if (!alreadyAdded) addTicker(item.ticker);
                     }}
+                    onMouseEnter={() => setHighlightIndex(index)}
                   >
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-[var(--text-primary)]">{item.ticker}</div>

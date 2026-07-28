@@ -2,6 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 
+import { parseLocalDate } from '@/lib/utils';
+
 const postsDir = path.join(process.cwd(), 'src/content/posts');
 
 export type PostMeta = {
@@ -59,7 +61,9 @@ export function getPostBySlug(slug: string): Post {
 }
 
 export function formatPostDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  // Frontmatter dates are bare YYYY-MM-DD; parseLocalDate keeps them on the
+  // written calendar day instead of shifting a day for UTC-negative viewers.
+  return parseLocalDate(dateStr).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

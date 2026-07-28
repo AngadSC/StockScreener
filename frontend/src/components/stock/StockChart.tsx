@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 
 import type { StockPrice } from '@/types/stock';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, parseLocalDate } from '@/lib/utils';
 
 interface StockChartProps {
   data: StockPrice[];
@@ -23,7 +23,8 @@ interface StockChartProps {
 export default function StockChart({ data, ticker }: StockChartProps) {
   const chartData = useMemo(() => {
     return data.map((item) => ({
-      date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      // parseLocalDate: bare YYYY-MM-DD parsed as UTC would label every bar a day early for US viewers.
+      date: parseLocalDate(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       price: item.close,
       volume: item.volume,
     }));

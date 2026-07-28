@@ -308,7 +308,8 @@ export default function StockTable({
                               : 'chip-dn'
                           }`}
                         >
-                          {formatPercent(changePercent, { mode: 'percent', withSign: true })}
+                          {/* day_change_percent is stored as a ratio (-0.013 = -1.3%). */}
+                          {formatPercent(changePercent, { mode: 'ratio', withSign: true })}
                         </span>
                       ) : (
                         <span className="tabular-nums text-[var(--text-secondary)]">N/A</span>

@@ -101,11 +101,35 @@ export function formatVolume(value: number | null | undefined): string {
   }
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Parse a date string without silently shifting it a day.
+ *
+ * `new Date('2026-07-17')` is parsed by the spec as UTC midnight, so every
+ * viewer west of UTC renders the *previous* calendar day. Bare `YYYY-MM-DD`
+ * values coming from the API are calendar dates, not instants, so they are
+ * built in the viewer's local timezone instead. Anything else (full ISO
+ * timestamps, RFC strings) keeps the native parsing behaviour.
+ */
+export function parseLocalDate(dateString: string): Date {
+  const value = dateString.trim();
+
+  if (DATE_ONLY_PATTERN.test(value)) {
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const day = Number(value.slice(8, 10));
+    return new Date(year, month - 1, day);
+  }
+
+  return new Date(value);
+}
+
 export function formatDate(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
-  
+
   try {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     if (Number.isNaN(date.getTime())) return 'N/A';
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -119,9 +143,9 @@ export function formatDate(dateString: string | null | undefined): string {
 
 export function formatDateTime(dateString: string | null | undefined): string {
   if (!dateString) return 'N/A';
-  
+
   try {
-    const date = new Date(dateString);
+    const date = parseLocalDate(dateString);
     if (Number.isNaN(date.getTime())) return 'N/A';
     return date.toLocaleString('en-US', {
       year: 'numeric',

@@ -39,14 +39,21 @@ const nextConfig = {
   async rewrites() {
     // 1. Get the API URL from environment, OR fallback to your Railway URL
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://stockscreenerapi-production.up.railway.app/api/v1';
-    
+
+    // TRAP: apiUrl already ends in /api/v1, so proxying to `${apiUrl}/:path*` doubled the
+    // version segment (/api/v1/email/unsubscribe -> .../api/v1/v1/email/unsubscribe = 404),
+    // silently breaking every emailed unsubscribe link. Rewrite from the backend ORIGIN
+    // instead so both /api/v1/* and /api/ai-reports/* resolve. (Same strip as getApiOrigin
+    // in src/lib/api.ts; tolerates a trailing slash and an apiUrl with no /api/v1 suffix.)
+    const backendOrigin = apiUrl.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+
     // 2. Log it so you can see it in the Vercel Build Logs
-    console.log('Using API URL:', apiUrl);
+    console.log('Using API URL:', apiUrl, '| proxying /api/* to:', `${backendOrigin}/api`);
 
     return [
       {
         source: '/api/:path*',
-        destination: `${apiUrl}/:path*`,
+        destination: `${backendOrigin}/api/:path*`,
       },
     ];
   },

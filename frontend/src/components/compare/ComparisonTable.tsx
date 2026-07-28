@@ -54,11 +54,12 @@ const METRIC_ROWS: MetricRow[] = [
   {
     key: 'day_change',
     label: 'Day Change',
+    // Stored as a ratio (-0.013 = -1.3%). 'auto' would misread a >100% mover.
     format: (s) => {
       const raw = s.day_change_percent ?? s.change_percent;
-      return raw == null ? 'N/A' : formatPercent(raw, { mode: 'auto', withSign: true });
+      return raw == null ? 'N/A' : formatPercent(raw, { mode: 'ratio', withSign: true });
     },
-    compareValue: (s) => normalizePercentValue(s.day_change_percent ?? s.change_percent, 'auto'),
+    compareValue: (s) => normalizePercentValue(s.day_change_percent ?? s.change_percent, 'ratio'),
     bestDirection: 'higher',
   },
   {

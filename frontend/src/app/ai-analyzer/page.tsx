@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { Lock, Search, Sparkles } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { Loader2, Lock, Search, Sparkles } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
 import { ManageSubscriptionButton } from '@/components/billing/ManageSubscriptionButton';
@@ -11,15 +12,70 @@ import { screenerAPI } from '@/lib/api';
 import { isProTier, useAuth } from '@/lib/auth';
 import type { StockSuggestion } from '@/types/stock';
 
-export default function AiAnalyzerPage() {
-  const { isLoading, isLoggedIn, userTier } = useAuth();
+// Stripe returns from checkout before the webhook has flipped the tier, so poll
+// the session for a short window instead of leaving the buyer on the paywall.
+const ACTIVATION_POLL_INTERVAL_MS = 3000;
+const ACTIVATION_TIMEOUT_MS = 18000;
+
+function AiAnalyzerPageContent() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { isLoading, isLoggedIn, refreshUser, userTier } = useAuth();
   const [tickerInput, setTickerInput] = useState('');
   const [submittedTicker, setSubmittedTicker] = useState('');
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
+  const [activationPending, setActivationPending] = useState(false);
+  const [activationTimedOut, setActivationTimedOut] = useState(false);
   const latestQueryRef = useRef(0);
+  // Ticker the user already acted on (submit or suggestion click). Stops the
+  // debounced suggest effect from firing again for that exact value.
+  const committedTickerRef = useRef<string | null>(null);
   const canAnalyze = isLoggedIn && isProTier(userTier);
+  const checkoutSucceeded = searchParams.get('checkout') === 'success';
+  const isActivating = activationPending && !canAnalyze;
+
+  // Latch the post-checkout redirect, then strip the query param so a reload
+  // does not restart the wait.
+  useEffect(() => {
+    if (!checkoutSucceeded) return;
+    setActivationPending(true);
+    setActivationTimedOut(false);
+    router.replace(pathname, { scroll: false });
+  }, [checkoutSucceeded, pathname, router]);
+
+  useEffect(() => {
+    if (!activationPending) return;
+
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = Date.now() + ACTIVATION_TIMEOUT_MS;
+
+    const poll = async () => {
+      const currentUser = await refreshUser();
+      if (cancelled) return;
+
+      if (currentUser && isProTier(currentUser.tier)) {
+        setActivationPending(false);
+        return;
+      }
+      if (Date.now() >= deadline) {
+        setActivationPending(false);
+        setActivationTimedOut(true);
+        return;
+      }
+      timer = setTimeout(() => void poll(), ACTIVATION_POLL_INTERVAL_MS);
+    };
+
+    void poll();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [activationPending, refreshUser]);
 
   useEffect(() => {
     const trimmed = tickerInput.trim();
@@ -29,6 +85,10 @@ export default function AiAnalyzerPage() {
       setSuggestOpen(false);
       return;
     }
+
+    // The value came from a suggestion click or a submit — the report is already
+    // rendering, so do not fetch matches that would reopen the dropdown over it.
+    if (committedTickerRef.current === trimmed.toUpperCase()) return;
 
     const requestId = ++latestQueryRef.current;
     const timer = setTimeout(async () => {
@@ -52,25 +112,32 @@ export default function AiAnalyzerPage() {
     return () => clearTimeout(timer);
   }, [canAnalyze, tickerInput]);
 
+  const commitTicker = (ticker: string) => {
+    const normalizedTicker = ticker.trim().toUpperCase();
+    if (!normalizedTicker) return;
+
+    // Invalidate the in-flight suggest request before closing the dropdown so a
+    // late response cannot reopen it on top of the report.
+    latestQueryRef.current += 1;
+    committedTickerRef.current = normalizedTicker;
+    setIsSuggestLoading(false);
+    setSuggestOpen(false);
+    setTickerInput(normalizedTicker);
+    if (canAnalyze) {
+      setSubmittedTicker(normalizedTicker);
+    }
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!canAnalyze) return;
 
-    const ticker = tickerInput.trim().toUpperCase();
-    if (ticker) {
-      setSuggestOpen(false);
-      setSubmittedTicker(ticker);
-    }
+    commitTicker(tickerInput);
   };
 
   const handleSuggestionSelect = (ticker: string) => {
-    const normalizedTicker = ticker.trim().toUpperCase();
-    setTickerInput(normalizedTicker);
-    setSuggestOpen(false);
-    if (canAnalyze) {
-      setSubmittedTicker(normalizedTicker);
-    }
+    commitTicker(ticker);
   };
 
   return (
@@ -104,7 +171,10 @@ export default function AiAnalyzerPage() {
                   onBlur={() => {
                     setTimeout(() => setSuggestOpen(false), 150);
                   }}
-                  onChange={(event) => setTickerInput(event.target.value)}
+                  onChange={(event) => {
+                    committedTickerRef.current = null;
+                    setTickerInput(event.target.value);
+                  }}
                   onFocus={() => {
                     if (suggestions.length > 0) setSuggestOpen(true);
                   }}
@@ -175,13 +245,33 @@ export default function AiAnalyzerPage() {
           ) : null}
         </section>
 
-        {isLoading ? (
+        {isActivating ? (
+          <section className="deco-panel p-6 md:p-7">
+            <div className="flex gap-4">
+              <div className="icon-tile h-10 w-10">
+                <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.6} />
+              </div>
+              <div>
+                <div className="eyebrow">Payment received</div>
+                <h2 className="heading-lg mt-2 text-[var(--text-primary)]">
+                  Activating your subscription...
+                </h2>
+                <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                  Stripe is confirming the payment with our servers. This usually takes a few
+                  seconds and the AI Analyst unlocks automatically.
+                </p>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {!isActivating && isLoading ? (
           <section className="deco-panel p-6 text-sm text-[var(--text-secondary)]">
             Checking account access...
           </section>
         ) : null}
 
-        {!isLoading && !isLoggedIn ? (
+        {!isActivating && !isLoading && !isLoggedIn ? (
           <section className="deco-panel p-6 md:p-7">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div>
@@ -203,7 +293,7 @@ export default function AiAnalyzerPage() {
           </section>
         ) : null}
 
-        {!isLoading && isLoggedIn && !isProTier(userTier) ? (
+        {!isActivating && !isLoading && isLoggedIn && !isProTier(userTier) ? (
           <section className="deco-panel p-6 md:p-7">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
               <div className="flex gap-4">
@@ -216,6 +306,12 @@ export default function AiAnalyzerPage() {
                   <p className="mt-2 text-sm text-[var(--text-secondary)]">
                     AI reports require a Pro, Trader, or Elite account tier.
                   </p>
+                  {activationTimedOut ? (
+                    <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                      Just paid? Your payment is still processing. Refresh this page in a moment —
+                      access unlocks as soon as Stripe confirms it.
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <Button asChild>
@@ -232,5 +328,13 @@ export default function AiAnalyzerPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+export default function AiAnalyzerPage() {
+  return (
+    <Suspense fallback={<div className="container-custom py-8" />}>
+      <AiAnalyzerPageContent />
+    </Suspense>
   );
 }

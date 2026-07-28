@@ -3,14 +3,18 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronRight, Loader2, Star, Sunrise, Sunset } from 'lucide-react';
+import { CalendarDays, ChevronRight, Loader2, RefreshCw, Star, Sunrise, Sunset } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { marketAPI } from '@/lib/api';
-import { cn, formatMarketCap } from '@/lib/utils';
+import { cn, formatMarketCap, parseLocalDate } from '@/lib/utils';
 import type { EarningsEventItem, EarningsTimeHint } from '@/types/earnings';
 
 const DAYS_AHEAD = 14;
+
+// Safety rail so a malformed from/to pair can never spin up an unbounded grid.
+const MAX_GRID_DAYS = 90;
 
 const TIME_HINT_LABEL: Record<EarningsTimeHint, string> = {
   bmo: 'Before Open',
@@ -19,28 +23,44 @@ const TIME_HINT_LABEL: Record<EarningsTimeHint, string> = {
 };
 
 function isWeekend(dateStr: string): boolean {
-  const day = new Date(`${dateStr}T00:00:00`).getDay();
+  const day = parseLocalDate(dateStr).getDay();
   return day === 0 || day === 6;
 }
 
 function formatDayLabel(dateStr: string): string {
-  return new Date(`${dateStr}T00:00:00`).toLocaleDateString('en-US', {
+  return parseLocalDate(dateStr).toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
     day: 'numeric',
   });
 }
 
-function buildWeekdayRange(fromDate: string, totalDays: number): string[] {
-  const start = new Date(`${fromDate}T00:00:00`);
-  const result: string[] = [];
-  for (let i = 0; i < totalDays; i += 1) {
-    const current = new Date(start);
-    current.setDate(start.getDate() + i);
-    const iso = current.toISOString().slice(0, 10);
-    if (!isWeekend(iso)) result.push(iso);
+/** ISO key from *local* date parts — toISOString() would shift the day. */
+function toISODate(date: Date): string {
+  const month = `${date.getMonth() + 1}`.padStart(2, '0');
+  const day = `${date.getDate()}`.padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * Build the grid straight from the API's inclusive from_date..to_date window.
+ * Deriving it locally (start + N days, keyed off toISOString) handed viewers
+ * east of UTC a phantom leading day and silently dropped the final one.
+ */
+function buildDateRange(fromDate: string, toDate: string): string[] {
+  const start = parseLocalDate(fromDate);
+  const end = parseLocalDate(toDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
+
+  const dates: string[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
+  while (cursor <= end && dates.length < MAX_GRID_DAYS) {
+    dates.push(toISODate(cursor));
+    cursor.setDate(cursor.getDate() + 1);
   }
-  return result;
+
+  return dates;
 }
 
 function groupByDate(events: EarningsEventItem[]): Map<string, EarningsEventItem[]> {
@@ -81,17 +101,29 @@ function TimeHintBadge({ hint }: { hint: EarningsTimeHint }) {
 }
 
 export default function EarningsPage() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['earnings-calendar', DAYS_AHEAD],
     queryFn: () => marketAPI.getEarningsCalendar(DAYS_AHEAD),
   });
 
   const grouped = useMemo(() => groupByDate(data?.events ?? []), [data]);
-  const dayRange = useMemo(
-    () => (data ? buildWeekdayRange(data.from_date, DAYS_AHEAD) : []),
-    [data]
+
+  // Weekday panels always render (an empty trading day is information); weekend
+  // panels only render when something is actually scheduled, so a Saturday-dated
+  // filing is still visible instead of being dropped from the grid.
+  const dayRange = useMemo(() => {
+    if (!data) return [];
+    return buildDateRange(data.from_date, data.to_date).filter(
+      (iso) => !isWeekend(iso) || (grouped.get(iso)?.length ?? 0) > 0
+    );
+  }, [data, grouped]);
+
+  // Count what the grid actually shows, so the tile can't advertise reports
+  // that never appear below it.
+  const totalReports = useMemo(
+    () => dayRange.reduce((sum, iso) => sum + (grouped.get(iso)?.length ?? 0), 0),
+    [dayRange, grouped]
   );
-  const totalReports = data?.events?.length ?? 0;
 
   return (
     <div className="container-custom py-8">
@@ -115,7 +147,7 @@ export default function EarningsPage() {
                 Reports ahead
               </div>
               <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
-                {isLoading ? '—' : totalReports.toLocaleString()}
+                {isLoading || isError ? '—' : totalReports.toLocaleString()}
               </div>
             </div>
           </div>
@@ -134,6 +166,12 @@ export default function EarningsPage() {
           <p className="text-sm text-[var(--text-secondary)]">
             Could not load the earnings calendar. Please try again shortly.
           </p>
+          <div className="mt-4 flex justify-center">
+            <Button type="button" variant="secondary" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
+          </div>
         </div>
       ) : null}
 

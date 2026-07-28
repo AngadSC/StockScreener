@@ -1,146 +1,294 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { BarChart3, HelpCircle, Search, Star, TrendingUp } from 'lucide-react';
+import { HelpCircle, Search, TrendingUp, type LucideIcon } from 'lucide-react';
 
-interface Command {
+import { screenerAPI } from '@/lib/api';
+import { navItems } from '@/lib/nav';
+import { cn } from '@/lib/utils';
+import type { StockSuggestion } from '@/types/stock';
+
+const SUGGEST_DEBOUNCE_MS = 200;
+const SUGGEST_LIMIT = 6;
+const LIST_ID = 'command-palette-results';
+
+interface PaletteCommand {
   id: string;
   label: string;
   description?: string;
-  icon?: React.ComponentType<{ className?: string }>;
-  action: () => void;
+  icon: LucideIcon;
   keywords?: string[];
+  proBadge?: boolean;
+  run: () => void;
+}
+
+/** Flattened selection model so one index spans both groups. */
+type PaletteRow =
+  | { kind: 'command'; command: PaletteCommand }
+  | { kind: 'stock'; suggestion: StockSuggestion };
+
+interface PaletteOptionProps {
+  icon: LucideIcon;
+  index: number;
+  isSelected: boolean;
+  onSelect: () => void;
+  onHover: () => void;
+  subtitle?: string | null;
+  title: string;
+  titleClassName?: string;
+  trailing?: ReactNode;
+}
+
+function PaletteOption({
+  icon: Icon,
+  index,
+  isSelected,
+  onSelect,
+  onHover,
+  subtitle,
+  title,
+  titleClassName,
+  trailing,
+}: PaletteOptionProps) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={isSelected}
+      id={`${LIST_ID}-option-${index}`}
+      data-row-index={index}
+      onClick={onSelect}
+      onMouseEnter={onHover}
+      className={cn(
+        'flex w-full items-center gap-3 px-4 py-3 transition-[background,border-color,box-shadow,color,transform] duration-[180ms]',
+        isSelected
+          ? 'border-l-2 border-l-[var(--forest)] bg-[var(--forest-soft)]'
+          : 'border-l-2 border-l-transparent hover:bg-[var(--surface-2)]'
+      )}
+    >
+      <Icon
+        className={cn('h-5 w-5 shrink-0', isSelected ? 'text-[var(--forest)]' : 'text-[var(--text-tertiary)]')}
+        strokeWidth={1.5}
+      />
+      <div className="min-w-0 flex-1 text-left">
+        <p className={cn('truncate font-medium text-[var(--ink)]', titleClassName)}>{title}</p>
+        {subtitle ? <p className="truncate text-xs text-[var(--ink-2)]">{subtitle}</p> : null}
+      </div>
+      {trailing}
+      {isSelected ? <kbd className="kbd">Enter</kbd> : null}
+    </button>
+  );
+}
+
+function GroupLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-4 pb-1 pt-3 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--mute)]">
+      {children}
+    </div>
+  );
 }
 
 export default function CommandPalette() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [stocks, setStocks] = useState<StockSuggestion[]>([]);
+  const [isStockLoading, setIsStockLoading] = useState(false);
+  const latestQueryRef = useRef(0);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const router = useRouter();
 
-  const commands: Command[] = [
-    {
-      id: 'screener',
-      label: 'Open Screener',
-      description: 'Filter and compare stocks',
-      icon: Search,
-      action: () => {
-        router.push('/screener');
-        setIsOpen(false);
-      },
-      keywords: ['screen', 'filter', 'search'],
-    },
-    {
-      id: 'backtester',
-      label: 'Open Backtester',
-      description: 'Run a portfolio study',
-      icon: BarChart3,
-      action: () => {
-        router.push('/backtester');
-        setIsOpen(false);
-      },
-      keywords: ['backtest', 'portfolio', 'strategy'],
-    },
-    {
-      id: 'watchlist',
-      label: 'View Watchlist',
-      description: 'Your saved names',
-      icon: Star,
-      action: () => {
-        router.push('/watchlist');
-        setIsOpen(false);
-      },
-      keywords: ['watch', 'saved', 'favorites'],
-    },
-    {
-      id: 'home',
-      label: 'Market Overview',
-      description: 'Return to the main dashboard',
-      icon: TrendingUp,
-      action: () => {
-        router.push('/');
-        setIsOpen(false);
-      },
-      keywords: ['home', 'dashboard', 'market'],
-    },
-    {
-      id: 'help',
-      label: 'Keyboard Guide',
-      description: 'Open the shortcut sheet',
-      icon: HelpCircle,
-      action: () => {
-        alert('Keyboard Shortcuts:\\nCtrl/Cmd+K - Command Palette\\n? - Shortcut Guide\\nEsc - Close');
-        setIsOpen(false);
-      },
-      keywords: ['help', 'shortcuts', 'keyboard'],
-    },
-  ];
+  const reset = useCallback(() => {
+    // Bump the request id so any in-flight suggest response is discarded
+    // instead of repopulating a palette that has moved on.
+    latestQueryRef.current += 1;
+    setQuery('');
+    setSelectedIndex(0);
+    setStocks([]);
+    setIsStockLoading(false);
+  }, []);
 
-  const filteredCommands = commands.filter((cmd) => {
-    const searchText = query.toLowerCase();
-    return (
-      cmd.label.toLowerCase().includes(searchText) ||
-      cmd.description?.toLowerCase().includes(searchText) ||
-      cmd.keywords?.some((kw) => kw.includes(searchText))
+  const openPalette = useCallback(() => {
+    reset();
+    setIsOpen(true);
+  }, [reset]);
+
+  const closePalette = useCallback(() => {
+    reset();
+    setIsOpen(false);
+  }, [reset]);
+
+  const navigate = useCallback(
+    (href: string) => {
+      closePalette();
+      router.push(href);
+    },
+    [closePalette, router]
+  );
+
+  const commands = useMemo<PaletteCommand[]>(() => {
+    const navCommands = navItems.map<PaletteCommand>((item) => ({
+      id: `nav:${item.href}`,
+      label: item.commandLabel ?? item.label,
+      description: item.description,
+      icon: item.icon,
+      keywords: [...(item.keywords ?? []), item.label.toLowerCase(), item.href.replace(/^\//, '')],
+      proBadge: item.proBadge,
+      run: () => navigate(item.href),
+    }));
+
+    return [
+      ...navCommands,
+      {
+        id: 'action:shortcuts',
+        label: 'Keyboard Guide',
+        description: 'Open the shortcut sheet',
+        icon: HelpCircle,
+        keywords: ['help', 'shortcuts', 'keyboard', 'keys', 'guide'],
+        run: () => {
+          closePalette();
+          window.dispatchEvent(new CustomEvent('qs-open-shortcuts'));
+        },
+      },
+    ];
+  }, [closePalette, navigate]);
+
+  const filteredCommands = useMemo(() => {
+    const searchText = query.trim().toLowerCase();
+    if (!searchText) return commands;
+    return commands.filter(
+      (cmd) =>
+        cmd.label.toLowerCase().includes(searchText) ||
+        cmd.description?.toLowerCase().includes(searchText) ||
+        cmd.keywords?.some((keyword) => keyword.includes(searchText))
     );
-  });
+  }, [commands, query]);
+
+  const rows = useMemo<PaletteRow[]>(
+    () => [
+      ...filteredCommands.map((command) => ({ kind: 'command' as const, command })),
+      ...stocks.map((suggestion) => ({ kind: 'stock' as const, suggestion })),
+    ],
+    [filteredCommands, stocks]
+  );
+
+  const runRow = useCallback(
+    (row: PaletteRow) => {
+      if (row.kind === 'command') {
+        row.command.run();
+        return;
+      }
+      navigate(`/stocks/${encodeURIComponent(row.suggestion.ticker)}`);
+    },
+    [navigate]
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setIsOpen((prev) => !prev);
-        setQuery('');
-        setSelectedIndex(0);
+        if (isOpen) closePalette();
+        else openPalette();
         return;
       }
 
-      if (e.key === 'Escape' && isOpen) {
-        setIsOpen(false);
-        setQuery('');
+      if (!isOpen) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closePalette();
         return;
       }
 
-      if (isOpen) {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
-          setSelectedIndex((prev) => (prev < filteredCommands.length - 1 ? prev + 1 : 0));
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
-          setSelectedIndex((prev) => (prev > 0 ? prev - 1 : filteredCommands.length - 1));
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          if (filteredCommands[selectedIndex]) filteredCommands[selectedIndex].action();
-        }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (rows.length === 0) return;
+        setSelectedIndex((prev) => (prev + 1) % rows.length);
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (rows.length === 0) return;
+        setSelectedIndex((prev) => (prev <= 0 ? rows.length - 1 : prev - 1));
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const row = rows[selectedIndex];
+        if (row) runRow(row);
       }
     },
-    [filteredCommands, isOpen, selectedIndex]
+    [closePalette, isOpen, openPalette, rows, runRow, selectedIndex]
   );
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
-    const openPalette = () => {
-      setIsOpen(true);
-      setQuery('');
-      setSelectedIndex(0);
-    };
     window.addEventListener('qs-open-command-palette', openPalette);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('qs-open-command-palette', openPalette);
     };
-  }, [handleKeyDown]);
+  }, [handleKeyDown, openPalette]);
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
+  // Keep the highlight inside the list when results shrink (e.g. suggestions
+  // are cleared while the palette stays open).
+  useEffect(() => {
+    setSelectedIndex((prev) => (prev >= rows.length ? 0 : prev));
+  }, [rows.length]);
+
+  useEffect(() => {
+    const node = listRef.current?.querySelector<HTMLElement>(`[data-row-index="${selectedIndex}"]`);
+    node?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, rows.length]);
+
+  // Ticker/company suggestions from the screener's relevance-ranked endpoint.
+  // The list order is preserved exactly as the backend returns it.
+  useEffect(() => {
+    const trimmed = query.trim();
+    // Invalidate before the early return so clearing the input also cancels an
+    // in-flight response instead of letting it land on an empty query.
+    const requestId = ++latestQueryRef.current;
+
+    if (!isOpen || !trimmed) {
+      setStocks([]);
+      setIsStockLoading(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsStockLoading(true);
+      try {
+        const result = await screenerAPI.suggestStocks(trimmed, SUGGEST_LIMIT);
+        if (requestId !== latestQueryRef.current) return;
+        setStocks(result.results);
+      } catch {
+        // Suggestions are an enhancement — fail silently and keep commands usable.
+        if (requestId !== latestQueryRef.current) return;
+        setStocks([]);
+      } finally {
+        if (requestId === latestQueryRef.current) setIsStockLoading(false);
+      }
+    }, SUGGEST_DEBOUNCE_MS);
+
+    return () => clearTimeout(timer);
+  }, [isOpen, query]);
+
   if (!isOpen) return null;
+
+  const hasQuery = query.trim().length > 0;
+  const showStockSection = hasQuery && (stocks.length > 0 || isStockLoading);
+  const activeOptionId = rows[selectedIndex] ? `${LIST_ID}-option-${selectedIndex}` : undefined;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/65 px-4 pt-[16vh] backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={() => setIsOpen(false)} />
+      <div className="absolute inset-0" onClick={closePalette} />
       <div className="hud hud-blue relative w-full max-w-[640px] overflow-hidden rounded-[18px] border border-[var(--line-2)] bg-[var(--surface)] shadow-[var(--shadow-3)]">
         <span className="hud-c1" />
         <span className="hud-c2" />
@@ -155,7 +303,14 @@ export default function CommandPalette() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type a command or route"
+            placeholder="Search a ticker, company, or page"
+            role="combobox"
+            aria-controls={LIST_ID}
+            aria-expanded
+            aria-autocomplete="list"
+            aria-activedescendant={activeOptionId}
+            aria-label="Search commands and stocks"
+            autoComplete="off"
             className="serif flex-1 border-none bg-transparent p-0 text-2xl text-[var(--ink)] shadow-none outline-none placeholder:text-[var(--whisper)] focus:border-none focus:shadow-none"
             autoFocus
           />
@@ -164,46 +319,64 @@ export default function CommandPalette() {
           </kbd>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto">
-          {filteredCommands.length === 0 ? (
+        <div
+          ref={listRef}
+          id={LIST_ID}
+          role="listbox"
+          aria-label="Command palette results"
+          className="deco-scroll max-h-[400px] overflow-y-auto"
+        >
+          {rows.length === 0 && !isStockLoading ? (
             <div className="px-4 py-8 text-center text-[var(--ink-2)]">
-              <p>No commands found</p>
-              <p className="smallcap-low mt-1">Try different keywords</p>
+              <p>No matches found</p>
+              <p className="smallcap-low mt-1">Try a ticker, a company name, or a page</p>
             </div>
           ) : (
-            <div className="py-2">
-              {filteredCommands.map((cmd, idx) => {
-                const Icon = cmd.icon || Search;
-                const isSelected = idx === selectedIndex;
-
-                return (
-                  <button
-                    key={cmd.id}
-                    onClick={() => cmd.action()}
-                    onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`flex w-full items-center gap-3 px-4 py-3 transition-[background,border-color,box-shadow,color,transform] duration-[180ms] ${
-                      isSelected
-                        ? 'border-l-2 border-l-[var(--forest)] bg-[var(--forest-soft)]'
-                        : 'border-l-2 border-l-transparent hover:bg-[var(--surface-2)]'
-                    }`}
-                  >
-                    <Icon
-                      className={`h-5 w-5 ${isSelected ? 'text-[var(--forest)]' : 'text-[var(--text-tertiary)]'}`}
-                      strokeWidth={1.5}
+            <>
+              {filteredCommands.length > 0 ? (
+                <div className="pb-2">
+                  <GroupLabel>Commands</GroupLabel>
+                  {filteredCommands.map((cmd, idx) => (
+                    <PaletteOption
+                      key={cmd.id}
+                      icon={cmd.icon}
+                      index={idx}
+                      isSelected={idx === selectedIndex}
+                      onHover={() => setSelectedIndex(idx)}
+                      onSelect={() => cmd.run()}
+                      subtitle={cmd.description}
+                      title={cmd.label}
+                      trailing={cmd.proBadge ? <span className="status">Pro</span> : null}
                     />
-                    <div className="flex-1 text-left">
-                      <p className="font-medium text-[var(--ink)]">{cmd.label}</p>
-                      {cmd.description ? <p className="text-xs text-[var(--ink-2)]">{cmd.description}</p> : null}
-                    </div>
-                    {isSelected ? (
-                      <kbd className="kbd">
-                        Enter
-                      </kbd>
-                    ) : null}
-                  </button>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {showStockSection ? (
+                <div className={cn('pb-2', filteredCommands.length > 0 && 'border-t border-[var(--line)]')}>
+                  <GroupLabel>{isStockLoading && stocks.length === 0 ? 'Stocks — searching' : 'Stocks'}</GroupLabel>
+                  {stocks.map((suggestion, idx) => {
+                    const rowIndex = filteredCommands.length + idx;
+                    return (
+                      <PaletteOption
+                        key={suggestion.ticker}
+                        icon={TrendingUp}
+                        index={rowIndex}
+                        isSelected={rowIndex === selectedIndex}
+                        onHover={() => setSelectedIndex(rowIndex)}
+                        onSelect={() => navigate(`/stocks/${encodeURIComponent(suggestion.ticker)}`)}
+                        subtitle={suggestion.name || 'Company profile'}
+                        title={suggestion.ticker}
+                        titleClassName="serif-num text-base"
+                      />
+                    );
+                  })}
+                  {stocks.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-[var(--ink-2)]">Looking up tickers…</div>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
           )}
         </div>
 

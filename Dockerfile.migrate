@@ -1,8 +1,71 @@
-FROM postgres:16-alpine
+# ============================================================================
+# Migration job image -- runs `alembic upgrade head` and exits.
+#
+# Build from the REPO ROOT (paths below are repo-relative):
+#     docker build -f Dockerfile.migrate -t quantorsignal-migrate .
+#     docker run --rm -e DATABASE_URL="postgresql://..." quantorsignal-migrate
+#
+# This previously piped app/database/migrations/001_optimized_schema.sql through
+# psql, which only ever created the original core tables -- none of the tables
+# added by Alembic revisions since. Running the documented Railway migrate step
+# left the database missing ai_stock_reports, ai_usage_events, email_preferences,
+# email_send_log, insider_transactions, earnings_events and macro_observations.
+# It now runs Alembic, which is the single source of truth for schema changes.
+# ============================================================================
+
+# 3.12 rather than 3.13: the pinned psycopg2-binary publishes cp312 wheels, and
+# a slim image has no compiler to fall back on if pip tries a source build.
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
 
-# copy your migration file into the container
-COPY backend/app/database/migrations/001_optimized_schema.sql /app/migration.sql
+# Only what backend/alembic/env.py's import chain actually needs:
+#   alembic itself
+#   app.config           -> pydantic, pydantic-settings, python-dotenv
+#   app.database.connection -> sqlalchemy + a PostgreSQL driver
+# Both drivers are installed so either URL form works: a bare
+# "postgresql://" URL resolves to psycopg2, "postgresql+psycopg://" to psycopg3.
+#
+# backend/requirements.txt is deliberately NOT used here -- it pulls pandas,
+# numpy, scikit-learn, matplotlib, yfinance, anthropic and openai, none of which
+# a schema migration touches, turning a seconds-long job into a multi-minute
+# build. The import check further down is what keeps this list honest.
+RUN pip install --no-cache-dir \
+        alembic==1.14.0 \
+        sqlalchemy==2.0.36 \
+        psycopg2-binary==2.9.11 \
+        "psycopg[binary]==3.3.2" \
+        pydantic==2.10.3 \
+        pydantic-settings==2.6.1 \
+        python-dotenv==1.0.1
 
-# run migration, then print tables so logs prove it worked
-CMD sh -c 'psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f /app/migration.sql && psql "$DATABASE_URL" -c "\dt"'
+# Copy paths explicitly. There is no .dockerignore in this repo, so a blanket
+# `COPY backend/ .` would drag in backend/.env (real credentials) and
+# backend/venv (a Windows virtualenv, useless here and large).
+COPY backend/alembic.ini ./alembic.ini
+COPY backend/alembic ./alembic
+COPY backend/app ./app
+
+# app/config.py declares REDIS_URL and SECRET_KEY as required settings, and
+# env.py imports settings, so the import fails without them even though no
+# migration reads either value. These placeholders exist purely to let that
+# import succeed; real values injected at runtime take precedence.
+#
+# DATABASE_URL is deliberately NOT defaulted. A missing one must fail loudly
+# rather than quietly point somewhere unintended.
+ENV REDIS_URL=redis://localhost:6379/0 \
+    SECRET_KEY=unused-by-migrations
+
+# Fail the BUILD, not the deploy, if the trimmed dependency list above ever
+# stops covering what env.py imports. The dummy DATABASE_URL is scoped to this
+# RUN layer only and never connects -- create_engine() resolves the driver
+# lazily without opening a socket.
+RUN DATABASE_URL="postgresql://user:pass@localhost:5432/db" \
+    python -c "import alembic.config, app.config, app.database.models; print('migrate image import check: OK')"
+
+# `alembic current` afterwards prints the revision the database landed on, so
+# the deploy logs prove which schema version is live.
+CMD ["sh", "-c", "alembic upgrade head && alembic current"]

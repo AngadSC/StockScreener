@@ -1,0 +1,16 @@
+# Keep secrets and junk out of every Docker build context (Dockerfile.migrate
+# builds from the repo root — without this, `COPY backend/ .` style commands
+# would bake real credentials from backend/.env and a Windows venv into images).
+**/.env
+**/.env.*
+!**/.env.example
+**/venv/
+**/__pycache__/
+**/.pytest_cache/
+backend/pytest-cache-files-*/
+**/node_modules/
+frontend/.next/
+.git/
+.claude/
+**/*.pyc
+logs.txt

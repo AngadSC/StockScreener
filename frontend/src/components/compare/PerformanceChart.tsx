@@ -15,7 +15,7 @@ import {
 import { Loader2 } from 'lucide-react';
 
 import { stocksAPI } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, parseLocalDate } from '@/lib/utils';
 import type { StockPrice } from '@/types/stock';
 
 import type { SeriesColorMap } from './colors';
@@ -35,41 +35,68 @@ interface PerformanceChartProps {
 
 type ChartRow = { date: string } & Record<string, number | string | null>;
 
+/**
+ * Rebase every series to a single, shared baseline date rather than to each
+ * ticker's own first close. The baseline is the latest first-available date
+ * across the selection, so a ticker with a shorter history (a recent IPO, a
+ * gap in coverage) can no longer sit at 0% while its peers already carry a
+ * market move it was never exposed to. Rows before the baseline are dropped.
+ */
 function buildNormalizedSeries(tickers: string[], historyByTicker: Map<string, StockPrice[]>): ChartRow[] {
-  const dateSet = new Set<string>();
-  const firstCloseByTicker = new Map<string, number>();
+  const usableByTicker = new Map<string, StockPrice[]>();
 
-  historyByTicker.forEach((data, ticker) => {
-    const firstPositive = data.find((point) => point.close > 0);
-    if (firstPositive) firstCloseByTicker.set(ticker, firstPositive.close);
-    data.forEach((point) => dateSet.add(point.date));
+  tickers.forEach((ticker) => {
+    const points = (historyByTicker.get(ticker) ?? []).filter(
+      (point) => Boolean(point.date) && Number.isFinite(point.close) && point.close > 0
+    );
+    if (points.length > 0) usableByTicker.set(ticker, points);
   });
 
-  const sortedDates = Array.from(dateSet).sort();
+  if (usableByTicker.size === 0) return [];
 
+  // Common baseline = the latest "first available" date across the series.
+  const firstDates = Array.from(usableByTicker.values()).map((points) =>
+    points.reduce((earliest, point) => (point.date < earliest ? point.date : earliest), points[0].date)
+  );
+  const baseline = firstDates.reduce((latest, date) => (date > latest ? date : latest), firstDates[0]);
+
+  const dateSet = new Set<string>();
   const pctByTickerDate = new Map<string, Map<string, number>>();
-  historyByTicker.forEach((data, ticker) => {
-    const firstClose = firstCloseByTicker.get(ticker);
+
+  usableByTicker.forEach((points, ticker) => {
+    const inWindow = points.filter((point) => point.date >= baseline);
+    if (inWindow.length === 0) return;
+
+    // Close on the baseline date, or the first session after it if this ticker
+    // did not trade that day.
+    const baselinePoint = inWindow.reduce(
+      (earliest, point) => (point.date < earliest.date ? point : earliest),
+      inWindow[0]
+    );
+    const baselineClose = baselinePoint.close;
+    if (!Number.isFinite(baselineClose) || baselineClose <= 0) return;
+
     const map = new Map<string, number>();
-    if (firstClose) {
-      data.forEach((point) => {
-        map.set(point.date, ((point.close - firstClose) / firstClose) * 100);
-      });
-    }
+    inWindow.forEach((point) => {
+      dateSet.add(point.date);
+      map.set(point.date, (point.close / baselineClose - 1) * 100);
+    });
     pctByTickerDate.set(ticker, map);
   });
 
-  return sortedDates.map((date) => {
-    const row: ChartRow = { date };
-    tickers.forEach((ticker) => {
-      row[ticker] = pctByTickerDate.get(ticker)?.get(date) ?? null;
+  return Array.from(dateSet)
+    .sort()
+    .map((date) => {
+      const row: ChartRow = { date };
+      tickers.forEach((ticker) => {
+        row[ticker] = pctByTickerDate.get(ticker)?.get(date) ?? null;
+      });
+      return row;
     });
-    return row;
-  });
 }
 
 function formatDateTick(value: string) {
-  const parsed = new Date(value);
+  const parsed = parseLocalDate(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
@@ -87,7 +114,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload || payload.length === 0) return null;
 
-  const parsed = label ? new Date(label) : null;
+  const parsed = label ? parseLocalDate(label) : null;
   const dateLabel =
     parsed && !Number.isNaN(parsed.getTime())
       ? parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -163,8 +190,8 @@ export default function PerformanceChart({ tickers, colorMap }: PerformanceChart
           <div className="eyebrow">Performance</div>
           <h2 className="heading-md mt-2 text-[var(--text-primary)]">Normalized % change</h2>
           <p className="mt-1.5 max-w-md text-[13px] leading-relaxed text-[var(--text-tertiary)]">
-            Each line is rebased to 0% at the start of the window, so you compare percentage moves,
-            not share prices.
+            Every line is rebased to 0% on the first date all selected tickers have data, so you
+            compare percentage moves over the same window, not share prices.
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-full border border-[var(--line)] bg-[var(--surface)] p-1">

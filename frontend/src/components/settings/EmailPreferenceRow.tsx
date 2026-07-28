@@ -43,6 +43,10 @@ export default function EmailPreferenceRow({
   onToggle,
 }: EmailPreferenceRowProps) {
   const isComingSoon = config.badge === 'Coming soon';
+  // A locked (tier-gated) or not-yet-shipped category can never actually be
+  // delivered, so the switch must be inert — otherwise it flips, says "Saved",
+  // and no email ever arrives. The backend rejects these with 403 as well.
+  const isDisabled = pending || locked || isComingSoon;
 
   return (
     <div className="flex flex-col gap-4 border-b border-[var(--border-subtle)] py-5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between">
@@ -71,6 +75,11 @@ export default function EmailPreferenceRow({
             </Link>
           </p>
         ) : null}
+        {isComingSoon && !locked ? (
+          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+            Not sending yet — we&rsquo;ll turn this on when it launches.
+          </p>
+        ) : null}
         {errorMessage ? (
           <p className="mt-2 text-xs text-[var(--negative)]">{errorMessage}</p>
         ) : null}
@@ -95,7 +104,7 @@ export default function EmailPreferenceRow({
         <EmailPreferenceToggle
           checked={checked}
           onChange={onToggle}
-          disabled={pending}
+          disabled={isDisabled}
           label={config.title}
         />
       </div>

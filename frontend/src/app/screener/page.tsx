@@ -2,11 +2,12 @@
 
 import { Suspense, useDeferredValue, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import FilterPanel from '@/components/screener/FilterPanel';
 import StockTable from '@/components/screener/StockTable';
+import { Button } from '@/components/ui/button';
 import { screenerAPI } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import type { ScreenerFilters } from '@/types/stock';
@@ -36,12 +37,15 @@ function ScreenerPageContent() {
     }));
   }, [searchQuery]);
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['screener', deferredFilters],
     queryFn: () => screenerAPI.screenStocks(deferredFilters),
     placeholderData: keepPreviousData,
   });
 
+  // The table's "No results found" state reads as a real answer to the filters.
+  // When the request itself failed, say so instead.
+  const showError = isError && !data;
   const currentPage = Math.floor((filters.skip ?? 0) / (filters.limit ?? 50)) + 1;
   const savedViews = ['Quality', 'Deep value', 'Growth', 'Dividend', 'Mega tech'];
 
@@ -106,8 +110,13 @@ function ScreenerPageContent() {
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
                 Matches
               </div>
-              <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--text-primary)]">
-                {data?.total.toLocaleString() ?? '0'}
+              <div
+                className={cn(
+                  'mt-1 text-2xl font-semibold tabular-nums',
+                  showError ? 'text-[var(--negative)]' : 'text-[var(--text-primary)]'
+                )}
+              >
+                {showError ? '—' : data?.total.toLocaleString() ?? '0'}
               </div>
             </div>
           </div>
@@ -127,25 +136,48 @@ function ScreenerPageContent() {
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-3 flex justify-end">
-            <button type="button" className="btn btn-quiet btn-sm inline-flex items-center">
-              <BarChart3 className="h-4 w-4" />
-              Columns
-            </button>
-          </div>
-          <StockTable
-            stocks={data?.results ?? []}
-            isLoading={isLoading || isFetching}
-            sortBy={filters.sort_by}
-            sortOrder={filters.sort_order}
-            onSort={handleSort}
-            page={data?.page ?? currentPage}
-            totalPages={data?.total_pages ?? 1}
-            total={data?.total ?? 0}
-            perPage={data?.per_page ?? filters.limit ?? 50}
-            onPageChange={handlePageChange}
-            onResetFilters={handleReset}
-          />
+          {showError ? (
+            <div className="deco-panel p-8 text-center">
+              <p className="text-sm text-[var(--text-secondary)]">
+                Could not run the screen. This is a connection problem, not an empty result — your
+                filters are still applied.
+              </p>
+              <div className="mt-4 flex justify-center">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => refetch()}
+                  disabled={isFetching}
+                >
+                  <RefreshCw className={cn('h-4 w-4', isFetching && 'animate-spin')} />
+                  {isFetching ? 'Retrying…' : 'Retry'}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-3 flex justify-end">
+                <button type="button" className="btn btn-quiet btn-sm inline-flex items-center">
+                  <BarChart3 className="h-4 w-4" />
+                  Columns
+                </button>
+              </div>
+              <StockTable
+                stocks={data?.results ?? []}
+                isLoading={isLoading || isFetching}
+                sortBy={filters.sort_by}
+                sortOrder={filters.sort_order}
+                onSort={handleSort}
+                page={data?.page ?? currentPage}
+                totalPages={data?.total_pages ?? 1}
+                total={data?.total ?? 0}
+                perPage={data?.per_page ?? filters.limit ?? 50}
+                onPageChange={handlePageChange}
+                onResetFilters={handleReset}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

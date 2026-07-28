@@ -1,85 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import {
-  Activity,
-  BarChart3,
-  BookOpen,
-  CalendarDays,
-  GitCompareArrows,
-  Home,
-  Landmark,
-  Lock,
-  LogIn,
-  LogOut,
-  Mail,
-  Menu,
-  Search,
-  Sparkles,
-  Star,
-  Tag,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react';
+import { Lock, LogIn, LogOut, Menu, Search, X } from 'lucide-react';
 
 import BrandMark from '@/components/layout/BrandMark';
 import { Button } from '@/components/ui/button';
 import { authAPI, screenerAPI } from '@/lib/api';
 import { isProTier } from '@/lib/auth';
+import { EMAIL_PREFERENCES_ITEM, isNavItemActive, navGroups, type NavItem } from '@/lib/nav';
 import { cn } from '@/lib/utils';
 import type { StockSuggestion } from '@/types/stock';
-
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  requiresAuth?: boolean;
-  proBadge?: boolean;
-};
-
-type NavGroup = {
-  label?: string;
-  items: NavItem[];
-};
-
-const navGroups: NavGroup[] = [
-  {
-    items: [{ href: '/', label: 'Home', icon: Home }],
-  },
-  {
-    label: 'Markets',
-    items: [
-      { href: '/markets', label: 'Scanners', icon: Activity },
-      { href: '/earnings', label: 'Earnings', icon: CalendarDays },
-      { href: '/insiders', label: 'Insiders', icon: Users },
-      { href: '/macro', label: 'Macro', icon: Landmark },
-    ],
-  },
-  {
-    label: 'Tools',
-    items: [
-      { href: '/screener', label: 'Screener', icon: Search },
-      { href: '/compare', label: 'Compare', icon: GitCompareArrows },
-      { href: '/backtester', label: 'Backtester', icon: BarChart3 },
-      { href: '/ai-analyzer', label: 'AI Analyst', icon: Sparkles, proBadge: true },
-    ],
-  },
-  {
-    label: 'Account',
-    items: [
-      { href: '/watchlist', label: 'Watchlist', icon: Star, requiresAuth: true },
-      { href: '/pricing', label: 'Pricing', icon: Tag },
-      { href: '/blog', label: 'Research Log', icon: BookOpen },
-    ],
-  },
-];
-
-function isNavItemActive(pathname: string, href: string) {
-  return pathname === href || (href !== '/' && pathname.startsWith(href));
-}
 
 function openCommandPalette() {
   window.dispatchEvent(new CustomEvent('qs-open-command-palette'));
@@ -96,8 +34,10 @@ export default function Header() {
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState(-1);
   const latestQueryRef = useRef(0);
   const isSearchFocusedRef = useRef(false);
+  const suggestListRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -135,20 +75,26 @@ export default function Header() {
 
   useEffect(() => {
     const trimmed = searchQuery.trim();
+    // Invalidate before the early return: clearing the box must also cancel an
+    // in-flight response, otherwise it lands late and re-opens the dropdown
+    // over an empty input.
+    const requestId = ++latestQueryRef.current;
 
     if (!trimmed) {
       setSuggestions([]);
       setSuggestOpen(false);
+      setIsSuggestLoading(false);
+      setHighlightIndex(-1);
       return;
     }
 
-    const requestId = ++latestQueryRef.current;
     const timer = setTimeout(async () => {
       setIsSuggestLoading(true);
       try {
         const result = await screenerAPI.suggestStocks(trimmed, 6);
         if (requestId !== latestQueryRef.current) return;
         setSuggestions(result.results);
+        setHighlightIndex(-1);
         // Only open the dropdown for explicit user typing/focus, not for
         // URL-driven searchQuery changes (e.g. navigating to ?search=...).
         if (isSearchFocusedRef.current) setSuggestOpen(true);
@@ -156,6 +102,7 @@ export default function Header() {
         if (requestId !== latestQueryRef.current) return;
         setSuggestions([]);
         setSuggestOpen(false);
+        setHighlightIndex(-1);
       } finally {
         if (requestId === latestQueryRef.current) {
           setIsSuggestLoading(false);
@@ -166,8 +113,18 @@ export default function Header() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Keep the active option visible while arrowing through the dropdown.
+  useEffect(() => {
+    if (highlightIndex < 0) return;
+    const node = suggestListRef.current?.querySelector<HTMLElement>(
+      `[data-suggest-index="${highlightIndex}"]`
+    );
+    node?.scrollIntoView({ block: 'nearest' });
+  }, [highlightIndex]);
+
   const closeSearchOverlays = () => {
     setSuggestOpen(false);
+    setHighlightIndex(-1);
     setIsMobileMenuOpen(false);
   };
 
@@ -179,9 +136,45 @@ export default function Header() {
   };
 
   const handleSuggestionSelect = (ticker: string) => {
+    // A selection ends this search session — drop any in-flight response so it
+    // cannot re-open the dropdown after we navigate.
+    latestQueryRef.current += 1;
     setSearchQuery(ticker);
+    setIsSuggestLoading(false);
     closeSearchOverlays();
     router.push(`/stocks/${ticker}`);
+  };
+
+  const handleSearchKeyDown = (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      if (suggestions.length === 0) return;
+      event.preventDefault();
+      setSuggestOpen(true);
+      setHighlightIndex((prev) => (prev + 1) % suggestions.length);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      if (suggestions.length === 0) return;
+      event.preventDefault();
+      setSuggestOpen(true);
+      setHighlightIndex((prev) => (prev <= 0 ? suggestions.length - 1 : prev - 1));
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      const highlighted = suggestOpen && highlightIndex >= 0 ? suggestions[highlightIndex] : undefined;
+      if (!highlighted) return; // fall through to the form submit (screener search)
+      event.preventDefault();
+      handleSuggestionSelect(highlighted.ticker);
+      return;
+    }
+
+    if (event.key === 'Escape' && suggestOpen) {
+      event.preventDefault();
+      setSuggestOpen(false);
+      setHighlightIndex(-1);
+    }
   };
 
   const handleLogout = async () => {
@@ -195,63 +188,107 @@ export default function Header() {
     }
   };
 
-  const renderSearchForm = (mobile = false) => (
-    <div className={cn('relative', mobile ? 'w-full' : 'w-full')}>
-      <form
-        onSubmit={handleSearchSubmit}
-        className="flex h-10 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm shadow-[var(--shadow-1)] transition-[border-color,box-shadow] duration-300 focus-within:border-[var(--forest)] focus-within:shadow-[0_0_0_3px_var(--forest-soft),var(--shadow-1)]"
-      >
-        <Search className="h-4 w-4 shrink-0 text-[var(--mute)]" aria-hidden="true" />
-        <input
-          aria-label="Search stocks"
-          className="w-full border-none bg-transparent p-0 text-sm text-[var(--ink)] shadow-none outline-none placeholder:text-[var(--whisper)] focus:border-none focus:shadow-none"
-          onBlur={() => {
-            isSearchFocusedRef.current = false;
-            setTimeout(() => setSuggestOpen(false), 150);
-          }}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          onFocus={() => {
-            isSearchFocusedRef.current = true;
-            if (suggestions.length > 0) setSuggestOpen(true);
-          }}
-          placeholder="Ticker or company"
-          type="text"
-          value={searchQuery}
-        />
-      </form>
+  const renderSearchForm = (mobile = false) => {
+    const idPrefix = mobile ? 'header-search-mobile' : 'header-search-desktop';
+    const listboxId = `${idPrefix}-listbox`;
+    const optionId = (index: number) => `${idPrefix}-option-${index}`;
+    const activeOptionId =
+      suggestOpen && highlightIndex >= 0 && suggestions[highlightIndex]
+        ? optionId(highlightIndex)
+        : undefined;
 
-      {suggestOpen ? (
-        <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-[120] overflow-hidden rounded-[16px] border border-[var(--line-2)] bg-[var(--surface)] shadow-[var(--shadow-3)]">
-          <div className="border-b border-[var(--line)] px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--mute)]">
-            {isSuggestLoading ? 'Searching' : 'Quick matches'}
-          </div>
-          <div className="deco-scroll max-h-64 overflow-auto py-1">
-            {!isSuggestLoading && suggestions.length === 0 ? (
-              <div className="px-4 py-3 text-sm text-[var(--ink-2)]">No matches found.</div>
-            ) : null}
-            {suggestions.map((item) => (
-              <div
-                key={item.ticker}
-                className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--surface-2)]"
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  handleSuggestionSelect(item.ticker);
-                }}
-              >
-                <div className="min-w-0">
-                  <div className="serif-num text-base text-[var(--ink)]">{item.ticker}</div>
-                  <div className="truncate text-sm text-[var(--ink-2)]">
-                    {item.name || 'Company profile'}
+    return (
+      <div className="relative w-full">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="flex h-10 items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-3.5 text-sm shadow-[var(--shadow-1)] transition-[border-color,box-shadow] duration-300 focus-within:border-[var(--forest)] focus-within:shadow-[0_0_0_3px_var(--forest-soft),var(--shadow-1)]"
+        >
+          <Search className="h-4 w-4 shrink-0 text-[var(--mute)]" aria-hidden="true" />
+          <input
+            aria-activedescendant={activeOptionId}
+            aria-autocomplete="list"
+            aria-controls={suggestOpen ? listboxId : undefined}
+            aria-expanded={suggestOpen}
+            aria-label="Search stocks"
+            autoComplete="off"
+            className="w-full border-none bg-transparent p-0 text-sm text-[var(--ink)] shadow-none outline-none placeholder:text-[var(--whisper)] focus:border-none focus:shadow-none"
+            onBlur={() => {
+              isSearchFocusedRef.current = false;
+              setTimeout(() => {
+                setSuggestOpen(false);
+                setHighlightIndex(-1);
+              }, 150);
+            }}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onFocus={() => {
+              isSearchFocusedRef.current = true;
+              if (suggestions.length > 0) setSuggestOpen(true);
+            }}
+            onKeyDown={handleSearchKeyDown}
+            placeholder="Ticker or company"
+            role="combobox"
+            type="text"
+            value={searchQuery}
+          />
+        </form>
+
+        <span className="sr-only" role="status" aria-live="polite">
+          {suggestOpen && !isSuggestLoading
+            ? `${suggestions.length} suggestion${suggestions.length === 1 ? '' : 's'} available. Use arrow keys to review, Enter to open.`
+            : ''}
+        </span>
+
+        {suggestOpen ? (
+          <div className="absolute left-0 right-0 top-[calc(100%+0.75rem)] z-[120] overflow-hidden rounded-[16px] border border-[var(--line-2)] bg-[var(--surface)] shadow-[var(--shadow-3)]">
+            <div className="border-b border-[var(--line)] px-4 py-2 font-mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--mute)]">
+              {isSuggestLoading ? 'Searching' : 'Quick matches'}
+            </div>
+            <div
+              ref={suggestListRef}
+              id={listboxId}
+              role="listbox"
+              aria-label="Stock suggestions"
+              className="deco-scroll max-h-64 overflow-auto py-1"
+            >
+              {!isSuggestLoading && suggestions.length === 0 ? (
+                <div className="px-4 py-3 text-sm text-[var(--ink-2)]">No matches found.</div>
+              ) : null}
+              {suggestions.map((item, index) => {
+                const isHighlighted = index === highlightIndex;
+
+                return (
+                  <div
+                    key={item.ticker}
+                    aria-selected={isHighlighted}
+                    data-suggest-index={index}
+                    id={optionId(index)}
+                    role="option"
+                    className={cn(
+                      'flex cursor-pointer items-center justify-between gap-3 px-4 py-3 transition-colors duration-[180ms] hover:bg-[var(--surface-2)]',
+                      isHighlighted && 'bg-[var(--surface-2)]'
+                    )}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      handleSuggestionSelect(item.ticker);
+                    }}
+                    onMouseEnter={() => setHighlightIndex(index)}
+                  >
+                    <div className="min-w-0">
+                      <div className="serif-num text-base text-[var(--ink)]">{item.ticker}</div>
+                      <div className="truncate text-sm text-[var(--ink-2)]">
+                        {item.name || 'Company profile'}
+                      </div>
+                    </div>
+                    <div className="status">Open</div>
                   </div>
-                </div>
-                <div className="status">Open</div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ) : null}
-    </div>
-  );
+        ) : null}
+      </div>
+    );
+  };
 
   const renderNavLink = (item: NavItem, mobile = false) => {
     const Icon = item.icon;
@@ -284,37 +321,46 @@ export default function Header() {
 
   const renderNavGroups = (mobile = false) => (
     <>
-      {navGroups.map((group, index) => (
-        <div key={group.label ?? `group-${index}`} className={cn(index > 0 && 'mt-4')}>
-          {group.label ? (
-            <div className="px-3.5 pb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--whisper)]">
-              {group.label}
+      {navGroups.map((group, index) => {
+        // `sidebarHidden` entries live in dedicated chrome (e.g. email
+        // preferences in the account block) but stay searchable in the palette.
+        const items = group.items.filter((item) => !item.sidebarHidden);
+        if (items.length === 0) return null;
+
+        return (
+          <div key={group.label ?? `group-${index}`} className={cn(index > 0 && 'mt-4')}>
+            {group.label ? (
+              <div className="px-3.5 pb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-[var(--whisper)]">
+                {group.label}
+              </div>
+            ) : null}
+            <div className="grid gap-0.5">
+              {items.map((item) => renderNavLink(item, mobile))}
             </div>
-          ) : null}
-          <div className="grid gap-0.5">
-            {group.items.map((item) => renderNavLink(item, mobile))}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </>
   );
 
-  const renderAccountControls = (mobile = false) => (
+  const EmailPrefsIcon = EMAIL_PREFERENCES_ITEM.icon;
+
+  const renderAccountControls = () => (
     <div className="grid gap-1.5">
       {isLoggedIn ? (
         <>
           <Link
-            href="/settings/emails"
+            href={EMAIL_PREFERENCES_ITEM.href}
             onClick={() => setIsMobileMenuOpen(false)}
             className={cn(
               'flex items-center gap-3 rounded-[10px] px-3.5 py-2 text-[13.5px] transition-[background,color] duration-200',
-              isNavItemActive(pathname, '/settings/emails')
+              isNavItemActive(pathname, EMAIL_PREFERENCES_ITEM.href)
                 ? 'bg-[rgba(221,228,225,0.06)] font-medium text-[var(--ink)]'
                 : 'text-[var(--mute)] hover:bg-[rgba(221,228,225,0.04)] hover:text-[var(--ink)]'
             )}
           >
-            <Mail className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.5} />
-            <span className="flex-1">Email preferences</span>
+            <EmailPrefsIcon className="h-4 w-4 shrink-0" aria-hidden="true" strokeWidth={1.5} />
+            <span className="flex-1">{EMAIL_PREFERENCES_ITEM.label}</span>
           </Link>
           <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
             <LogOut className="h-4 w-4" />
@@ -429,7 +475,7 @@ export default function Header() {
                 <kbd className="kbd">Ctrl K</kbd>
               </button>
               <nav>{renderNavGroups(true)}</nav>
-              <div className="border-t border-[var(--line)] pt-4">{renderAccountControls(true)}</div>
+              <div className="border-t border-[var(--line)] pt-4">{renderAccountControls()}</div>
             </div>
           ) : null}
         </div>

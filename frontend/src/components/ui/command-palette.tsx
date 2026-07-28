@@ -324,7 +324,7 @@ export default function CommandPalette() {
           id={LIST_ID}
           role="listbox"
           aria-label="Command palette results"
-          className="deco-scroll max-h-[400px] overflow-y-auto"
+          className="deco-scroll max-h-[50vh] overflow-y-auto sm:max-h-[400px]"
         >
           {rows.length === 0 && !isStockLoading ? (
             <div className="px-4 py-8 text-center text-[var(--ink-2)]">

@@ -307,7 +307,7 @@ export default function StockDetailPage({ params }: PageProps) {
                 <div className="smallcap">
                   Markets / {stock.sector || 'Sector'} / {ticker}
                 </div>
-                <h1 className="mt-3 text-[clamp(64px,8vw,96px)] leading-[0.9]">{ticker}</h1>
+                <h1 className="mt-3 text-[clamp(44px,13vw,64px)] leading-[0.9] md:text-[clamp(64px,8vw,96px)]">{ticker}</h1>
                 <div className="serif mt-3 text-2xl italic text-[var(--ink-2)]">{companyName}</div>
                 <div className="smallcap-low mt-2">{stock.industry || 'Equity research profile'}</div>
                 <div className="mt-6 flex flex-wrap gap-3">
@@ -325,7 +325,7 @@ export default function StockDetailPage({ params }: PageProps) {
 
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="readout text-5xl text-[var(--text-primary)]">
+                  <div className="readout text-4xl text-[var(--text-primary)] md:text-5xl">
                     {stock.current_price != null ? `$${stock.current_price.toFixed(2)}` : 'N/A'}
                   </div>
                   {changePercent !== null ? (

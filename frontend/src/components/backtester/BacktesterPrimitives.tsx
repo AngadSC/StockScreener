@@ -136,7 +136,7 @@ export function StrategyInfoDrawer({ strategy }: { strategy: StrategyDef }) {
 
 export function EmptyResultsState() {
   return (
-    <div className="flex min-h-[720px] items-center justify-center px-6 py-10">
+    <div className="flex min-h-[420px] items-center justify-center px-6 py-10 lg:min-h-[720px]">
       <div className="max-w-md text-center">
         <svg viewBox="0 0 280 160" className="mx-auto h-40 w-full max-w-[280px]" aria-hidden="true">
           <defs>

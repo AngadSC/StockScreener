@@ -95,7 +95,8 @@ export default function WatchlistPage() {
             </div>
           ) : (
             <div className="deco-panel overflow-hidden bg-card">
-              <table className="deco-table">
+              <div className="deco-scroll overflow-x-auto">
+                <table className="deco-table">
                 <thead className="bg-muted/20">
                   <tr>
                     <th>Ticker</th>
@@ -127,7 +128,8 @@ export default function WatchlistPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           )}
         </>

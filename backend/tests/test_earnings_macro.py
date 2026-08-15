@@ -11,6 +11,7 @@ from datetime import date, datetime
 from unittest.mock import MagicMock
 
 from app.services.earnings import (
+    MARKET_TZ,
     _merge_scope_symbols,
     chunk_symbols,
     get_earnings_scope_tickers,
@@ -170,7 +171,7 @@ def test_parse_calendar_event_returns_none_when_no_earnings_date():
 def test_parse_calendar_event_parses_single_date():
     raw = {
         "earnings": {
-            "earningsDate": [datetime(2026, 8, 15)],
+            "earningsDate": [date(2026, 8, 15)],
             "earningsAverage": 1.23,
         }
     }
@@ -185,7 +186,10 @@ def test_parse_calendar_event_parses_single_date():
 def test_parse_calendar_event_picks_earliest_of_date_range():
     raw = {
         "earnings": {
-            "earningsDate": [datetime(2026, 8, 20), datetime(2026, 8, 17)],
+            "earningsDate": [
+                datetime(2026, 8, 20, 12, 0, tzinfo=MARKET_TZ),
+                datetime(2026, 8, 17, 12, 0, tzinfo=MARKET_TZ),
+            ],
             "earningsAverage": None,
         }
     }
@@ -195,20 +199,62 @@ def test_parse_calendar_event_picks_earliest_of_date_range():
 
 
 def test_parse_calendar_event_infers_bmo_and_amc_from_hour():
-    bmo_raw = {"earnings": {"earningsDate": [datetime(2026, 8, 15, 7, 0)]}}
-    amc_raw = {"earnings": {"earningsDate": [datetime(2026, 8, 15, 16, 30)]}}
-    midday_raw = {"earnings": {"earningsDate": [datetime(2026, 8, 15, 13, 0)]}}
+    """Boundaries are the ET session: before 09:30 is BMO, 16:00 onward is AMC."""
+    def at(hour, minute=0):
+        return {"earnings": {"earningsDate": [datetime(2026, 8, 15, hour, minute, tzinfo=MARKET_TZ)]}}
 
-    assert parse_calendar_event(bmo_raw)["time_hint"] == "bmo"
-    assert parse_calendar_event(amc_raw)["time_hint"] == "amc"
-    assert parse_calendar_event(midday_raw)["time_hint"] == "unknown"
+    assert parse_calendar_event(at(7))["time_hint"] == "bmo"
+    assert parse_calendar_event(at(8, 30))["time_hint"] == "bmo"      # Yahoo's BMO placeholder
+    assert parse_calendar_event(at(16))["time_hint"] == "amc"          # Yahoo's AMC placeholder
+    assert parse_calendar_event(at(16, 30))["time_hint"] == "amc"
+    assert parse_calendar_event(at(13))["time_hint"] == "unknown"      # intraday, don't guess
 
 
 def test_parse_calendar_event_handles_iso_string_dates():
-    raw = {"earnings": {"earningsDate": ["2026-09-01T00:00:00"], "earningsAverage": 0.5}}
+    raw = {"earnings": {"earningsDate": ["2026-09-01"], "earningsAverage": 0.5}}
     parsed = parse_calendar_event(raw)
     assert parsed["earnings_date"] == date(2026, 9, 1)
+    assert parsed["time_hint"] == "unknown"
     assert parsed["eps_estimate"] == 0.5
+
+
+def test_parse_calendar_event_handles_yahooquery_broken_seconds_format():
+    """
+    Regression: yahooquery 2.4.x renders earningsDate with a literal "S" instead
+    of "%S" ("2026-10-29 14:00:S"). fromisoformat() rejects it, which silently
+    emptied the entire earnings calendar.
+    """
+    raw = {"earnings": {"earningsDate": ["2026-10-29 14:00:S"], "earningsAverage": 1.98}}
+    parsed = parse_calendar_event(raw)
+    assert parsed is not None
+    assert parsed["earnings_date"] == date(2026, 10, 29)
+    assert parsed["eps_estimate"] == 1.98
+
+
+def test_parse_calendar_event_normalises_host_timezone_to_eastern():
+    """
+    yahooquery builds these strings with a naive datetime.fromtimestamp(), so the
+    hour is host-local. A UTC host must still classify a 12:30 UTC (08:30 ET)
+    report as BMO rather than 'unknown'.
+    """
+    raw = {"earnings": {"earningsDate": ["2026-10-29T12:30:00+00:00"]}}
+    parsed = parse_calendar_event(raw)
+    assert parsed["earnings_date"] == date(2026, 10, 29)
+    assert parsed["time_hint"] == "bmo"
+
+    raw_amc = {"earnings": {"earningsDate": ["2026-10-29T20:00:00+00:00"]}}
+    assert parse_calendar_event(raw_amc)["time_hint"] == "amc"
+
+
+def test_parse_calendar_event_handles_epoch_seconds():
+    raw = {"earnings": {"earningsDate": [1787774400]}}  # 2026-08-26 16:00 ET
+    parsed = parse_calendar_event(raw)
+    assert parsed["earnings_date"] == date(2026, 8, 26)
+    assert parsed["time_hint"] == "amc"
+
+
+def test_parse_calendar_event_returns_none_for_unparseable_date():
+    assert parse_calendar_event({"earnings": {"earningsDate": ["not-a-date"]}}) is None
 
 
 # ---------------------------------------------------------------------------

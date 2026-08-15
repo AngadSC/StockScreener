@@ -13,9 +13,11 @@ small, independently-testable helper functions:
 from __future__ import annotations
 
 import random
+import re
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,17 @@ from app.database.models import StockFundamental, Ticker, Watchlist
 
 # Cost-control: only fetch earnings for tickers that matter.
 DEFAULT_TOP_MARKET_CAP_LIMIT = 500
+
+MARKET_TZ = ZoneInfo("America/New_York")
+
+# yahooquery 2.4.x formats earningsDate with a literal "S" instead of "%S"
+# (base.py: strftime("%Y-%m-%d %H:%M:S")), producing "2026-10-29 14:00:S".
+# fromisoformat() rejects that outright, so without this repair EVERY ticker
+# parses as "no earnings data" and the calendar stays permanently empty.
+_BROKEN_SECONDS_SUFFIX = re.compile(r":S$")
+
+# "2026-09-01" with no time-of-day component.
+_DATE_ONLY = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _merge_scope_symbols(watchlisted_symbols: List[str], top_market_cap_symbols: List[str]) -> List[str]:
@@ -57,33 +70,63 @@ def get_earnings_scope_tickers(db: Session, top_n: int = DEFAULT_TOP_MARKET_CAP_
     return _merge_scope_symbols(watchlisted_symbols, top_market_cap_symbols)
 
 
+def _to_market_time(dt: datetime) -> datetime:
+    """
+    Normalise a parsed event datetime to naive US/Eastern wall-clock.
+
+    yahooquery builds these strings with `datetime.fromtimestamp(ts)` — no
+    timezone — so the hour reflects whatever the HOST clock is (UTC on Railway,
+    MT on a dev laptop). Reading BMO/AMC off that raw hour gives a different
+    answer per machine, so we re-attach the host offset and convert to ET.
+    """
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # naive -> aware in the host's local zone
+    return dt.astimezone(MARKET_TZ).replace(tzinfo=None)
+
+
 def _coerce_event_date(raw: Any) -> Optional[datetime]:
-    """yahooquery returns earningsDate entries as datetime, date, or ISO strings depending on version."""
+    """
+    yahooquery returns earningsDate entries as datetime, date, epoch seconds, or
+    ISO-ish strings depending on version. Returns naive ET, or None if unusable.
+    """
     if raw is None:
         return None
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        return datetime.fromtimestamp(raw, tz=timezone.utc).astimezone(MARKET_TZ).replace(tzinfo=None)
     if isinstance(raw, datetime):
-        return raw
+        return _to_market_time(raw)
     if isinstance(raw, date):
+        # Date-only: no instant to convert, so shifting zones would only risk
+        # moving it off by a day.
         return datetime(raw.year, raw.month, raw.day)
     if isinstance(raw, str):
+        cleaned = _BROKEN_SECONDS_SUFFIX.sub(":00", raw.strip()).replace("Z", "+00:00")
         try:
-            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(cleaned)
         except ValueError:
             return None
+        if _DATE_ONLY.match(cleaned):
+            # No instant to convert — shifting zones off a bare midnight would
+            # slide the date a day backwards on a UTC host.
+            return parsed
+        return _to_market_time(parsed)
     return None
 
 
 def _infer_time_hint(dt: datetime) -> str:
     """
-    Best-effort BMO/AMC classification.
+    Best-effort BMO/AMC classification from an ET wall-clock datetime.
 
-    Yahoo's calendarEvents payload usually only carries a date (midnight,
-    no time-of-day), so this can only classify events that DO carry an
-    hour component. Known gap: most events will resolve to 'unknown'.
+    Yahoo supplies placeholder times rather than exact ones: pre-market reporters
+    land on 08:30 ET and post-close reporters on 16:00 ET. Anything inside the
+    session (or a date-only payload at midnight) stays 'unknown' rather than
+    being guessed at.
     """
     if dt.hour == 0 and dt.minute == 0:
         return "unknown"
-    if dt.hour < 12:
+    if (dt.hour, dt.minute) < (9, 30):
         return "bmo"
     if dt.hour >= 16:
         return "amc"

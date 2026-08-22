@@ -1,0 +1,114 @@
+---
+title: "Stripping the Margin Out of a Quoted Price"
+date: "2026-08-22"
+excerpt: "Every quoted two-sided price contains a fair value plus a margin you can't observe. How you separate them is a modelling choice — and on a longshot, that choice is an order of magnitude larger than any edge you'd find."
+tags: ["statistics", "market-efficiency", "research"]
+---
+
+Here's a problem that shows up in three places I care about: recovering a risk-neutral density from an option chain, recovering a fair mid from a wide bid-ask, and recovering a fair probability from a bookmaker's two-sided price.
+
+They're the same problem. **An observable spread has to be decomposed into a fair value plus a margin whose distribution across states is unobserved.** The betting version is the cleanest laboratory for it, because the labels are hard, immediate, unambiguous and free — the game ends, and you find out.
+
+So I ran it there. 5,280 NFL games, 2006–2025, free public data.
+
+## Four estimators, not five
+
+The standard toolkit has five ways to strip margin out of a two-sided quote:
+
+- **Multiplicative** — divide each raw implied probability by the booksum. Equal *proportional* margin on every outcome. This is what every free no-vig calculator does.
+- **Additive** — subtract the excess evenly. Equal *absolute* margin, which loads relatively harder on longshots.
+- **Power** — raise each raw probability to a power, solve for the exponent that makes them sum to one.
+- **Shin** — solve for an implied proportion of informed traders. This one has an economic story: margin as protection against informed flow.
+- **Worst-case** — a deliberately conservative bound. A screening floor, not a fair value.
+
+First result, and it's a clean one: **Shin and additive are numerically identical on two-way markets.** Maximum absolute difference across 5,280 games: 1.93 × 10⁻¹³. That's floating-point noise, not disagreement.
+
+Anyone treating them as two independent methods is double-counting one opinion. There are four distinct estimators here, not five.
+
+## On mainlines, the choice doesn't matter at all
+
+This reverses what I expected. I went in assuming the multiplicative method — the default everywhere, chosen because it's a one-liner — would be measurably biased. Ten thousand five hundred and sixty side-observations, cluster-bootstrapped by game:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Method</th><th>Calibration slope</th><th>95% CI</th><th>Brier</th><th>Log loss</th></tr></thead>
+    <tbody>
+      <tr><td>Multiplicative</td><td>1.0158</td><td>[0.787, 1.224]</td><td>0.2111</td><td>0.6095</td></tr>
+      <tr><td>Additive / Shin</td><td>0.9808</td><td>[0.791, 1.223]</td><td>0.2111</td><td>0.6093</td></tr>
+      <tr><td>Power</td><td>0.9624</td><td>[0.753, 1.176]</td><td>0.2111</td><td>0.6093</td></tr>
+      <tr><td>Odds-ratio</td><td>0.9790</td><td>[0.783, 1.202]</td><td>0.2111</td><td>0.6093</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Every confidence interval contains 1.00. Brier scores identical to four decimal places. Bin by bin, the recovered probability sits inside the 95% binomial interval for realised frequency in **every single bin from 0 to 1**.
+
+The null could not be rejected. That's a useful negative result, not a failed experiment: it means a screen built on mainline prices is trustworthy, and any edge it flags is not an artifact of how you stripped the margin.
+
+The reason turns out to be structural, and it leads directly to the finding.
+
+## The error law
+
+De-vig error is not a property of the estimator. It's the *mismatch* between how the margin was loaded into the price and how you strip it out. Simulating a quote where margin goes in one way and comes out another:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Market (margin)</th><th>p = 0.05</th><th>p = 0.10</th><th>p = 0.20</th><th>p = 0.35</th><th>p = 0.50</th></tr></thead>
+    <tbody>
+      <tr><td>NFL moneyline (2.6%)</td><td>2.1 pp</td><td>1.7</td><td>1.2</td><td>0.6</td><td>0.00</td></tr>
+      <tr><td>Standard line (4.5%)</td><td>4.2</td><td>3.2</td><td>2.3</td><td>1.1</td><td>0.00</td></tr>
+      <tr><td>Player prop (8.3%)</td><td>6.5</td><td>7.0</td><td>4.5</td><td>2.2</td><td>0.00</td></tr>
+      <tr><td>Exotic prop (15.3%)</td><td>12.5</td><td>10.6</td><td>10.9</td><td>4.8</td><td>0.00</td></tr>
+    </tbody>
+  </table>
+</div>
+
+*(worst-case error across the four estimators, in percentage points of probability)*
+
+The law that falls out:
+
+**de-vig error ∝ (margin) × |p − 0.5|**
+
+At p = 0.50 every estimator agrees *exactly*, at every margin level. All of the disagreement is asymmetry, amplified by margin.
+
+That's a far more useful rule than "pick the right method," because it tells you *where you are allowed to trust a recovered fair value at all*. The NFL moneyline result is clean precisely because that market is cheap — 2.65% hold — and mostly near pick'em. The method choice was invisible because the conditions made it invisible, not because the estimators agree in general.
+
+## How much flagged edge is phantom
+
+Translate the error into money. Take the most common real-world mismatch — margin loaded additively, stripped proportionally — and ask what share of a flagged +3% edge is specification error rather than edge:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Market</th><th>True probability</th><th>De-vig error</th><th>Share of a flagged +3% edge that is phantom</th></tr></thead>
+    <tbody>
+      <tr><td>Mainline</td><td>0.50</td><td>0.00 pp</td><td>0% — the edge is real</td></tr>
+      <tr><td>Mainline</td><td>0.10</td><td>1.82 pp</td><td>18%</td></tr>
+      <tr><td>Player prop</td><td>0.10</td><td>3.30 pp</td><td>33%</td></tr>
+      <tr><td>Exotic prop</td><td>0.10</td><td>6.10 pp</td><td>61% — mostly phantom</td></tr>
+    </tbody>
+  </table>
+</div>
+
+On a 10% longshot in a high-margin market, a screen showing +3% expected value is measuring mostly its own specification error. And that is *exactly* where any screen points you, because that's where raw numbers look most mispriced. The tool's error term and the tool's output are maximised in the same place.
+
+## The rule I'd actually use
+
+Not "pick the best estimator." The right framing is shrinkage with segment-varying intensity. If your edge estimate carries estimation-error variance, you shrink toward zero in proportion to it — and the key point is that **this variance is not constant across the book**. It's about 0.35 percentage points near pick'em and around 5 points on longshots.
+
+So shrinkage should be near 1 on symmetric, liquid, low-margin quotes and near 0 on asymmetric, high-margin ones. Concretely:
+
+- **Trust symmetric, low-margin quotes directly.** No shrinkage needed.
+- **Compute all four methods and take the worst case** as your fair value anywhere margin exceeds 5% or |p − 0.5| exceeds 0.15. If it still shows an edge against the most conservative estimator, the edge is structural rather than specification error.
+- **Never screen far-from-even outcomes on a single method.** The phantom fraction exceeds the edge.
+- **Shrink by the method spread, not by a constant.**
+- **Prefer symmetric markets.** They're the only place where fair value is estimator-independent.
+
+And one thing that generalises past this entirely: **more data will not fix specification error.** Estimation error shrinks with sample size. Specification error is a property of the model, and it sits there at the same magnitude no matter how many observations you collect. If your dominant error term is specification, collecting a bigger dataset is the wrong response.
+
+## Back to option chains
+
+The transfer is direct. Wide-spread, far-out-of-the-money options carry exactly this pathology: an observable two-sided quote, an unobservable split between fair value and market-maker margin, and a spread that widens precisely where the payoff is most convex. The standard fix — take the mid — *is* the multiplicative estimator, applied silently and without anyone checking whether it's the right one for that quote's asymmetry.
+
+The general result is worth keeping: **when you decompose an observed price into a fair value plus an unobserved margin, your specification error vanishes at the symmetric point and grows with the product of spread width and asymmetry.**
+
+Near the money, take the mid and stop worrying. Far from it, in a wide market, your fair value is a modelling opinion — and you should be treating it like one.

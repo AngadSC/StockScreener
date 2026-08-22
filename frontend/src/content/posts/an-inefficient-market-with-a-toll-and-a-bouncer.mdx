@@ -1,0 +1,81 @@
+---
+title: "An Inefficient Market With a 4.5% Toll and a Bouncer"
+date: "2026-08-22"
+excerpt: "Sportsbooks post prices instead of running an auction, which really does make them less informationally efficient than equities. It also makes them far more expensive to trade, and they can throw you out for winning."
+tags: ["market-efficiency", "research", "costs"]
+---
+
+The thesis I started with: a sportsbook *sets* its own odds rather than running a continuous two-sided auction, so it should be more beatable than an equity market.
+
+That's half right, and the wrong half is the half that determines whether you make money.
+
+I'm writing this up because the reasoning applies well beyond betting. It's a case study in the difference between **informational** efficiency and **economic** efficiency, and most people — me included, before this — conflate them.
+
+## Where the thesis is right
+
+There genuinely is no continuous auction. Prices are *posted*, and a posted price can be stale, mis-rounded, or simply wrong. You hold unilateral optionality: you choose whether to transact, at a price the counterparty must stand behind for some interval.
+
+That's a structurally better position than an equity taker has. In equities you cross a spread against informed flow — every fill contains adverse selection. Here, you hit a quote somebody left up too long.
+
+And the prices really aren't fully efficient. A 2024 *Management Science* study of 3,681 baseball games across four books **rejects weak-form efficiency**: significantly negatively autocorrelated line changes, meaning overreaction, and weekend-daytime forecasts that were *worse* than the same book's own forecast 90 minutes earlier. That's a real, published, peer-reviewed inefficiency in a market people assume is tight.
+
+## Where it breaks down — four ways
+
+**1. "Sets its own odds" is mostly relabelling.** Retail-facing operators do not form independent opinions on a football spread. They follow market makers. Operator-side commentary is explicit that they source lines from third parties and manage risk through **customer limits and account closures rather than pricing**.
+
+In a screen across 40 books, the number of genuinely independent opinions is roughly **3 to 6** on major-league mainlines and **1 to 2** on everything else. Treating cross-book dispersion as an ensemble of independent forecasters is the single most common modelling error in the space. You're measuring latency, rounding and margin — not disagreement.
+
+This one has an equity analogue that bit me before I ever looked at betting: a screen that reads N data sources is not N independent opinions if they all derive from the same upstream feed. Consensus estimates, sell-side price targets and most "sentiment" products have the same problem. Count your independent sources, not your columns.
+
+**2. Transaction costs are 100 to 1000× equities.** A standard two-sided sports market carries about 4.55% theoretical hold. A liquid equity costs 1 to 5 basis points. Every strategy comparison has to start there, and almost none do.
+
+**3. The right of refusal runs the wrong way.** The book quotes *and* retains the option to fire you. Nobody in equities can ban you for being right. Books identify and limit winning accounts within roughly 20 bets, and the detection feature is closing line value — the same statistic you'd use to prove you have an edge. One state's forced disclosure showed 13,400 of 2.1 million accounts limited, with the operators' own data showing a direct link between winning and restriction. Typical runway before limits: 4 to 10 weeks. Limits collapse maximum stake from $500 to somewhere between $5 and $27.
+
+You cannot hide the signal, either. A stale-price bet has positive closing line value *by construction* — that's what makes it profitable — and closing line value is the primary detection metric. The thing you're collecting and the thing they're detecting are the same thing.
+
+**4. No shorting, no market making, no leverage, no compounding in-account.** Every position is a fully collateralised long binary. Capital velocity is capped by settlement lag and by having to pre-fund across every venue at once.
+
+**Net: less informationally efficient than equities, far more expensive and capacity-constrained to trade.** An inefficient market with a 4.5% toll and a bouncer.
+
+## The free 5.6 points nobody takes
+
+The largest single edge I found in this entire research file required no model at all.
+
+Product mix has shifted the economics completely. Parlays are now about 39% of handle but roughly **84% of operator revenue**, and all-in hold crossed 10% for the first time in 2025, hitting a record 11.6% in Q3 2026 — against 4.55% theoretical on a straight bet.
+
+So by betting only straights, you face 4.5% hold while the average participant faces 10.1%. That 5.6-point gap is larger than any forecasting edge a solo researcher will build, and it costs nothing to capture.
+
+The general form of that: **before you look for alpha, check whether you're paying an avoidable toll.** In equities that's the same argument as fund fees, spread capture, tax drag and turnover — all of which are certain, all of which compound, and none of which require you to be right about anything. It's boring, which is why it stays available.
+
+## Fade-the-public is dead, and where it went
+
+The classic finding — that books deliberately shade prices toward public bias rather than balancing their book — is real and well replicated. One study found a 3-point road favourite drew 72% of the money against 56% for a 3-point home favourite at an identical price, and books didn't move.
+
+But it has migrated. A study of **155,563 contests across all major North American sports, 2007–2023** found no exploitable bias remaining on mainlines: hockey and basketball efficient, football's slight-underdog returns of 2–6.5% not statistically significant, only baseball showing significant longshot bias.
+
+The shading didn't disappear. It moved into **product design** — into parlays and same-game parlays, where the margin is over 35% and the correlation engine is in-house. The inefficiency you read about in a 2004 paper is now priced into a different product that didn't exist when the paper was written.
+
+That's a general warning about published anomalies: the mechanism can survive while the *implementation* migrates somewhere you can't reach. The bias is still there. It's just been repackaged into something with a 35% toll.
+
+## Where the softness actually is
+
+If you rank markets by (pricing error) ÷ (hold) — which is the only ratio that matters — the answer is consistent and slightly surprising: **anything derived by formula.**
+
+- **Alternate lines**, derived from static distribution tables. Correct pricing requires the joint distribution of margin and total, re-estimated as the scoring environment drifts. Books use fixed tables.
+- **Period derivatives** — first half, first quarter, team totals — priced by a formula off the full-game number.
+- **Secondary player props**, where there are roughly 18 main lines a night against over 1,000 prop lines, with limits an order of magnitude lower. Syndicates skip them, so books tolerate the error.
+- **Under-covered leagues**, where injuries price into the major league in minutes and into the minor one in weeks.
+
+And where it isn't: major-league sides and totals, where you'd need to beat the line by 0.8 points to break even and milliseconds matter; in-play, which needs sub-200ms infrastructure; and same-game parlays, which are lottery tickets.
+
+**The tell: anything derived by formula is where a better formula wins, and the formula never gets corrected because nobody bets enough to teach it.**
+
+That's a genuinely portable heuristic. Look for prices that are *computed* rather than *traded*. In equities the analogues are the obvious ones — derived instruments, thin wrappers, anything whose price is a function of another price rather than the output of its own order flow. The error is in the function, and the function only gets corrected by volume it never receives.
+
+## What I concluded
+
+I'd allocate roughly 80% of effort to market-relative work — modelling the fair price implied by the sharpest available quotes and detecting deviations — and 20% to fundamental modelling, and only in a market where you could plausibly be the best-informed person trading it.
+
+Market-relative needs no domain knowledge and generalises across sports. Fundamental modelling is a 200-analyst moat, and the base rates are brutal: the best public football model finds its optimum at 65% model, 35% market. The best public model *is partly the market*. If your model needs a market blend to be competitive, you've built a market tracker, not an edge.
+
+Which is roughly what I already believed about equities, arrived at from a completely different direction. That's the part that made the detour worth taking.

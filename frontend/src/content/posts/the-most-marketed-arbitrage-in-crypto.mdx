@@ -1,0 +1,93 @@
+---
+title: "A Real Signal That Loses Money the Harder You Trade It"
+date: "2026-08-22"
+excerpt: "Cross-venue funding carry is the most-marketed arbitrage in crypto. The bias is genuinely there — 8.5 to 11.4% annualised. The rule that captures the most of it finishes at −15% a year."
+tags: ["crypto", "costs", "research", "risk"]
+---
+
+Perpetual futures pay periodic funding between longs and shorts. Long the spot, short the perp, and you're delta-neutral while collecting funding. Across venues, the spread between what one type of exchange pays and what another pays looks like free money. It is the single most heavily marketed "arbitrage" in crypto, and you will meet it constantly.
+
+I put it in the research queue with a note saying **do not fund this**, because a good published replication already kills it, and reproducing a known kill is a much cheaper lesson than discovering it with money.
+
+The failure mechanism turned out to be the most transferable thing in the whole file.
+
+## The bias is real, and it's properly measured
+
+A reproducible two-year analysis — July 2024 to July 2026, **18,208 hourly observations per pair**, three major assets across four venues, all from public endpoints with no API keys:
+
+- The decentralised venue pays more than the centralised ones in **65–72% of hours, worth 8.5 to 11.4% annualised.**
+- The matched centralised-vs-centralised **control pair is centred on zero** (41–47% sign stability).
+
+That control is what makes the result credible. Without it, "I found a persistent spread" is indistinguishable from "I found a pattern in noise." With it, the finding is solid: there is a genuine, structural, persistent bias, and the plausible mechanism is demographic — institutions can't easily hold size on a decentralised venue, so the two populations price funding differently.
+
+So far this reads like a discovery.
+
+## Then you look at the time scale
+
+The **level** of the spread mean-reverts with an AR(1) half-life of **1.5 to 3.5 hours**.
+
+One round trip costs about 13 basis points, and needs **100 to 135 hours of holding to repay itself.**
+
+Those two numbers are the entire result. The signal's *direction* is a regime that lasts months. Its *level* is hour-to-hour noise. Confusing the two is the trap, and every threshold-entry rule confuses them by construction: you enter when the level is extreme, and the level is the part that mean-reverts before your position has paid for its own entry.
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Rule</th><th>Gross</th><th>Net, annualised</th><th>Round trips</th></tr></thead>
+    <tbody>
+      <tr><td>Threshold entry above 10% annualised</td><td>Highest of any rule tested</td><td>−9% to −15%</td><td>Many</td></tr>
+      <tr><td>Hold continuously, revisit venue monthly</td><td>Lower</td><td>+2.7% to +5.4%</td><td>1–5 in two years</td></tr>
+    </tbody>
+  </table>
+</div>
+
+The aggressive rule earned **the most gross income of anything tested** and finished deeply negative. Execution consumed roughly three times the gross. The rule that barely trades is the one that works, with a maximum drawdown under 2%.
+
+**Gross income is the trap.** If you rank your candidate rules by gross P&L — which is what a parameter sweep does by default unless you make it not — you will select precisely the rule that trades most, which is precisely the rule that costs most. The sweep is optimising for the thing that kills you.
+
+And the spread is shrinking: 20–35% lower in year two than year one, and 45–60% below its late-2024 peak. The patient rule survives round-trip costs above 250 bps. The active rule dies above 8.
+
+## Two data traps worth naming
+
+Both are the kind of bug that produces a *plausible* wrong answer, which is the worst kind.
+
+**Units.** Some venues quote funding per 8 hours; others quote it per hour. Compared raw, the 8-hour venues look eight times more generous than they are. Worse, at least one exchange silently moves volatile symbols to a 4-hour schedule — so a hard-coded interval constant **fails silently on exactly the symbols with the widest spreads**, which are exactly the ones your signal fires on. Read the interval from the API, per symbol, per period.
+
+**Look-ahead.** The funding rate applicable at time T is *predicted* continuously and *settled* at T. Most datasets store the settled rate against the settlement timestamp. Backtesting "enter when funding exceeds X" against the settled rate uses information from the settlement moment to place a trade before it — and predicted diverges from settled most during volatility, which is exactly when the signal fires. The bias points the right way to make you money in the backtest.
+
+## The risk that's in none of the numbers
+
+The original author volunteers this, and it's the most important sentence in the write-up: **there is no liquidation modelling.** A sharp move can liquidate the losing leg while the winning one is still open, turning a market-neutral position directional at the worst possible moment.
+
+From the record of 10 October 2025: over **$19B liquidated in 24 hours** across 1.62 million accounts, **$3.21B in a single minute**. A major synthetic-dollar collateral token traded to **$0.65** — a 35% depeg on the collateral leg, isolated to one venue's order book. And **auto-deleveraging closed profitable shorts** while long losses ran.
+
+That last one has no listed-equities analogue and it's the one an equity person will not see coming. Your hedge can be *administratively terminated by the exchange at the exact moment it is working*. Delta-neutral is only neutral if both legs stay open. Size for the auto-deleveraging scenario, not the VaR scenario.
+
+## The capacity statement the market already made
+
+You don't have to estimate how much money this trade can hold, because someone industrialised it and published the answer. The largest synthetic-dollar protocol *is* this trade at scale, with better fee tiers and off-exchange settlement than any individual will get. Its supply peaked above **$14B with 27% yields**; twenty-four months later it sat at **$5.9B with 3.72%**. Its reserve fund is **1.18% of assets** against a strategy whose realised worst case was a 35% collateral depeg.
+
+That is the capacity and the risk budget of crypto carry, stated by the market itself. A marginal dollar earns the residual after that.
+
+## What it's actually worth
+
+At the patient rule's honest net of 2.7–5.4% on notional:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Capital</th><th>Patient rule, net</th><th>Insured savings account at ~3.5%</th></tr></thead>
+    <tbody>
+      <tr><td>$5,000</td><td>$135–270/yr</td><td>$175/yr, insured, zero work</td></tr>
+      <tr><td>$30,000</td><td>$810–1,620/yr</td><td>$1,050/yr, insured, zero work</td></tr>
+    </tbody>
+  </table>
+</div>
+
+The best-case version of the most-marketed arbitrage in crypto is roughly a savings account, plus unhedgeable forced-unwind risk, plus exchange insolvency risk, plus operating outside any regulatory perimeter with no recourse.
+
+## The sentence worth writing on the wall
+
+**A statistically real signal whose mean-reversion half-life is short relative to its cost-recovery time is not tradeable — and the more aggressively you trade it, the more money you lose, while generating the highest gross P&L of any rule you test.**
+
+That applies directly to intraday equity signals, which is where I actually work. Any short-horizon idea — a five-minute trigger off a daily screen, a mean-reversion entry, an intraday gap fade — should face that test before anything else gets built. Measure the half-life of the mispricing. Compute how long you need to hold it to cover a round trip. If the first number is smaller than the second, stop. There's no parameter that fixes it.
+
+Run the replication. Don't fund the trade.

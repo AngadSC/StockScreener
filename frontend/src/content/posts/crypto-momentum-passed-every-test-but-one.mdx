@@ -1,0 +1,98 @@
+---
+title: "My Crypto Momentum Backtest Passed Every Test But One"
+date: "2026-08-22"
+excerpt: "Net Sharpe 1.19. Beat Bitcoin on return and drawdown. Survived Bonferroni, Hansen SPA and a deflated Sharpe ratio. Then it landed at the 52.8th percentile of a portfolio that entered at random."
+tags: ["crypto", "backtesting", "momentum", "research"]
+---
+
+The academic case for crypto trend following is unusually good. The best-designed study I could find — December 2013 to August 2023, universe filtered to over $1M market cap and over $1M daily volume, stablecoins excluded, and critically **15 basis points per trade calibrated to real exchange fees and slippage** — reports a Sharpe of 1.51 for a 28-day lookback with a 5-day hold, against 0.85 for buy-and-hold.
+
+It also reports something more interesting, which is why I bothered testing it at all.
+
+## The asymmetry that made this worth a month
+
+In equities, cross-sectional momentum — rank the universe, buy the winners, sell the losers — is the robust, replicated one. Time-series momentum — buy anything whose own trailing return is positive — is the contested one.
+
+**In crypto that ranking inverts.** In the study, only 6 of 21 cross-sectional specifications beat buy-and-hold, and five portfolios were liquidated entirely. Time-series momentum was the strong version.
+
+The likely mechanism is clean and testable: crypto's cross-section is so dominated by Bitcoin beta that market-neutral ranking is mostly noise, while the aggregate market itself trends hard. That's a structural claim about a different asset class, and if it held it would be the most transferable thing in the whole file.
+
+So I built the thing.
+
+## What got built
+
+A full research engine, because I wanted the validation harness to be reusable regardless of how this particular strategy turned out:
+
+- a data layer with `universe_asof()` and a proven no-look-ahead property — the universe is unchanged when future rows are deleted *and* when future values are randomised, mutation-tested against a deliberately leaky version
+- signal functions for time-series and cross-sectional momentum, with a causality assertion
+- a cost ladder with slippage modelled against 20-day median volume
+- exact and fast backtest engines that always report gross and net side by side
+- a validation module: random-entry control, multiple-testing report, robustness sweeps, benchmark comparison
+- 108 passing tests, including a look-ahead detector proven to have teeth
+
+Run on a real 88-asset panel, 2017-01-01 to 2026-05-24, 15 bps per trade, stablecoins excluded.
+
+## The headline numbers looked good
+
+Best of 16 lookback/hold specifications: a 30-day lookback with a 7-day hold. **Net Sharpe 1.19. Net CAGR 66%. Max drawdown −77%. Turnover 6.9× a year.**
+
+And it cleared three gates that kill most crypto backtests:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Gate</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Multiple testing across 16 specifications</td><td>Survives. Bonferroni p = 0.002, Hansen SPA p = 0.009, deflated Sharpe 0.997</td></tr>
+      <tr><td>Benchmark vs buy-and-hold BTC</td><td>Beats it on both axes. 66% vs 59% CAGR, −77% vs −84% drawdown, beta 0.46, alpha 34%/yr</td></tr>
+      <tr><td>Look-ahead detection</td><td>Clean. One day of granted foresight lifts Sharpe above 4.0; the causal run stays below 1.0 on a random-walk panel</td></tr>
+    </tbody>
+  </table>
+</div>
+
+At this point I had a strategy that beat its benchmark on both return and risk, survived a multiple-testing correction, and demonstrably contained no look-ahead. In most write-ups you'll read, that's the end of the post.
+
+## And then the control failed
+
+I ran 1,000 matched random-entry portfolios. Identical average exposure (49.5%), identical position count (14.1), identical turnover, identical universe — **random entry timing**.
+
+Mean net Sharpe of the random portfolios: **1.215.** The strategy: **1.218.**
+
+The 52.8th percentile. The trend rule contributed essentially nothing over simply being about half-invested in that universe. Every impressive number above is explained by partial exposure to a high-return asset class, not by momentum timing.
+
+Walk-forward confirmed it independently: 2-year train / 1-year test over 8 folds gives an **out-of-sample net Sharpe of 0.59** against 1.19 in-sample. Half the edge disappears the moment the parameters have to be chosen in advance rather than in hindsight.
+
+**This is exactly why the control was written before the backtest.** The multiple-testing correction passed. The benchmark comparison passed. The look-ahead test passed. All three would have let this through. Only the turnover-matched random-entry null caught it — and I only ran it because the house rules said to, not because I suspected anything.
+
+If you take one thing from this post: a benchmark is not a control. Beating buy-and-hold tells you that you were partially exposed to something that went up. A control tells you whether your *decisions* did anything.
+
+## The costs would have killed it anyway
+
+Worth recording separately, because it's an arithmetic argument that doesn't depend on the signal at all.
+
+The academic study assumed 15 bps per trade. Canadian retail venues charge **0.43% to 0.75% per side** — three to five times that, and one major exchange raised its entry tier in July 2026 to 0.40% maker / 0.80% taker, which most reviews still misquote.
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Rebalance schedule</th><th>Notional traded/yr</th><th>Annual cost drag</th><th>Sharpe lost at 55% vol</th></tr></thead>
+    <tbody>
+      <tr><td>Daily, 15%/day</td><td>75.6×</td><td>32.5–49.1%</td><td>0.76</td></tr>
+      <tr><td>Weekly, 30% — what the study assumed</td><td>31.2×</td><td>13.4–20.3%</td><td>0.31</td></tr>
+      <tr><td>Monthly, 40%</td><td>9.6×</td><td>4.1–6.2%</td><td>0.08</td></tr>
+      <tr><td>Quarterly, 60%</td><td>4.8×</td><td>2.1–3.1%</td><td>0.04</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Weekly rebalancing at retail cost is as expensive as daily rebalancing at institutional cost. That single fact reorders the whole design space: at retail fees, the only variants worth testing are the low-turnover ones, and turnover has to be a **hard constraint inside the optimiser** — wider no-trade bands, longer formation windows, rank hysteresis — not a number you subtract at the end.
+
+And then there's the benchmark that ends the argument. A spot Bitcoin ETF on the TSX charges 0.35% a year, trades commission-free at some brokers, and is tax-sheltered inside a registered account. For the self-run strategy to *tie* it after tax at weekly rebalancing, gross returns have to hit 32.9% in a year when Bitcoin does +10%, and 47.3% when Bitcoin does +20%. Before you count the accountant, the tax software and 20–40 hours of reconciliation, which at a $10,000 account exceed the ETF's entire management fee.
+
+## What survived
+
+The asymmetry claim replicated, cleanly, across all 8 lookback/hold pairs tested. Time-series momentum ran about 50% exposure with −73% to −83% drawdowns. Cross-sectional momentum ran 100% exposure with **−96% to −98% drawdowns** and two to three times the turnover.
+
+Cross-sectional ranking in crypto really is dominated by Bitcoin beta to the point of uselessness, and the equity factor literature's ordering really does invert here. That result stands regardless of the strategy's fate — and it's a warning about porting factor intuitions across asset classes without retesting them.
+
+The engine survived too, which was the point of building it properly. The random-entry control, the multiple-testing report and the look-ahead detector are all asset-class agnostic. They're now the first thing any new idea in the queue goes through — including the equity ones.
+
+The strategy is closed unless two things turn out to be true: that the signal survives a liquidity-realistic universe of 15–20 tradeable names rather than 88, and that a monthly or quarterly variant clears the 95th percentile of its matched control, which the weekly version did not. I'd run the first one first. It's the cheapest possible kill.

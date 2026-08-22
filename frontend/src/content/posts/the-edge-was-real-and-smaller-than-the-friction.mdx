@@ -1,0 +1,77 @@
+---
+title: "Five Hypotheses, Five Rejections, One Law"
+date: "2026-08-22"
+excerpt: "I spent a month testing strategies outside equities — crypto momentum, funding carry, sports betting models. Almost everything got rejected, and every rejection failed the same way: the edge was real and smaller than the friction."
+tags: ["research", "backtesting", "market-efficiency"]
+---
+
+I keep a queue of strategy ideas. Every idea gets one page. It stays there until it's either backtested with a real number or rejected with the reason written down. A rejection is a result — it's just a result nobody publishes, which is exactly why the same bad ideas keep circulating.
+
+This summer I pointed that queue at markets outside equities. The premise was the one everybody has: equities are picked over by people with better data and faster machines, so surely sports betting and crypto — younger, retail-dominated, less institutional — are softer.
+
+The premise is half right. Here's what came back.
+
+## The house rules, because they're most of the story
+
+Four rules, and the first one did all the work:
+
+- **Every idea gets a null test before it gets a strategy.** Not a benchmark — a *matched control*. Same universe, same turnover, same exposure, same holding period, random entry timing. If your strategy can't beat the version of itself that trades at random, you don't have a signal.
+- **Every backtest reports net of costs.** Spread, commission, slippage. A gross return curve is not a result.
+- **Walk-forward and an out-of-sample holdout, always** — and record how many specifications you tried, so the multiple-testing correction is honest.
+- **End every session with an artifact**: a documented hypothesis, a backtest with a number, or a rejection with a reason.
+
+## The scorecard
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Hypothesis</th><th>Verdict</th><th>The number that decided it</th></tr></thead>
+    <tbody>
+      <tr><td>Crypto time-series momentum</td><td>Rejected</td><td>Failed its random-entry control at the 52.8th percentile</td></tr>
+      <tr><td>Cross-venue funding carry</td><td>Rejected before funding</td><td>1.5–3.5h mean-reversion half-life vs 100–135h cost recovery</td></tr>
+      <tr><td>Memecoin sentiment lottery</td><td>Rejected</td><td>Needs ~1-in-80 to hit 100x; reality is ~1-in-1,000</td></tr>
+      <tr><td>Middling key numbers</td><td>Downgraded — my error</td><td>ROI decayed from +3.2% to +0.8% across eras</td></tr>
+      <tr><td>1H/1Q derivative mispricing</td><td>Primary rejected, one survivor</td><td>Means stable; variance ratio 0.757 vs the assumed 0.707</td></tr>
+      <tr><td>De-vig estimator selection</td><td>Null not rejected</td><td>All four estimators calibrated; every slope CI contains 1.00</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Six tests. One clean negative result, one correction to my own earlier advice, three outright rejections, and one hypothesis that died but left a better finding behind it.
+
+## Every rejection failed the same way
+
+This is the part worth carrying into any market you trade.
+
+The crypto momentum strategy produced a net Sharpe of 1.19 and a 66% CAGR, beat buy-and-hold Bitcoin on both return and drawdown, and survived Bonferroni correction, a Hansen SPA test and a deflated Sharpe ratio. Then it landed at the **52.8th percentile** of its own random-entry control. The trend rule contributed essentially nothing over simply being about half-invested in a high-return asset class.
+
+The cross-venue funding spread is genuinely, measurably real — one venue type pays more than another in 65–72% of hours, worth 8.5–11.4% annualised, against a control pair centred on zero. But the *level* mean-reverts with a half-life of 1.5 to 3.5 hours, while one round trip costs 13 basis points and needs 100 to 135 hours of holding to repay itself. The rule that traded that signal aggressively earned the **highest gross income of anything tested** and finished at −9% to −15% annualised after costs.
+
+Key-number mispricing in football is real: one in four NFL games is decided by exactly 3 or 7 points, against about 10% under a smooth distribution. But the lumps are shrinking — seven-point finishes are down 20% since the early 2000s — and the strategy built on them decayed from +3.2% ROI to +0.8%. Still positive. Not positive enough to survive one bad fill.
+
+Same shape every time. **The effect was real. The cost of capturing it was larger.**
+
+## The law
+
+In any market with enough participants, edge gets competed down to just below the cost of capturing it. Not to zero — to *just below the toll*. That's the equilibrium, and it explains why so much visible, well-documented, statistically significant inefficiency is untradeable. It's visible *because* it's untradeable. If it were capturable at your cost structure, it would already be gone.
+
+Which reframes the search. The question isn't "where is there an inefficiency" — those are everywhere and mostly published. The question is "where is there an inefficiency **whose capture cost is lower for me than for whoever else would take it**."
+
+That's a much shorter list, and the answers are structural rather than clever:
+
+- **You're smaller than the people who'd otherwise compete.** The one strategy in the whole file that cleared its own costs did so because the trade was too small for anyone with a risk desk to bother with. That's a capacity niche, not an intelligence niche — and it doesn't scale, which is exactly why it's still there.
+- **You hold longer than they do.** The patient version of the funding trade — hold continuously, revisit once a month — nets +2.7% to +5.4%. The active version loses money on the same signal. Same edge, different cost structure.
+- **You pay less.** By far the largest single "edge" I found anywhere in this research required no model at all: in sports betting, the average participant now faces about 10% all-in hold because of product mix, while a straight bet costs 4.5%. That 5.6-point gap is bigger than any forecasting edge I could plausibly build.
+
+## What this changed about how I screen equities
+
+Three things came straight back into the equity work.
+
+**Turnover is a design constraint, not a post-hoc subtraction.** I used to backtest a signal and then subtract costs. Now the annual turnover × round-trip cost gets computed *before* any code gets written. If that number exceeds the backtested gross return, the idea is dead and no amount of parameter tuning revives it. A daily round trip at retail crypto fees costs 73% a year. That should have been the first calculation, not the last.
+
+**Half-life versus cost recovery is a test you can run on any signal.** How long does the mispricing persist, and how long do you need to hold it to pay for the trip? If the first number is smaller than the second, the signal is untradeable no matter how statistically clean it is. That test costs an afternoon and has killed more of my ideas than everything else combined.
+
+**A benchmark is not a control.** Beating buy-and-hold means very little. Beating a random-entry portfolio matched on turnover, exposure and universe means something. Almost every backtest I see published — mine included, until this year — compares against a benchmark and calls it validation.
+
+None of that is exotic. It's just the discipline of assuming your result is wrong until a control says otherwise. The screener I build is a filter for narrowing 8,000 tickers to 30 worth reading. The research process is the same shape: a filter for narrowing a hundred plausible ideas down to the one or two that survive contact with their own costs.
+
+Most of them don't. That's the finding.

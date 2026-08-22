@@ -1,0 +1,94 @@
+---
+title: "A Correction I Had to Publish: When the Sample Is an Era That Ended"
+date: "2026-08-22"
+excerpt: "I recommended a strategy on the strength of the literature. Then I split the data by era and found the effect had decayed by 75%. The literature wasn't wrong — it was describing a period that no longer exists."
+tags: ["research", "backtesting", "statistics"]
+---
+
+Earlier in this research file I listed a strategy as robustly positive expected value, on the strength of a well-replicated academic finding. Then I actually tested it on era-split data, and the strong version of that recommendation was wrong.
+
+I'm writing the correction up as its own post rather than editing the original quietly, because the *shape* of the mistake is more instructive than the specific strategy.
+
+## The effect is real and enormous
+
+American football scoring comes in threes and sevens, so final margins don't follow a smooth distribution. They pile up on specific numbers. Across 6,967 games, 1999–2025:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Final margin</th><th>Actual frequency</th><th>Smooth bell curve</th><th>Ratio</th></tr></thead>
+    <tbody>
+      <tr><td>3 points</td><td>15.0%</td><td>5.4%</td><td>2.8×</td></tr>
+      <tr><td>7 points</td><td>9.1%</td><td>4.9%</td><td>1.9×</td></tr>
+      <tr><td>14 points</td><td>4.8%</td><td>3.3%</td><td>1.5×</td></tr>
+      <tr><td>21 points</td><td>2.7%</td><td>1.7%</td><td>1.6×</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Roughly **one in four games is decided by exactly 3 or 7 points**, against about one in ten under a smooth model. Any pricing ladder generated from a continuous distribution is wrong in a predictable direction. That much is not in doubt, and it's the basis for a family of well-known strategies.
+
+## But the lumps are shrinking
+
+Split the same data by era:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Era</th><th>P(margin = 3)</th><th>P(margin = 7)</th><th>P(3 or 7)</th><th>Margin SD</th></tr></thead>
+    <tbody>
+      <tr><td>1999–2006</td><td>16.4%</td><td>9.6%</td><td>26.0%</td><td>14.40</td></tr>
+      <tr><td>2007–2013</td><td>14.6%</td><td>9.7%</td><td>24.2%</td><td>15.32</td></tr>
+      <tr><td>2014–2019</td><td>14.1%</td><td>9.3%</td><td>23.4%</td><td>14.45</td></tr>
+      <tr><td>2020–2025</td><td>14.6%</td><td>7.7%</td><td>22.3%</td><td>14.21</td></tr>
+    </tbody>
+  </table>
+</div>
+
+**Seven-point finishes are down 20% from the early era.** Two-point conversions and offensive inflation flattened the distribution. The mechanism is a rule change and a tactical response to it — a structural break in the data-generating process, not a random walk in the parameter.
+
+And that flips the direction of the trade. A pricing table fitted on old data now *overprices* those outcomes, which means the correct position is to sell them, not buy them. Priced at the 1999–2013 rate and settled at the current rate, "margin is exactly 7" returns **−20.2%**.
+
+The strategy I'd recommended decayed straight through:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Era</th><th>P(hit)</th><th>Breakeven</th><th>ROI</th></tr></thead>
+    <tbody>
+      <tr><td>2007–2013</td><td>10.7%</td><td>7.0%</td><td>+3.2%</td></tr>
+      <tr><td>2014–2019</td><td>10.4%</td><td>7.0%</td><td>+3.0%</td></tr>
+      <tr><td>2020–2025</td><td>7.8%</td><td>7.0%</td><td>+0.8%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Still positive. Not positive enough. At +0.8%, one bad settlement rule or a slightly worse fill erases the whole thing — and per the sample-size arithmetic, you'd need over 30,000 outcomes to distinguish +0.8% from zero, which is a career.
+
+## What I actually got wrong
+
+Not the literature. The papers were correct about the period they measured. What I got wrong was **pooling**.
+
+The published result was computed over a sample dominated by an era that no longer exists. Pooling 1999–2025 gives you a number that describes no year in particular — it's a weighted average across a regime change, and the weight sits on the regime that's gone.
+
+That's a specific, avoidable error, and it has a specific, cheap fix: **split by era before you trust a pooled estimate.** Not as a robustness check afterwards. First, as the primary analysis. If the effect is stable across sub-periods, pooling was legitimate and you've lost nothing. If it isn't, the pooled number was never the estimate you wanted.
+
+The tell you're at risk: the effect has a *mechanism* that could plausibly change. Here, the mechanism was scoring rules — and scoring rules changed. When the mechanism is institutional or regulatory rather than behavioural, assume it will change, and check.
+
+## The equity version
+
+This is factor decay, and it's the same error with a different label.
+
+The published anomaly literature is largely computed on pooled samples spanning decades. Value's long-run premium is a pooled number across periods where it worked spectacularly and periods where it didn't. Small-cap effects, calendar effects, most of the classic catalogue — same structure. And unlike a rule change in a sport, in markets there's an additional decay force: **publication itself.** An anomaly that gets documented gets traded, and the trading is what removes it.
+
+So the operating rule I've adopted, and I'd defend it generally:
+
+- **Split by era first**, before any pooled estimate gets believed.
+- **Weight recent data more heavily** when the mechanism is subject to structural change.
+- **Ask what would have to change for this to stop working**, and then check whether it already has.
+- **When an effect decays toward the cost of trading it, treat it as gone.** Not "marginal." Gone. A +0.8% edge against a 7% breakeven has no margin for the ordinary friction of actually doing it.
+
+## Why publish the correction
+
+Partly because a research file that only records successes isn't a research file. But mostly because the correction is more useful than the original claim was.
+
+The original claim was "this thing is mispriced," which is a fact about one market. The correction is "your pooled estimate is describing a regime that ended," which is a fact about how to read every empirical result you'll ever encounter — including the ones you generate yourself.
+
+I'd rather have the second one.

@@ -1,0 +1,75 @@
+---
+title: "A Market With a Known Birthday"
+date: "2026-08-22"
+excerpt: "Most questions about how quickly a market becomes efficient are unanswerable because you can't see the starting gun. Alberta's betting market opened on 13 July 2026. That's a natural experiment with a timestamp."
+tags: ["market-efficiency", "research", "statistics"]
+---
+
+Price efficiency is usually studied in markets that have always existed. You can measure how efficient something is *now*, and compare across venues, but the interesting question — how fast does a market converge, and what does the decay curve look like — needs a market whose birthday you know.
+
+Alberta's competitive online betting market opened on **13 July 2026**. Roughly a dozen operators went live simultaneously, in a jurisdiction with no prior competitive market, on a date published in advance.
+
+That's a clean natural experiment, and as far as I can find, nobody has published the measurement for anywhere.
+
+## The thesis
+
+A newly opened market should show **wider cross-venue price dispersion** than a mature one, for three mechanical reasons:
+
+1. Operators haven't converged on shared pricing feeds or calibrated local risk parameters.
+2. Risk desks haven't calibrated their limiting thresholds to local flow.
+3. Operators are buying market share, which shows up as thinner margins and richer promotions.
+
+All three decay on a timescale of months. If the thesis holds, it produces a **dated estimate of how long a new market stays soft** — which generalises to the next jurisdiction, and rhymes with a set of questions I care about much more: how quickly does a newly listed equity get efficiently priced, how long does a new venue take to converge, what does the half-life of a structural dislocation actually look like.
+
+## The null hypothesis, written before any data
+
+**H₀: the distribution of minimum cross-venue price sums in the new market is statistically indistinguishable from that of a mature market on matched events, and shows no time trend since launch.**
+
+The matched control is the important half — the same fixtures, the same market types, the same timestamps, priced across a mature jurisdiction's operator set. If the new market's distribution sits on top of the mature one's and is flat in time, the thesis is dead and there's nothing here.
+
+The secondary null: whether the achievable price sum ever gets below a threshold that matters economically. That's the number that decides whether the whole exercise is worth doing at all.
+
+And the rejection criteria, also written before running:
+
+- **Reject** if the two distributions aren't distinguishable at matched timestamps.
+- **Reject the decay claim** if the days-since-launch coefficient is insignificant or the half-life confidence interval includes infinity — **even if the level difference is real.** A persistent level difference is a different, and frankly better, finding. Record it as such rather than letting it rescue the original claim.
+
+That last point is the one I'd emphasise to anyone designing a study. The failure mode isn't finding nothing. It's finding *something else* and retroactively deciding that's what you were testing.
+
+## The confound that would ruin it
+
+Launch fell in mid-July, which is deep in one sport's offseason and the middle of another's. The football season starts in September. Any naive time trend in price dispersion will be dominated by **sport mix**, not by market maturation — different sports carry structurally different margins, so the composition change alone would manufacture a decay curve that has nothing to do with the hypothesis.
+
+Fixture-level fixed effects are mandatory, and I'd rather state that up front than discover it in the residuals. There's also a scheduled regulatory change partway through the sample window that alters which operators are present — a structural break to timestamp and handle explicitly, not smooth over.
+
+This is the unglamorous part of research design and it's where most of the value is. The measurement is easy. Knowing which of the things moving in your data are the thing you're measuring is the whole job.
+
+## The finding that came out before the data did
+
+While specifying this, I ended up somewhere more interesting than the hypothesis itself.
+
+The premise behind the entire research programme was that these markets are soft because the participants are unsophisticated. That premise does not survive contact with the evidence. Calibration slopes on liquid short-dated markets regress on realised outcomes at approximately **1.00** across 87,960 observations. Across **353 million trades on 429,000 binary contracts**, calibration sits between 0.90 and 1.10 inside a 48-hour horizon. These markets are as well-calibrated as listed equities.
+
+And the quantitative firms are already there — multiple well-known trading firms have run dedicated desks since 2023, with staff counts in the dozens and explicit recruiting for cross-platform work. On the betting side, one syndicate runs 200+ analysts and coders, with alleged annual turnover in the billions, acting when market prices diverge from their model by 1 to 2%.
+
+Meanwhile, the operators identify and limit winning accounts within roughly 20 bets, using closing line value as the detection feature. A market that ejects informed flow that fast is not a market where informed flow is absent.
+
+**But here's the part of the original instinct that survives.** The professionals are absent from *small* tickets. A syndicate cannot deploy meaningful size into a regional player-prop market. A trading firm cannot harvest a CAD $250 sign-up offer. The residual inefficiency is real, and it lives specifically where the trade is **too small for anyone with a risk desk to bother with**.
+
+That's a capacity niche, not an intelligence niche. It's genuine — and it does not scale, which is precisely why it's still there.
+
+## Why that reframing matters
+
+It changes what you search for. "Where is there a mispricing" is the wrong question, because mispricings are everywhere and mostly documented. The right question is "where is there a mispricing whose capture cost is lower for me than for whoever else would take it."
+
+The answers are structural, not clever:
+
+- **You're too small to be worth competing with.** The only strategy in this entire research file that cleared its own costs did so on this basis alone.
+- **You can hold longer than they can.** Patient capital captures signals that active capital destroys through its own transaction costs.
+- **You pay a different toll.** Sometimes the entire edge is a tax wrapper or a fee tier.
+
+None of those require you to be smarter than the market. They require you to be *differently constrained* than the market — which is a far more reliable thing to be.
+
+The equity analogue is the whole small-cap and micro-cap literature: the inefficiency is well documented, and it persists because the capacity is too small for the funds that would otherwise arbitrage it away. That's not a secret. It's an equilibrium, and being small is the one structural advantage an individual actually has.
+
+Which is roughly the design principle behind a screener. You're not trying to out-compute anyone. You're trying to look carefully at the part of the market nobody with a billion dollars can afford to look at.

@@ -989,6 +989,60 @@
     font-style: italic;
     padding-left: 1rem;
   }
+
+  .blog-prose h4 {
+    color: var(--ink);
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .blog-prose hr {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+    border: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  /* Research posts carry a lot of tabular data; keep wide tables scrollable
+     inside their own container so the page body never scrolls sideways. */
+  .blog-prose .table-scroll {
+    margin-top: 1.5rem;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+  }
+
+  .blog-prose table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .blog-prose thead {
+    background: var(--surface-2);
+  }
+
+  .blog-prose th {
+    color: var(--ink);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    padding: 0.625rem 0.875rem;
+  }
+
+  .blog-prose td {
+    border-top: 1px solid var(--line);
+    padding: 0.625rem 0.875rem;
+    vertical-align: top;
+  }
+
+  .blog-prose td:not(:first-child),
+  .blog-prose th:not(:first-child) {
+    white-space: nowrap;
+  }
 }
 
 @layer utilities {

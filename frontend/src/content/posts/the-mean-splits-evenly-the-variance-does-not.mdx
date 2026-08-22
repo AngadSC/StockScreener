@@ -1,0 +1,84 @@
+---
+title: "The Mean Splits Evenly. The Variance Does Not."
+date: "2026-08-22"
+excerpt: "I went looking for a stale pricing formula and found the means were right. The variance was the thing that was wrong — and it was wrong in opposite directions for two quantities derived from the same assumption."
+tags: ["statistics", "research", "market-efficiency"]
+---
+
+The hypothesis was straightforward. Books don't price a first-half line independently; they derive it from the full-game number with a fixed multiplier — roughly 52% of the total, roughly 55% of the spread. A static multiplier has to be wrong somewhere, and nobody bets these markets hard enough to correct it.
+
+Three ways it could be wrong. I tested all three on 2,639 games, 2016–2025, reconstructed from public play-by-play data.
+
+All three came back negative. And then the fourth thing — the one I only looked at because the first three failed — turned out to be the finding.
+
+## Rejected: the share doesn't drift
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Measure</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>First-half share of all scoring, 2016–2025</td><td>0.5042</td></tr>
+      <tr><td>First-quarter share</td><td>0.1951</td></tr>
+      <tr><td>Season-to-season standard deviation of the 1H share</td><td>0.0071</td></tr>
+      <tr><td>Full ten-season range</td><td>0.4919 – 0.5144</td></tr>
+    </tbody>
+  </table>
+</div>
+
+Ten seasons, and the share never moves more than about a point off 50%. Compare that to the *margin* distribution over the same period, which drifted materially — seven-point finishes fell 20%. Scoring splits between halves are one of the most stable quantities in the sport. A fixed multiplier is the right model. No staleness edge.
+
+## Rejected: the share doesn't depend on the total
+
+This was the main mechanism. If high-scoring games split differently from low-scoring ones, a constant multiplier is systematically wrong at both ends of the board.
+
+Regression of the first-half share on the posted total: slope **+0.00065 per point, p = 0.325.** No relationship. The bucket-to-bucket wobble isn't even monotonic — it's noise.
+
+## Rejected: the spread multiplier is basically right
+
+Empirical fit: first-half margin = **0.559 × full-game spread + 0.47**, against a rule of thumb of 0.55. Essentially correct.
+
+The residuals aren't perfectly flat — big favourites over-perform the linear rule in one bucket and under-perform it in the next — but that's non-monotonic across buckets holding 119 and 252 games, with standard errors around ±1 point. Suggestive, not actionable. Underpowered, and I'd rather say so than build on it.
+
+## The thing that survived
+
+If two halves were independent with equal variance, the first-half standard deviation would be √0.5 = **0.7071** of the full game's. That's the assumption inside any formula-derived price.
+
+It isn't right. And it misses in *opposite directions* for two different quantities:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>Quantity</th><th>Full-game SD</th><th>First-half SD</th><th>Observed ratio</th><th>Naive √0.5</th><th>Share of variance in 1H</th></tr></thead>
+    <tbody>
+      <tr><td>Margin</td><td>14.21</td><td>10.76</td><td>0.7572</td><td>0.7071</td><td>57.3%</td></tr>
+      <tr><td>Total</td><td>13.88</td><td>9.04</td><td>0.6518</td><td>0.7071</td><td>42.5%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+**The first half carries 50.4% of the scoring, but 57.3% of the margin variance and only 42.5% of the total variance.** The mean splits evenly. The variance doesn't — and it splits the wrong way twice.
+
+## The mechanism is clean
+
+Second-half play is partly a *response* to the first half. A trailing team throws more and stops the clock; a leading team runs it and bleeds time.
+
+That's a mean-reverting force on the **margin** — which is why there's less margin variance in the second half, and why the first-half-to-second-half margin correlation is **−0.027**, slightly negative rather than zero. The same behaviour does the opposite to **points**: comeback attempts and garbage time make second-half scoring *more* volatile, not less.
+
+One behaviour, two quantities, opposite signs. Which is exactly the signature you'd expect from a single wrong assumption applied to two different things — and it's why the errors are diagnostic rather than random.
+
+The pricing implication: the odds attached to a derived line depend on the *variance*, not the mean. A model that scales variance by √0.5 **understates** first-half margin dispersion by about 7% and **overstates** first-half total dispersion by about 8%. Tails away from the number get priced too cheap in one market and too rich in the other.
+
+## Why I'm not trading it
+
+Because establishing what the true distribution *is* does not establish that anyone is pricing it wrong. Those are two different claims, and I've only tested the first.
+
+Settling the second needs a historical archive of posted derived lines, which is the one thing no cheap data source carries. Without it, I have a well-measured property of the world and no evidence about anyone's model. Those get written down differently.
+
+## What generalises
+
+**Square-root-of-time scaling is an assumption, not an identity.** It follows from independent, identically distributed increments. Wherever the increments *respond* to the accumulated path — and in markets they very often do — it breaks, and the direction of the break depends on whether the feedback is stabilising or destabilising.
+
+Volatility that mean-reverts within the period scales *slower* than √t. Trending or momentum-driven volatility scales *faster*. Intraday volatility patterns are the obvious equity case: a U-shaped intraday profile means the volatility of a partial session is not √(fraction) of the full session's, and any option or risk calculation that assumes otherwise is wrong in a knowable direction.
+
+**And the meta-lesson, which is the one I'll actually remember:** I went in expecting the means to be wrong and they were right. The variance was the thing worth measuring, and I would not have looked at it if the first three tests had come back positive.
+
+Rejected hypotheses aren't wasted work. They're what makes you look somewhere you'd otherwise have walked past.

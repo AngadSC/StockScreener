@@ -1,0 +1,65 @@
+---
+title: "Your Backtest Universe Is Lying to You"
+date: "2026-08-22"
+excerpt: "Of the two million tokens launched in 2024, the ones with an average lifespan of six days don't show up in your data. A universe built from what's listed today measures the returns of the things that didn't die."
+tags: ["backtesting", "crypto", "screening", "research"]
+---
+
+Every backtest has a universe. Almost nobody builds it correctly, and the failure mode is the same in crypto as it is in equities: you pull the list of what exists *now*, walk it backwards through history, and quietly measure the returns of the survivors.
+
+I hit this while testing a crypto momentum strategy, where the bias is at its most extreme. But the mechanism is identical for a stock screener, and the fix is the same.
+
+## The size of the problem in crypto
+
+Of **2,063,519 tokens launched in 2024**, 3.59% showed pump-and-dump patterns with an **average lifespan of 6.23 days**.
+
+Think about what a current-listings universe does to that. Every one of those tokens had a period of spectacular positive returns followed by a terminal collapse. If your universe is built from what's tradeable today, none of them are in it — but any name that ran up and *survived* is. You're not sampling the asset class. You're sampling the winners of a lottery, and then measuring how well momentum picked winners.
+
+I built a synthetic panel where the deaths were real crashes, ran the same strategy on the survivorship-filtered version, and measured **+24.15% a year of phantom return**. That's not a rounding error. That's most of the alpha in a typical crypto backtest.
+
+## The measurement that surprised me
+
+Here's the part I didn't expect. On my *real* panel — 88 assets from a commercial reference-rate provider, 2017 to 2026 — measured survivorship bias came out at **−4.06% a year. Negative.**
+
+The reason is that the "deaths" in that dataset aren't rugs. They're ticker migrations and renames. An asset exits the panel at $1.00 or $1,600, not at zero. The dataset's sampling frame never contained the 2024 pump-and-dump cohort at all — those tokens never met the listing criteria to enter it in the first place.
+
+So the panel is **survivorship-aware, not survivorship-free**, and the difference matters enormously. A dataset that can't see the deaths will report *no* survivorship bias, which is not the same as *having* none. The +24.15% from the synthetic panel is the honest estimate of the magnitude this data cannot measure.
+
+If you take one methodological point from this: when you measure a bias and get roughly zero, ask whether your instrument is capable of detecting it before you conclude it isn't there.
+
+## The one API call that decides it
+
+This is the practical bit, and it's smaller than you'd think.
+
+Most exchanges expose two things: a **current instruments endpoint** that returns what's tradeable right now, and an **append-only historical archive** that retains delisted pairs. Every tutorial, every quickstart, every "here's how to pull crypto data" post uses the first one, because it's the documented way to enumerate symbols.
+
+That single choice is how survivorship bias gets baked into most crypto research. Not through carelessness in the strategy — through the enumeration step, three lines into the data layer, before anyone is thinking about validity.
+
+For equities the equivalent is pulling today's index constituents and backtesting them through history. Same bug, older asset class, better-documented consequences.
+
+## Point-in-time universes, concretely
+
+The rule is that universe membership at time *t* must be computable from information available at time *t*, and nothing else. Which means:
+
+- **Rebuild membership month by month from historical snapshots**, with liquidity filters applied *as of that month* — not filters applied once to the full history.
+- **Include names that died**, with their terminal returns. A delisting at −100% is data.
+- **Apply the filters to the past, not the present.** "Over $1M daily volume" has to mean over $1M *then*.
+
+And then test that you got it right, because it's easy to believe you did and be wrong. Two properties are worth asserting directly in code:
+
+1. **Deleting future rows must not change the universe.** If `universe_asof(t)` returns something different when you truncate the panel after *t*, you have a leak.
+2. **Randomising future values must not change it either.** This catches the subtler case where you're not reading future rows directly but something downstream of them — a rolling statistic with a centred window, a forward-filled column, a normalisation computed over the whole sample.
+
+I mutation-tested both assertions against a deliberately leaky version of the loader to confirm the tests actually fail when they should. A test that has never failed is not evidence of anything.
+
+## Why this matters for a stock screener
+
+A screener is a universe constructor. Every filter you apply is a membership rule, and the exact same failure mode is available.
+
+The obvious version: backtesting a screen on today's listed universe, which silently excludes every company that was acquired, delisted, or went to zero. Small-cap and momentum screens are hit hardest, because the names that fail those screens' way *out* of the universe are precisely the ones that failed.
+
+The less obvious version, and the one I see more often: a filter whose threshold is computed over the full sample. "Volume above the median" is a look-ahead if the median is the median of the whole history. So is a sector-relative rank, a z-score, or a percentile filter, unless the reference distribution is trailing-only.
+
+The fix is unglamorous. Snapshot your universe on a schedule, store it, and build your history forward rather than reconstructing it backwards. In eighteen months, your own archive is worth more than any model you'd have built with the time — and it's the only version of the data that is honest by construction.
+
+That's the actual lesson from a month of crypto work: the survivorship problem isn't a crypto problem. Crypto just makes it loud enough to hear.

@@ -1,0 +1,72 @@
+---
+title: "Proving You Have an Edge Takes Longer Than Having One"
+date: "2026-08-22"
+excerpt: "At a realistic 2% edge you need about 6,000 settled outcomes to distinguish it from zero. At 100 a week that's over a year. The fix isn't more patience — it's measuring something with less variance."
+tags: ["statistics", "backtesting", "research"]
+---
+
+Here is the most important table I found this summer, and it has nothing to do with any particular strategy. Flat stakes on an even-money proposition, how many outcomes you need to distinguish a true edge from zero:
+
+<div className="table-scroll">
+  <table>
+    <thead><tr><th>True ROI</th><th>n (95%, one-sided)</th><th>n (99%, two-sided)</th></tr></thead>
+    <tbody>
+      <tr><td>1%</td><td>24,573</td><td>60,259</td></tr>
+      <tr><td>2%</td><td>6,135</td><td>15,045</td></tr>
+      <tr><td>3%</td><td>2,722</td><td>6,676</td></tr>
+      <tr><td>5%</td><td>976</td><td>2,394</td></tr>
+    </tbody>
+  </table>
+</div>
+
+A realistic solo edge is 2%. So you need six to nine thousand settled outcomes before you can honestly say the edge exists. At 100 a week that's more than a year — and if you're operating anywhere with capacity constraints, you'll be shut off long before the sample matures.
+
+Sit with the implication. **You will run out of runway before you run out of statistical uncertainty.** For most of the strategies people run, the edge is fundamentally unverifiable within the strategy's own lifespan.
+
+That's not a betting fact. It's a variance fact, and it applies to every discretionary trader who has ever said "my system works, I've got two hundred trades."
+
+## The base rate that should scare you
+
+A study of 14 seasons across 5 leagues found that **in a perfectly efficient market, there is a 77.6% chance of finding at least one statistically significant single-season "bias."**
+
+Read that again. In a market with *no* exploitable structure, if you go looking across a plausible set of segments and seasons, you'll find a significant result three times out of four. Not because you cheated — because that's what happens when you test many hypotheses against noisy data.
+
+The same study found that strategies built on those biases returned −6.2%, which is approximately the transaction cost. The "signal" was the toll, discovered and then paid.
+
+There's a documented individual case that makes it concrete: a strategy at **+5.77% over 2,375 outcomes** that went to **−0.63% over 17,717**. The first sample wasn't fraudulent or mismeasured. It was 2,375 observations of a 0% edge, which is exactly what the table above says 2,375 observations look like.
+
+## The escape: measure something with less variance
+
+You don't fix this with patience. You fix it by measuring a different quantity.
+
+In betting, that quantity is **closing line value** — whether the price you got was better than the price the market settled at. It's observable at the moment you act, and it carries none of the outcome noise. The standard deviation of closing line value is around 0.10; the standard deviation of realised profit and loss is around 1.0. That's a variance reduction of 45× to 400×, and it turns "thousands of outcomes" into **65 outcomes** to reject randomness.
+
+The general principle: **when the outcome is noisy but the decision quality is observable, measure the decision, not the outcome.**
+
+Every domain has a version of this:
+
+- A screener's job is to surface candidates worth reading. The noisy metric is the forward return of the names it surfaced. The low-variance metric is whether those names differ measurably from a matched random draw from the same universe on the characteristic you were selecting for.
+- An execution algorithm's outcome is P&L. Its decision quality is slippage against arrival price — same trade, vastly less noise.
+- A backtest's outcome is a Sharpe ratio. Its decision quality is whether it beats a turnover-matched, exposure-matched random-entry control. I ran exactly that on a crypto momentum strategy that beat its benchmark on every axis, and it landed at the 52.8th percentile of random.
+
+## Two conditions the proxy has to meet
+
+Substituting a lower-variance proxy for the real outcome is only valid under conditions people skip.
+
+**The proxy has to be unbiased where you use it.** Closing line value is a valid attribution metric only where the closing price is itself unbiased. In deep, liquid, heavily traded markets, it is. In thin ones — obscure props, alternate lines, minor leagues — the close carries the *very bias you're trying to exploit*. Positive closing line value there measures your agreement with a biased benchmark, not your skill. Same statistic, opposite meaning, depending on where you compute it.
+
+The equity analogue is measuring your fills against a VWAP you're a material fraction of, or measuring your model against a consensus your model is downstream of.
+
+**And the reference price has to be constructed correctly.** Compare against the margin-stripped close, never the raw one — the raw-close error is around 4.5 percentage points, which is larger than the entire edge you're looking for. Your measurement instrument has to be more precise than the thing you're measuring. Obvious when stated; routinely violated in practice.
+
+## What I do with this now
+
+Three practical rules, all of which came out of this research and all of which I now apply to equity work.
+
+**Never report a P&L-based return on a sample the table above says is too small.** If 200 trades can't distinguish your edge from zero, then reporting the return of 200 trades isn't a weak result — it's not a result.
+
+**Log every flagged opportunity with a timestamp, and settle it against a reference price, before any money moves.** A few hundred logged opportunities showing a beat-rate materially above chance is a far stronger basis for shipping something than a year of live P&L, and it arrives sooner.
+
+**Treat a single-season backtest on a small sample as false until it survives forward on live prices.** The 77.6% false-positive rate is a base rate, not a warning. Assume you're in it.
+
+There's a version of this that sounds defeatist — you can never prove anything, so why bother. That's not the conclusion. The conclusion is that **the metric you validate on is a design decision, and it's a more consequential one than the strategy itself.** Pick a noisy metric and you'll spend years failing to learn anything. Pick a low-variance proxy that's unbiased in your regime, and you'll know within a month.

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Lock, Search, Sparkles } from 'lucide-react';
+import { LoaderCircle, Lock, Search, Sparkles } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
 import AIUsageMeter from '@/components/ai/AIUsageMeter';
@@ -253,7 +253,7 @@ function AiAnalyzerPageContent() {
           <section className="deco-panel p-6 md:p-7">
             <div className="flex gap-4">
               <div className="icon-tile h-10 w-10">
-                <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.6} />
+                <LoaderCircle className="h-5 w-5 animate-spin" strokeWidth={1.6} />
               </div>
               <div>
                 <div className="eyebrow">Payment received</div>

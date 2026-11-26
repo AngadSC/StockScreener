@@ -356,7 +356,7 @@ export default function ComparisonTable({
       </div>
 
       <div className="border-t border-[var(--border-subtle)] px-5 py-3 text-[11px] text-[var(--text-tertiary)]">
-        A tinted cell marks the strongest value in a row where a clear "better" direction exists.
+        A tinted cell marks the strongest value in a row where a clear &ldquo;better&rdquo; direction exists.
       </div>
     </div>
   );

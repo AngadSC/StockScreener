@@ -1,12 +1,13 @@
 import BacktesterWorkspace from '@/components/backtester/BacktesterWorkspace';
 
 interface BacktesterPageProps {
-  searchParams?: {
+  searchParams?: Promise<{
     tickers?: string;
-  };
+  }>;
 }
 
-export default function BacktesterPage({ searchParams }: BacktesterPageProps) {
+export default async function BacktesterPage(props: BacktesterPageProps) {
+  const searchParams = await props.searchParams;
   const tickers =
     searchParams?.tickers
       ?.split(',')

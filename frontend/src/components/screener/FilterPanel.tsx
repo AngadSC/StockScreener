@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, Loader2, Search } from 'lucide-react';
+import { ChevronDown, LoaderCircle, Search } from 'lucide-react';
 
 import HelpPopover from '@/components/ui/help-popover';
 import { Input } from '@/components/ui/input';
@@ -457,7 +457,7 @@ export default function FilterPanel({ filters, isFetching, onChange, onReset }: 
           <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
             {isFetching ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
                 Updating results
               </>
             ) : (

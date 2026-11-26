@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { HelpCircle, X } from 'lucide-react';
+import { CircleQuestionMark, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -104,7 +104,7 @@ export default function HelpPopover({
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <HelpCircle className="h-3.5 w-3.5" />
+        <CircleQuestionMark className="h-3.5 w-3.5" />
       </button>
       {open && typeof document !== 'undefined'
         ? createPortal(

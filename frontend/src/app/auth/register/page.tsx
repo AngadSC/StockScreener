@@ -2,11 +2,12 @@ import Link from 'next/link';
 import RegisterForm from '@/components/auth/RegisterForm';
 import { sanitizeRedirectPath } from '@/lib/utils';
 
-export default function RegisterPage({
-  searchParams,
-}: {
-  searchParams?: { redirect?: string | string[] };
-}) {
+export default async function RegisterPage(
+  props: {
+    searchParams?: Promise<{ redirect?: string | string[] }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const redirectTo = sanitizeRedirectPath(searchParams?.redirect);
   const loginHref =
     redirectTo === '/screener'

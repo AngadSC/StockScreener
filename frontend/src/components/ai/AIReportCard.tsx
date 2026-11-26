@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ChevronDown, RotateCcw } from 'lucide-react';
+import { CircleExclamationPoint, ChevronDown, RotateCcw } from 'lucide-react';
 
 import AIReportButton from '@/components/ai/AIReportButton';
 import { AI_USAGE_QUERY_KEY } from '@/components/ai/AIUsageMeter';
@@ -183,7 +183,7 @@ export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
           <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
             <div className="flex gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--negative)]/25 bg-[var(--negative-bg)]">
-                <AlertCircle className="h-5 w-5 text-[var(--negative)]" />
+                <CircleExclamationPoint className="h-5 w-5 text-[var(--negative)]" />
               </div>
               <div>
                 <h3 className="heading-sm text-[var(--text-primary)]">Report unavailable</h3>

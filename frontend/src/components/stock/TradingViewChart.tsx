@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 
 interface TradingViewChartProps {
   ticker: string;
@@ -88,7 +88,7 @@ function TradingViewChart({ ticker, height = 500 }: TradingViewChartProps) {
             style={{ height: `${height}px` }}
           >
             <div className="text-center">
-              <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+              <LoaderCircle className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
               <p className="text-xs text-muted-foreground">Initializing chart...</p>
             </div>
           </div>

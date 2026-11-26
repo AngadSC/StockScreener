@@ -1,10 +1,10 @@
 import {
   Activity,
-  BarChart3,
+  ChartColumn,
   BookOpen,
   CalendarDays,
   GitCompareArrows,
-  Home,
+  House,
   Landmark,
   Mail,
   Search,
@@ -68,7 +68,7 @@ export const navGroups: NavGroup[] = [
       {
         href: '/',
         label: 'Home',
-        icon: Home,
+        icon: House,
         commandLabel: 'Market Overview',
         description: 'Return to the main dashboard',
         keywords: ['home', 'dashboard', 'market', 'overview', 'movers'],
@@ -134,7 +134,7 @@ export const navGroups: NavGroup[] = [
       {
         href: '/backtester',
         label: 'Backtester',
-        icon: BarChart3,
+        icon: ChartColumn,
         commandLabel: 'Open Backtester',
         description: 'Run a portfolio study',
         keywords: ['backtester', 'backtest', 'portfolio', 'strategy', 'simulate', 'indicator'],

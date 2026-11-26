@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, ChevronRight, Loader2, RefreshCw, Star, Sunrise, Sunset } from 'lucide-react';
+import { CalendarDays, ChevronRight, LoaderCircle, RefreshCw, Star, Sunrise, Sunset } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -156,7 +156,7 @@ export default function EarningsPage() {
 
       {isLoading ? (
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[var(--accent)]" />
+          <LoaderCircle className="mx-auto mb-4 h-8 w-8 animate-spin text-[var(--accent)]" />
           <p className="text-sm text-[var(--text-secondary)]">Loading earnings calendar...</p>
         </div>
       ) : null}

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import List, Optional
 from app.models.stock import StockDetail
@@ -12,8 +12,7 @@ class WatchlistItemResponse(BaseModel):
     added_at: datetime
     stock: Optional[StockDetail] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class WatchlistResponse(BaseModel):
     items: List[WatchlistItemResponse]

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Lock, Loader2, Sparkles } from 'lucide-react';
+import { Lock, LoaderCircle, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -52,7 +52,7 @@ export default function AIReportButton({
     <Button disabled={isGenerating} onClick={handleClick}>
       {isGenerating ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <LoaderCircle className="h-4 w-4 animate-spin" />
           Generating
         </>
       ) : (

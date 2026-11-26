@@ -6,7 +6,7 @@ import { useQueries, useQuery } from '@tanstack/react-query';
 import {
   Activity,
   ArrowRight,
-  BarChart3,
+  ChartColumn,
   CalendarDays,
   ChevronRight,
   GitCompareArrows,
@@ -197,7 +197,7 @@ const FREE_TOOLS: Tool[] = [
   { href: '/insiders', icon: Users, name: 'Insiders', descriptor: 'Form 4 buys and sells from SEC filings' },
   { href: '/macro', icon: Landmark, name: 'Macro', descriptor: 'Rates, inflation, jobs, and volatility (FRED)' },
   { href: '/compare', icon: GitCompareArrows, name: 'Compare', descriptor: 'Line up to four tickers side by side' },
-  { href: '/backtester', icon: BarChart3, name: 'Backtester', descriptor: 'Test a strategy against price history' },
+  { href: '/backtester', icon: ChartColumn, name: 'Backtester', descriptor: 'Test a strategy against price history' },
   { href: '/watchlist', icon: Star, name: 'Watchlist', descriptor: 'Track the names you revisit most' },
 ];
 

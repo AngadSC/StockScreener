@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, Loader2 } from 'lucide-react';
+import { Clock, LoaderCircle } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -96,7 +96,7 @@ export default function EmailPreferenceRow({
           Saved
         </span>
         {pending ? (
-          <Loader2
+          <LoaderCircle
             className="h-3.5 w-3.5 animate-spin text-[var(--text-tertiary)]"
             aria-hidden="true"
           />

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Landmark, Loader2, Minus, TrendingUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Landmark, LoaderCircle, Minus, TrendingUp } from 'lucide-react';
 
 import MacroSparkline from '@/components/macro/MacroSparkline';
 import { marketAPI } from '@/lib/api';
@@ -208,7 +208,7 @@ export default function MacroPage() {
 
       {isLoading ? (
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[var(--accent)]" />
+          <LoaderCircle className="mx-auto mb-4 h-8 w-8 animate-spin text-[var(--accent)]" />
           <p className="text-sm text-[var(--text-secondary)]">Loading macro data...</p>
         </div>
       ) : null}

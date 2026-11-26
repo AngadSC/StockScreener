@@ -44,7 +44,7 @@ def screen_stocks_endpoint(
     
     # Sorting
     sort_by: str = Query("market_cap", description="Field to sort by"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$", description="Sort order"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$", description="Sort order"),
     
     db: Session = Depends(get_db)
 ):

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, StarOff } from 'lucide-react';
+import { LoaderCircle, StarOff } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { watchlistAPI } from '@/lib/api';
@@ -37,7 +37,7 @@ export default function WatchlistPage() {
 
       {isLoading ? (
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground" />
+          <LoaderCircle className="mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground" />
           <p className="text-sm text-muted-foreground">Loading watchlist...</p>
         </div>
       ) : null}

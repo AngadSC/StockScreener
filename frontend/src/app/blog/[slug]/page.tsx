@@ -5,14 +5,15 @@ import { MDXRemote } from 'next-mdx-remote/rsc';
 import { getAllPosts, getPostBySlug, formatPostDate } from '@/lib/blog';
 
 type Props = {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 };
 
 export async function generateStaticParams() {
   return getAllPosts().map((post) => ({ slug: post.slug }));
 }
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata(props: Props): Promise<Metadata> {
+  const params = await props.params;
   try {
     const post = getPostBySlug(params.slug);
     return {
@@ -31,7 +32,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 }
 
-export default function BlogPostPage({ params }: Props) {
+export default async function BlogPostPage(props: Props) {
+  const params = await props.params;
   let post;
   try {
     post = getPostBySlug(params.slug);

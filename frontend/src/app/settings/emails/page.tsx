@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Mail } from 'lucide-react';
+import { LoaderCircle, Mail } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import EmailPreferenceRow, {
@@ -141,7 +141,7 @@ export default function EmailPreferencesPage() {
 
         {showLoadingState ? (
           <Card className="p-8 text-center">
-            <Loader2
+            <LoaderCircle
               className="mx-auto mb-3 h-6 w-6 animate-spin text-[var(--text-tertiary)]"
               aria-hidden="true"
             />

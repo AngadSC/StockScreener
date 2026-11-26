@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { Loader2 } from 'lucide-react';
+import { LoaderCircle } from 'lucide-react';
 
 import { stocksAPI } from '@/lib/api';
 import { cn, parseLocalDate } from '@/lib/utils';
@@ -221,7 +221,7 @@ export default function PerformanceChart({ tickers, colorMap }: PerformanceChart
 
       {isLoading ? (
         <div className="flex h-[340px] items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[var(--accent)]" />
+          <LoaderCircle className="h-6 w-6 animate-spin text-[var(--accent)]" />
         </div>
       ) : !hasAnyData ? (
         <div className="flex h-[340px] items-center justify-center text-sm text-[var(--text-secondary)]">

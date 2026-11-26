@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { HelpCircle, Search, TrendingUp, type LucideIcon } from 'lucide-react';
+import { CircleQuestionMark, Search, TrendingUp, type LucideIcon } from 'lucide-react';
 
 import { screenerAPI } from '@/lib/api';
 import { navItems } from '@/lib/nav';
@@ -144,7 +144,7 @@ export default function CommandPalette() {
         id: 'action:shortcuts',
         label: 'Keyboard Guide',
         description: 'Open the shortcut sheet',
-        icon: HelpCircle,
+        icon: CircleQuestionMark,
         keywords: ['help', 'shortcuts', 'keyboard', 'keys', 'guide'],
         run: () => {
           closePalette();

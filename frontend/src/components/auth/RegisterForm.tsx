@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, UserPlus } from 'lucide-react';
+import { LoaderCircle, UserPlus } from 'lucide-react';
 
 import { authAPI } from '@/lib/api';
 import { sanitizeRedirectPath } from '@/lib/utils';
@@ -117,7 +117,7 @@ export default function RegisterForm({ redirectTo = '/screener' }: { redirectTo?
           <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <LoaderCircle className="mr-2 h-4 w-4 animate-spin" />
                 Creating Account
               </>
             ) : (

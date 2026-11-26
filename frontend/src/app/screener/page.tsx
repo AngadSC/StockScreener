@@ -2,7 +2,7 @@
 
 import { Suspense, useDeferredValue, useEffect, useState } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { BarChart3, RefreshCw } from 'lucide-react';
+import { ChartColumn, RefreshCw } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
 import FilterPanel from '@/components/screener/FilterPanel';
@@ -104,7 +104,7 @@ function ScreenerPageContent() {
 
           <div className="flex min-w-[240px] items-center gap-4 rounded-[var(--radius-lg)] border border-[var(--line-2)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow-1)]">
             <div className="icon-tile h-11 w-11">
-              <BarChart3 className="h-5 w-5" strokeWidth={1.6} />
+              <ChartColumn className="h-5 w-5" strokeWidth={1.6} />
             </div>
             <div>
               <div className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-tertiary)]">
@@ -159,7 +159,7 @@ function ScreenerPageContent() {
             <>
               <div className="mb-3 flex justify-end">
                 <button type="button" className="btn btn-quiet btn-sm inline-flex items-center">
-                  <BarChart3 className="h-4 w-4" />
+                  <ChartColumn className="h-4 w-4" />
                   Columns
                 </button>
               </div>

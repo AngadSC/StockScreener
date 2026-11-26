@@ -331,7 +331,7 @@ def get_stock_detail(ticker: str, db: Session = Depends(get_db)):
 @router.get("/{ticker}/prices")
 def get_stock_prices(
     ticker: str,
-    period: str = Query("1y", regex="^(1mo|3mo|6mo|1y)$", description="Time period"),
+    period: str = Query("1y", pattern="^(1mo|3mo|6mo|1y)$", description="Time period"),
     db: Session = Depends(get_db),
 ):
     """Get historical price data for a stock."""
@@ -376,8 +376,8 @@ def get_stock_prices(
 @router.post("/{ticker}/backtest-data", response_model=BacktestDataResponse)
 def get_backtest_data(
     ticker: str,
-    start_date: str = Query(..., description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
-    end_date: str = Query(..., description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     include_indicators: bool = Query(True, description="Include technical indicators"),
     db: Session = Depends(get_db),
 ):
@@ -510,8 +510,8 @@ def run_global_indicator_backtest(
 @router.post("/{ticker}/ml-features")
 def get_ml_features(
     ticker: str,
-    start_date: str = Query(..., description="Start date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
-    end_date: str = Query(..., description="End date (YYYY-MM-DD)", regex=r"^\d{4}-\d{2}-\d{2}$"),
+    start_date: str = Query(..., description="Start date (YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    end_date: str = Query(..., description="End date (YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     db: Session = Depends(get_db),
 ):
     """
@@ -617,7 +617,7 @@ def get_ml_features(
 @router.get("/{ticker}/intraday")
 def get_intraday_data(
     ticker: str,
-    interval: str = Query("5m", regex="^(1m|5m|15m|30m|60m)$", description="Time interval"),
+    interval: str = Query("5m", pattern="^(1m|5m|15m|30m|60m)$", description="Time interval"),
     days: int = Query(5, ge=1, le=30, description="Number of days (max 30)"),
     db: Session = Depends(get_db),
 ):

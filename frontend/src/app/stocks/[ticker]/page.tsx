@@ -1,9 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useMemo, use } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, LoaderCircle } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
 import StockMetrics from '@/components/stock/StockMetrics';
@@ -22,7 +22,7 @@ import {
 import type { Stock, StockPrice } from '@/types/stock';
 
 interface PageProps {
-  params: { ticker: string };
+  params: Promise<{ ticker: string }>;
 }
 
 function getCompanyName(stock: Stock): string {
@@ -192,7 +192,8 @@ function Sparkline({
   );
 }
 
-export default function StockDetailPage({ params }: PageProps) {
+export default function StockDetailPage(props: PageProps) {
+  const params = use(props.params);
   const ticker = params.ticker.toUpperCase();
   const { userTier } = useAuth();
 
@@ -239,7 +240,7 @@ export default function StockDetailPage({ params }: PageProps) {
     return (
       <div className="container-custom py-8">
         <div className="deco-panel p-12 text-center">
-          <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
+          <LoaderCircle className="mx-auto mb-4 h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Loading stock profile...</p>
         </div>
       </div>

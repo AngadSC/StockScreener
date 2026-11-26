@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import AliasChoices, Field, field_validator
 from typing import List, Union
 from pathlib import Path 
@@ -208,8 +208,9 @@ class Settings(BaseSettings):
             parsed = [str(email).strip().lower() for email in v if str(email).strip()]
         return list(dict.fromkeys(parsed))
     
-    class Config:
-        env_file = Path(__file__).parent.parent / ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parent.parent / ".env",
+        case_sensitive=True,
+    )
 
 settings = Settings()

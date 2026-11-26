@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { ArrowLeft, ChevronDown, Loader2 } from 'lucide-react';
+import { ArrowLeft, ChevronDown, LoaderCircle } from 'lucide-react';
 
 import { EquityCurveChart, type EquityPoint } from '@/components/backtester/BacktesterChart';
 import {
@@ -446,7 +446,7 @@ export default function BacktesterWorkspace({
               <div className="flex-1 overflow-y-auto px-5 py-5">{mode === 'indicator' ? indicatorPanel : automatedStepBody}<div className="border-t border-[var(--border-subtle)] pt-4"><button type="button" onClick={resetDefaults} className="text-sm text-[var(--text-tertiary)] underline-offset-4 transition-colors hover:text-[var(--text-primary)] hover:underline">Reset to defaults</button></div></div>
               <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-base)] px-5 py-5">
                 {!canRun ? <div className="mb-3 text-sm text-[var(--text-tertiary)]">{dateRangeInvalid ? 'Fix the date range before running.' : mode === 'indicator' ? 'Enter a ticker to run the indicator backtest.' : request.universe === 'custom' ? 'Add at least one ticker to run a custom basket.' : 'Complete the required inputs to run the backtest.'}</div> : null}
-                <Button type="submit" className="w-full" disabled={!canRun || activePending}>{activePending ? <><Loader2 className="h-4 w-4 animate-spin" />Running...</> : 'Run Backtest'}</Button>
+                <Button type="submit" className="w-full" disabled={!canRun || activePending}>{activePending ? <><LoaderCircle className="h-4 w-4 animate-spin" />Running...</> : 'Run Backtest'}</Button>
               </div>
             </div>
           </aside>
@@ -462,7 +462,7 @@ export default function BacktesterWorkspace({
                 <div className="rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--bg-surface-1)] p-5 shadow-[var(--shadow-sm)]">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div><div style={headingMdStyle}>Equity Curve</div><p className="mt-1 text-sm text-[var(--text-secondary)]">{formatDate(activeResult.start_date)} to {formatDate(activeResult.end_date)} {'\u00B7'} {activeResult.timeframe}</p></div>
-                    <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">{activePending ? <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]"><Loader2 className="h-4 w-4 animate-spin" />Running new backtest</span> : null}<span>{activeResult.source}{activeResult.cached ? ' / cached' : ''}</span></div>
+                    <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">{activePending ? <span className="inline-flex items-center gap-2 text-[var(--text-secondary)]"><LoaderCircle className="h-4 w-4 animate-spin" />Running new backtest</span> : null}<span>{activeResult.source}{activeResult.cached ? ' / cached' : ''}</span></div>
                   </div>
                   <div className="mt-5"><EquityCurveChart key={runVersion} points={equityData} showBenchmark={mode === 'automated' && Boolean(automatedResult?.buy_and_hold) && request.include_buy_and_hold} runVersion={runVersion} /></div>
                 </div>

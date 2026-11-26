@@ -1,9 +1,10 @@
 import { redirect } from 'next/navigation';
 
 interface PageProps {
-  params: { ticker: string };
+  params: Promise<{ ticker: string }>;
 }
 
-export default function StockBacktestRedirectPage({ params }: PageProps) {
+export default async function StockBacktestRedirectPage(props: PageProps) {
+  const params = await props.params;
   redirect(`/backtester?tickers=${encodeURIComponent(params.ticker.toUpperCase())}`);
 }

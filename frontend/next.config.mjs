@@ -2,10 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   
-  images: {
-    domains: ['logo.clearbit.com', 'assets.coingecko.com'],
-  },
-
   async headers() {
     const csp = [
       "default-src 'self'",

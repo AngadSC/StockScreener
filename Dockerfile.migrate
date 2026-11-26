@@ -34,13 +34,13 @@ WORKDIR /app
 # a schema migration touches, turning a seconds-long job into a multi-minute
 # build. The import check further down is what keeps this list honest.
 RUN pip install --no-cache-dir \
-        alembic==1.14.0 \
-        sqlalchemy==2.0.36 \
-        psycopg2-binary==2.9.11 \
-        "psycopg[binary]==3.3.2" \
-        pydantic==2.10.3 \
-        pydantic-settings==2.6.1 \
-        python-dotenv==1.0.1
+        alembic==1.20.1 \
+        sqlalchemy==2.0.58 \
+        psycopg2-binary==2.9.13 \
+        "psycopg[binary]==3.3.9" \
+        pydantic==2.14.4 \
+        pydantic-settings==2.16.3 \
+        python-dotenv==1.2.4
 
 # Copy paths explicitly. There is no .dockerignore in this repo, so a blanket
 # `COPY backend/ .` would drag in backend/.env (real credentials) and

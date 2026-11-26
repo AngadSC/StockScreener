@@ -185,9 +185,12 @@ class YFinanceProvider(StockDataProvider):
                 print(f"   This could mean: stocks are delisted, date range is invalid, or Yahoo API issues")
                 return None
             
-            # Handle single ticker vs multiple tickers
-            if len(tickers) == 1:
-                # Single ticker - simple format
+            # yfinance returns (Price, Ticker) MultiIndex columns even for ONE ticker
+            # (multi_level_index=True default), so branch on the frame shape, not
+            # len(tickers) -- the old check sent single-ticker batches down the
+            # flat path, which raised KeyError and returned None.
+            if not isinstance(data.columns, pd.MultiIndex):
+                # Flat columns - single ticker
                 ticker = tickers[0]
                 df = data[['Open', 'High', 'Low', 'Close', 'Volume']].copy()
                 df['ticker'] = ticker

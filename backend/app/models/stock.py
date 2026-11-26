@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime, date
 
@@ -57,8 +57,7 @@ class StockDetail(StockBase):
     # Metadata
     last_updated: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StockFilter(BaseModel):
     # Valuation filters
@@ -105,8 +104,7 @@ class StockPriceHistory(BaseModel):
     close: float
     volume: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StockWithPrices(StockDetail):
     prices: List[StockPriceHistory] = []

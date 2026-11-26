@@ -76,7 +76,7 @@ def sync_earnings_events(manual_trigger: bool = False) -> None:
                         earnings_date=parsed["earnings_date"],
                         time_hint=parsed["time_hint"],
                         eps_estimate=parsed["eps_estimate"],
-                        fetched_at=datetime.utcnow(),
+                        fetched_at=datetime.now(timezone.utc).replace(tzinfo=None),
                     )
                     stmt = stmt.on_conflict_do_update(
                         index_elements=["ticker_id", "earnings_date"],

@@ -12,7 +12,7 @@ from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Request
-from jose import JWTError, jwt
+import jwt
 from sqlalchemy.orm import Session, joinedload
 
 from app.config import settings
@@ -58,7 +58,7 @@ def get_optional_current_user(request: Request, db: Session = Depends(get_db)) -
         email = payload.get("sub")
         if not email:
             return None
-    except JWTError:
+    except jwt.InvalidTokenError:
         return None
 
     return db.query(User).filter(User.email == email).first()

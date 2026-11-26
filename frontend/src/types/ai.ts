@@ -213,3 +213,14 @@ export type AIReportErrorResponse =
 export type AIReportResponse = AIReportSuccessResponse | AIReportErrorResponse;
 
 export type AIReportState = 'idle' | 'loading' | 'loaded' | 'error' | 'locked';
+
+/** A user's standing against their monthly AI report allowance. */
+export interface AIUsageSummary {
+  tier: string;
+  limit: number;
+  used: number;
+  remaining: number;
+  has_access: boolean;
+  period_start: string;
+  resets_at: string;
+}

@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircle, ChevronDown, RotateCcw } from 'lucide-react';
 
 import AIReportButton from '@/components/ai/AIReportButton';
+import { AI_USAGE_QUERY_KEY } from '@/components/ai/AIUsageMeter';
 import AIReportNewsSection from '@/components/ai/AIReportNewsSection';
 import AIReportSummaryCard from '@/components/ai/AIReportSummaryCard';
 import AIReportThesisSection from '@/components/ai/AIReportThesisSection';
@@ -81,6 +83,7 @@ export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
   );
   const [report, setReport] = useState<AIReportOutput | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const normalizedTicker = ticker.trim().toUpperCase();
   const locked = !isProTier(userTier) || state === 'locked';
 
@@ -108,6 +111,12 @@ export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
       if (isSuccessResponse(response)) {
         setReport(response.report);
         setState('loaded');
+        // A cached report costs nothing, so only a fresh generation moves the
+        // counter. Refetch rather than decrement locally: the server is the
+        // only thing that knows what was actually recorded.
+        if (!response.cached) {
+          void queryClient.invalidateQueries({ queryKey: AI_USAGE_QUERY_KEY });
+        }
         return;
       }
 
@@ -115,6 +124,11 @@ export default function AIReportCard({ ticker, userTier }: AIReportCardProps) {
         setState('locked');
       } else {
         setState('error');
+        // A 429 means the allowance ran out mid-session; pull the real numbers
+        // so the meter shows zero left instead of a stale count.
+        if (response.error === 'limit_exceeded') {
+          void queryClient.invalidateQueries({ queryKey: AI_USAGE_QUERY_KEY });
+        }
       }
       setErrorMessage(response.message);
     } catch {

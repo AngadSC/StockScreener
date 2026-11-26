@@ -407,3 +407,17 @@ class AIReportResponse(BaseModel):
     @classmethod
     def normalize_ticker(cls, value: str) -> str:
         return value.strip().upper()
+
+
+class AIUsageSummary(BaseModel):
+    """A user's standing against their monthly AI report allowance."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tier: str = Field(..., min_length=1, max_length=20)
+    limit: int = Field(..., ge=0)
+    used: int = Field(..., ge=0)
+    remaining: int = Field(..., ge=0)
+    has_access: bool
+    period_start: datetime
+    resets_at: datetime

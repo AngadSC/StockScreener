@@ -13,7 +13,7 @@ import type {
 } from '@/types/stock';
 import type { AuthResponse, LoginCredentials, RegisterData, User } from '@/types/user';
 import type { WatchlistResponse } from '@/types/watchlist';
-import type { AIReportResponse, AIReportSuccessResponse } from '@/types/ai';
+import type { AIReportResponse, AIReportSuccessResponse, AIUsageSummary } from '@/types/ai';
 import type { EmailPreferences, EmailPreferencesUpdate } from '@/types/email';
 import type { MarketScansResponse, MarketSectorsResponse } from '@/types/market';
 import type {
@@ -379,6 +379,16 @@ export const watchlistAPI = {
 // ====================================
 // AI REPORTS API
 // ====================================
+
+/**
+ * The caller's monthly report allowance and how much of it is spent.
+ * Throws on failure (including 401) so callers can distinguish "signed out"
+ * from "zero remaining" — a meter must never render 0 left on a network error.
+ */
+export const getAIUsage = async (): Promise<AIUsageSummary> => {
+  const response = await api.get<AIUsageSummary>(`${getApiOrigin()}/api/ai-reports/usage`);
+  return response.data;
+};
 
 export const generateAIReport = async (ticker: string): Promise<AIReportResponse> => {
   try {

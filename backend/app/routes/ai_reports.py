@@ -10,8 +10,8 @@ from sqlalchemy.orm import Session
 from app.ai.llm_client import generate_single_stock_report
 from app.ai.payload_builder import build_ai_payload, summarize_ai_payload_for_logs
 from app.ai.report_cache import get_fresh_report, save_report
-from app.ai.schemas import AIReportOutput, AIReportResponse
-from app.ai.usage_limits import check_usage_limit, record_usage_event
+from app.ai.schemas import AIReportOutput, AIReportResponse, AIUsageSummary
+from app.ai.usage_limits import check_usage_limit, get_usage_summary, record_usage_event
 from app.config import settings
 from app.database.connection import get_db
 from app.database.models import AIStockReport, User
@@ -139,6 +139,20 @@ def _pop_usage_metadata(ai_response: dict[str, Any]) -> dict[str, int | str]:
         "tokens_input": int(usage.get("tokens_input") or 0),
         "tokens_output": int(usage.get("tokens_output") or 0),
     }
+
+
+@router.get("/usage", response_model=AIUsageSummary)
+def read_ai_usage(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> AIUsageSummary:
+    """Report the caller's monthly AI report usage, allowance and reset date.
+
+    Cheap enough to poll after every generation: one indexed COUNT. Cached
+    reports are deliberately absent from the count — they cost nothing and the
+    generation path only records an event when a fresh report is produced.
+    """
+    return AIUsageSummary(**get_usage_summary(str(current_user.id), db))
 
 
 @router.post("/{ticker}", response_model=AIReportResponse)

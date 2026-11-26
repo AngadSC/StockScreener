@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Lock, Search, Sparkles } from 'lucide-react';
 
 import AIReportCard from '@/components/ai/AIReportCard';
+import AIUsageMeter from '@/components/ai/AIUsageMeter';
 import { ManageSubscriptionButton } from '@/components/billing/ManageSubscriptionButton';
 import { Button } from '@/components/ui/button';
 import { screenerAPI } from '@/lib/api';
@@ -152,7 +153,10 @@ function AiAnalyzerPageContent() {
               structure.
             </p>
           </div>
-          <ManageSubscriptionButton userTier={userTier} />
+          <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:min-w-[19rem] md:items-end">
+            <ManageSubscriptionButton userTier={userTier} />
+            {canAnalyze ? <AIUsageMeter userTier={userTier} className="w-full" /> : null}
+          </div>
         </section>
 
         <section className="glass hud hud-blue p-5 md:p-6">

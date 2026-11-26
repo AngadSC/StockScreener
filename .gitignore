@@ -21,3 +21,7 @@ build/
 # Next.js generated
 next-env.d.ts
 *.tsbuildinfo
+
+# pytest
+.pytest_cache/
+backend/pytest-cache-files-*/
